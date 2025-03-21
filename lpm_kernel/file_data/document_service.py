@@ -164,6 +164,19 @@ class DocumentService:
         except Exception as e:
             logger.error(f"Error updating document analyze status: {str(e)}")
 
+    def check_all_documents_embeding_status(self) -> bool:
+        """
+        Check if there are any documents that need embedding
+        Returns:
+            bool: True if there are documents that need embedding, False otherwise
+        """
+        try:
+            unembedding_docs = self._repository.find_unembedding()
+            return len(unembedding_docs) > 0
+        except Exception as e:
+            logger.error(f"Error checking documents embedding status: {str(e)}", exc_info=True)
+            raise
+
     def analyze_all_documents(self) -> List[DocumentDTO]:
         """
         analyze all unanalyzed documents

@@ -91,6 +91,15 @@ class DocumentRepository(BaseRepository[Document]):
             logger.error(f"Error updating chunk embedding status: {str(e)}")
             raise
 
+    def find_unembedding(self) -> List[DocumentDTO]:
+        """search unembedding documents according to embedding_status"""
+        with self._db.session() as session:
+            query = select(self.model).where(
+                self.model.embedding_status.in_([ProcessStatus.INITIALIZED, ProcessStatus.FAILED])
+            )
+            result = session.execute(query)
+            return [Document.to_dto(doc) for doc in result.scalars().all()]
+
     def update_embedding_status(self, document_id: int, status: ProcessStatus) -> None:
         """update doc embedding"""
         try:
