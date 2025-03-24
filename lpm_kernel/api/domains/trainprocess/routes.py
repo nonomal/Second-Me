@@ -8,6 +8,7 @@ from flask import Blueprint, jsonify, Response, request
 from lpm_kernel.file_data.trainprocess_service import TrainProcessService
 from .progress import Status
 from ...common.responses import APIResponse
+from threading import Thread
 
 trainprocess_bp = Blueprint("trainprocess", __name__, url_prefix="/api/trainprocess")
 
@@ -95,9 +96,10 @@ def start_process():
             progress_callback=progress_callback,
             model_name=model_name
         )
-
-        # start training process in a new thread
-        from threading import Thread
+        if not train_service.check_training_condition():
+            # Reset progress
+            clear_specific_logs()
+            train_service.set_retrian_progress()
 
         thread = Thread(target=train_service.start_process)
         thread.daemon = True
@@ -293,29 +295,11 @@ def retrain():
             return jsonify(APIResponse.error(message="missing necessary parameter: model_name", code=400))
         
         # Create training service instance
-        train_service = TrainProcessService(model_name=model_name)
-        
-        # Reset progress
-        train_service.progress.reset_progress()
-        
-        # Reinitialize progress object
-        progress = train_service.progress.progress
-        
-        # Mark downloading_the_base_model stage as completed
-        for step_name in progress.stages["downloading_the_base_model"].steps:
-            progress.update_progress("downloading_the_base_model", step_name, Status.COMPLETED)
-        
-        # Save progress
-        train_service.progress._save_progress()
-        
-        # Create new service instance, pass in progress callback and model name
         train_service = TrainProcessService(
             progress_callback=progress_callback,
             model_name=model_name
         )
-        
-        # start training process in a new thread
-        from threading import Thread
+        train_service.set_retrian_progress()
 
         thread = Thread(target=train_service.start_process)
         thread.daemon = True

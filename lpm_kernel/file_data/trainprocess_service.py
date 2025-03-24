@@ -1198,6 +1198,20 @@ class TrainProcessService:
             self.progress.mark_step_failed(step)
             return False
 
+    def set_retrian_progress(self):
+        """Save current progress
+        
+        This method saves the current progress to the progress file and triggers the progress callback if available.
+        """
+        try:
+            self.progress.reset_progress()
+            for step_name in self.progress.progress.stages["downloading_the_base_model"].steps:
+                self.progress.progress.update_progress("downloading_the_base_model", step_name, Status.COMPLETED)
+            self.progress._save_progress()
+            self.logger.info("Progress saved successfully")
+        except Exception as e:
+            self.logger.error(f"Failed to save progress: {str(e)}")
+    
     def stop_process(self):
         """Stop training process
         
