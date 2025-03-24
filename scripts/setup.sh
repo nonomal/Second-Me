@@ -307,6 +307,13 @@ install_conda() {
 activate_python_env() {
     log_section "PYTHON ENVIRONMENT ACTIVATION"
     
+    # If custom conda mode is enabled, skip to dependency installation
+    if is_custom_conda_mode; then
+        log_info "Using custom conda environment"
+        goto_dependency_installation
+        return $?
+    fi
+    
     # 1. Check conda installation
     log_step "Checking conda installation"
     if ! try_source_conda_sh_all; then
@@ -321,13 +328,13 @@ activate_python_env() {
         return 1
     fi
     
-    # 3. Activate environment
+    # 3. Create or update environment
     log_step "Activating conda environment: $env_name"
     
     if conda env list | grep -q "^${env_name} "; then
-        log_info "Environment exists, updating dependencies..."
+        log_info "Environment exists, updating..."
         if ! conda env update -f environment.yml -n "$env_name"; then
-            log_error "Failed to update conda environment"
+            log_error "Failed to update conda environment $env_name"
             return 1
         fi
     else
@@ -338,10 +345,7 @@ activate_python_env() {
         fi
     fi
     
-    
-    log_info "Found conda.sh at: $conda_sh_path"
-    
-    # attempt to activate conda environment using conda activate command
+    # attempt to activate conda environment
     log_info "Attempting to activate conda environment: $env_name"
     if ! conda activate "$env_name" 2>/dev/null; then
         log_info "conda activate failed, trying alternative method..."
@@ -353,8 +357,13 @@ activate_python_env() {
     fi
     
     log_success "Successfully activated conda environment: $env_name"
-    
-    # 4. Install Python packages using Poetry
+    goto_dependency_installation
+    return $?
+}
+
+# Helper function to install dependencies
+goto_dependency_installation() {
+    # Install Python packages using Poetry
     log_step "Installing Python packages using Poetry"
     
     # Check if pyproject.toml exists
@@ -394,7 +403,7 @@ activate_python_env() {
     GRAPHRAG_VERSION=$(pip show graphrag 2>/dev/null | grep "Version:" | cut -d " " -f2)
     GRAPHRAG_TARGET="1.2.1.dev27"
     GRAPHRAG_LOCAL_PATH="dependencies/graphrag-${GRAPHRAG_TARGET}.tar.gz"
-    
+
     if [ "$GRAPHRAG_VERSION" != "$GRAPHRAG_TARGET" ]; then
         log_info "Installing correct version of graphrag..."
         if [ -f "$GRAPHRAG_LOCAL_PATH" ]; then
@@ -412,7 +421,7 @@ activate_python_env() {
     else
         log_success "Graphrag version is correct, skipping installation"
     fi
-    
+
     log_success "Python environment setup completed"
     return 0
 }
@@ -775,6 +784,16 @@ check_potential_conflicts() {
     if ! check_system_requirements; then
         log_error "System requirements check failed"
         exit 1
+    fi
+    
+    # Check custom conda configuration if enabled
+    if is_custom_conda_mode; then
+        log_info "Custom conda mode is enabled, verifying environment..."
+        if ! verify_conda_env; then
+            log_error "Custom conda environment verification failed"
+            exit 1
+        fi
+        log_success "Custom conda environment verification passed"
     fi
     
     # Configuration files check

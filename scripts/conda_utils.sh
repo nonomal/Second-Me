@@ -221,6 +221,42 @@ try_source_conda_sh_all() {
     return 1
 }
 
+# Check if custom conda mode is enabled
+is_custom_conda_mode() {
+    if [ -f ".env" ]; then
+        local custom_mode=$(grep '^CUSTOM_CONDA_MODE=' .env | cut -d '=' -f2)
+        if [ "$custom_mode" = "true" ]; then
+            log_warning "Custom conda mode is enabled"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+# Verify if current conda environment matches the required one
+verify_conda_env() {
+    if [ -f ".env" ]; then
+        local env_name=$(grep '^CONDA_DEFAULT_ENV=' .env | cut -d '=' -f2)
+        if [ -n "$env_name" ]; then
+            log_info "Verifying conda environment..."
+            
+            # Verify current environment exists in system
+            local current_env=$(conda info --envs 2>/dev/null | grep '*' | awk '{print $1}')
+            if [ "$current_env" != "$env_name" ]; then
+                log_warning "Please activate the specified conda environment: conda activate $env_name"
+                log_info "Current environment: $current_env"
+                return 1
+            fi
+            
+            log_success "Conda environment verified: $env_name"
+            return 0
+        fi
+    fi
+    
+    log_error "CONDA_DEFAULT_ENV not set in .env file"
+    return 1
+}
+
 # Initialize conda environment
 initialize_conda() {
     log_info "Initializing conda environment..."

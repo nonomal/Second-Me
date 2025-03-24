@@ -91,10 +91,17 @@ check_frontend_ready() {
 check_setup_complete() {
     log_info "Checking if setup is complete..."
     
-    # Check if conda environment exists
-    if ! conda env list | grep -q "${CONDA_DEFAULT_ENV:-second-me}"; then
-        log_error "Conda environment '${CONDA_DEFAULT_ENV:-second-me}' not found. Please run 'make setup' first."
-        return 1
+    # Check conda environment
+    if is_custom_conda_mode; then
+        log_info "Custom conda mode enabled, verifying environment..."
+        if ! verify_conda_env; then
+            return 1
+        fi
+    else
+        if ! conda env list | grep -q "${CONDA_DEFAULT_ENV:-second-me}"; then
+            log_error "Conda environment '${CONDA_DEFAULT_ENV:-second-me}' not found. Please run 'make setup' first."
+            return 1
+        fi
     fi
     
     # Check if frontend dependencies are installed
@@ -158,46 +165,58 @@ start_services() {
     fi
     log_success "All ports are available"
     
-    # Initialize conda environment
-    log_info "Initializing conda environment..."
-    local conda_cmd
-    if ! conda_cmd=$(try_source_conda_sh_all); then
-        log_error "Failed to initialize conda environment"
-        return 1
-    fi
-    
-    # get conda.sh path
-    local conda_sh_path
-    if [[ -n "$conda_cmd" ]]; then
-        local conda_root="$(dirname "$(dirname "$conda_cmd")")"
-        if ! find_and_source_conda_sh "$conda_root" conda_sh_path; then
-            log_error "Could not find conda.sh activation script"
+    # Initialize conda environment if not using custom configuration
+    if ! is_custom_conda_mode; then
+        log_info "Initializing conda environment..."
+        local conda_cmd
+        if ! conda_cmd=$(try_source_conda_sh_all); then
+            log_error "Failed to initialize conda environment"
             return 1
         fi
+        
+        # get conda.sh path
+        local conda_sh_path
+        if [[ -n "$conda_cmd" ]]; then
+            local conda_root="$(dirname "$(dirname "$conda_cmd")")"
+            if ! find_and_source_conda_sh "$conda_root" conda_sh_path; then
+                log_error "Could not find conda.sh activation script"
+                return 1
+            fi
+        else
+            log_error "conda command not found"
+            return 1
+        fi
+        log_info "Found conda.sh at: $conda_sh_path"
+        log_success "Conda initialized successfully: $conda_cmd"
     else
-        log_error "conda command not found"
-        return 1
+        log_info "Using custom conda environment, skipping conda initialization"
+        conda_sh_path="" # Set empty value since it won't be used
     fi
-    log_info "Found conda.sh at: $conda_sh_path"
-    
-    log_success "Conda initialized successfully: $conda_cmd"
     
     # Create logs directory if it doesn't exist
     mkdir -p logs
     mkdir -p run
     
     # Start backend service
-    log_info "Starting backend service with conda environment: ${CONDA_DEFAULT_ENV}"
+    log_info "Starting backend service..."
     
-    # Ensure conda is properly initialized in the subshell
-    nohup bash -c "source ${conda_sh_path} && conda activate ${CONDA_DEFAULT_ENV} && exec ./scripts/start_local.sh" > logs/start.log 2>&1 &
+    # Check if using custom conda mode
+    if is_custom_conda_mode; then
+        log_info "Using custom conda environment, skipping conda activation"
+        nohup zsh -c ./scripts/start_local.sh > logs/start.log 2>&1 &
+    else
+        log_info "Using conda environment: ${CONDA_DEFAULT_ENV}"
+        # Ensure conda is properly initialized in the subshell
+        nohup zsh -c "source ${conda_sh_path} && conda activate ${CONDA_DEFAULT_ENV} && exec ./scripts/start_local.sh" > logs/start.log 2>&1 &
+    fi
+    
     echo $! > run/.backend.pid
     log_info "Backend service started in background with PID: $(cat run/.backend.pid)"
     
     # Wait for backend to be healthy
     log_info "Waiting for backend service to be ready..."
     if ! check_backend_health 300; then
-        log_error "Backend service failed to start within 30 seconds"
+        log_error "Backend service failed to start within 300 seconds"
         return 1
     fi
     log_success "Backend service is ready"
@@ -232,7 +251,7 @@ start_services() {
         # Wait for frontend to be ready
         log_info "Waiting for frontend service to be ready..."
         if ! check_frontend_ready 300; then
-            log_error "Frontend service failed to start within 30 seconds"
+            log_error "Frontend service failed to start within 300 seconds"
             cd ..
             return 1
         fi
