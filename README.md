@@ -62,11 +62,13 @@ Star and join us, and you will receive all release notifications from GitHub wit
 
 ## Quick Start
 
-### Prerequisites
+### Installation and Setup
+
+#### Prerequisites
 - macOS operating system
-- Git installed
-- Homebrew (recommended for system dependencies)
-- Xcode Command Line Tools (for using make commands)
+- Python 3.8 or higher
+- Node.js 16 or higher (for frontend)
+- Xcode Command Line Tools
 
 #### Installing Xcode Command Line Tools
 If you haven't installed Xcode Command Line Tools yet, you can install them by running:
@@ -79,8 +81,6 @@ After installation, you may need to accept the license agreement:
 sudo xcodebuild -license accept
 ```
 
-### Installation and Setup
-
 1. Clone the repository
 ```bash
 git clone git@github.com:Mindverse/Second-Me.git
@@ -89,58 +89,78 @@ cd Second-Me
 
 2. Set up the environment
 
-Using make (requires Xcode Command Line Tools):
-```bash
-make setup
-```
+#### Option A: For users with existing conda environment
+If you already have conda installed:
 
-Alternatively, you can use the setup script directly:
-```bash
-./scripts/setup.sh
-```
+1. Create a new environment from our environment file:
+   ```bash
+   conda env create -f environment.yml   # This will create an environment named 'second-me'
+   conda activate second-me
+   ```
+
+2. Set the custom conda mode in `.env`:
+    ```bash
+    CUSTOM_CONDA_MODE=true
+    ```
+
+3. Run setup:
+    ```bash
+    make setup
+    ```
+
+#### Option B: For new users
+If you're new or want a fresh environment:
+    ```bash
+    make setup
+    ```
 
 This command will automatically:
-- Install all required system dependencies
-- Set up Python environment
+- Install all required system dependencies (including conda if not present)
+- Create a new Python environment named 'second-me'
 - Build llama.cpp
 - Set up frontend environment
 
 3. Start the service
-
-Using make:
 ```bash
 make start
-```
-
-Alternatively, use the script directly:
-```bash
-./scripts/start.sh
 ```
 
 4. Access the service
 Open your browser and visit `http://localhost:3000`
 
-5. For help and more commands
-
-Using make:
+5. View help and more commands
 ```bash
 make help
 ```
+
+### Important Notes
+1. Ensure you have sufficient disk space (at least 10GB recommended)
+2. If using an existing conda environment, ensure there are no conflicting package versions
+3. First startup may take a few minutes to download and install dependencies
+4. Some commands may require sudo privileges
+
+### Troubleshooting
+If you encounter issues, check:
+1. Python and Node.js versions meet requirements
+2. You're in the correct conda environment
+3. All dependencies are properly installed
+4. System firewall allows the application to use required ports
+
 ## Tutorial
 - Feel free to follow [User tutorial](https://second-me.gitbook.io/a-new-ai-species-making-we-matter-again) to build your Second Me.
 
 
-## Coming Soon 🚀
+## Coming Soon 
 
 The following features have been completed internally and are being gradually integrated into the open-source project. For detailed experimental results and technical specifications, please refer to our [Technical Report](https://arxiv.org/abs/2503.08102).
 
-### 🔬 Model Enhancement Features
+### Model Enhancement Features
 - [ ] **Long Chain-of-Thought Training Pipeline**: Enhanced reasoning capabilities through extended thought process training
 - [ ] **Direct Preference Optimization for L2 Model**: Improved alignment with user preferences and intent
 - [ ] **Data Filtering for Training**: Advanced techniques for higher quality training data selection
 - [ ] **Apple Silicon Support**: Native support for Apple Silicon processors with MLX Training and Serving capabilities
 
-### 🛠️ Product Features
+### Product Features
 - [ ] **Natural Language Memory Summarization**: Intuitive memory organization in natural language format
 
 

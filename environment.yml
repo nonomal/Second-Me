@@ -1,4 +1,4 @@
-name: python-env  # Generic name, actual environment name will be specified by command line argument
+name: second-me  # Generic name, actual environment name will be specified by command line argument
 channels:
   - conda-forge
   - defaults
