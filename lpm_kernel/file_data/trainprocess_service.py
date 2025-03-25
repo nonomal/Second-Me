@@ -6,7 +6,7 @@ import re
 import time
 import psutil
 from lpm_kernel.configs.config import Config
-import logging
+from lpm_kernel.configs.logging import get_train_process_logger, setup_logging
 from lpm_kernel.L1.utils import save_true_topics
 from lpm_kernel.L1.serializers import NotesStorage
 from lpm_kernel.kernel.note_service import NoteService
@@ -28,6 +28,10 @@ from lpm_kernel.kernel.l1.l1_manager import generate_l1_from_l0
 import threading
 from ..api.domains.trainprocess.progress import TrainProgress, Status, Step, Status
 import gc
+
+from lpm_kernel.configs.logging import get_train_process_logger, setup_logging
+setup_logging()
+logger = get_train_process_logger()
 
 class ProcessStep(Enum):
     """Training process steps"""
@@ -98,7 +102,7 @@ class Progress:
         self.progress_file = os.path.join(progress_dir, progress_file)
         self.progress = TrainProgress()
         self.progress_callback = progress_callback
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
         self._load_progress()
 
     def _load_progress(self):
@@ -265,7 +269,7 @@ class TrainProcessService:
             if model_name:
                 progress_file = f"trainprocess_progress_{model_name}.json"
             self.progress = Progress(progress_file, progress_callback)
-            self.logger = logging.getLogger(__name__)
+            self.logger = logger  # 使用训练过程专用日志器
             self.model_name = None  # Initialize as None
             self._initialized = True
             

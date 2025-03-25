@@ -1,5 +1,4 @@
 import json
-import logging
 import time
 from pathlib import Path
 
@@ -9,6 +8,10 @@ from lpm_kernel.file_data.trainprocess_service import TrainProcessService
 from .progress import Status
 from ...common.responses import APIResponse
 from threading import Thread
+
+from lpm_kernel.configs.logging import get_train_process_logger, setup_logging
+setup_logging()
+logger = get_train_process_logger()
 
 trainprocess_bp = Blueprint("trainprocess", __name__, url_prefix="/api/trainprocess")
 
@@ -32,7 +35,7 @@ def progress_callback(progress_update):
         if stage and step:
             progress.update_progress(stage, step, status, prog)
     except Exception as e:
-        logging.error(f"Progress callback error: {str(e)}")
+        logger.error(f"Progress callback error: {str(e)}")
 
 
 def clear_specific_logs():
@@ -47,7 +50,7 @@ def clear_specific_logs():
                 with open(log_file, 'w') as f:
                     f.truncate(0)
             except Exception as e:
-                logging.error(f"Failed to clear log file {log_file}: {e}")
+                logger.error(f"Failed to clear log file {log_file}: {e}")
 
 
 @trainprocess_bp.route("/start", methods=["POST"])
@@ -83,7 +86,7 @@ def start_process():
             }
         }
     """
-    logging.info("Training process starting...")  # Log the startup
+    logger.info("Training process starting...")  # Log the startup
     try:
         data = request.get_json()
         if not data or "model_name" not in data:
@@ -114,7 +117,7 @@ def start_process():
         )
     
     except Exception as e:
-        logging.error(f"Training process failed: {str(e)}")
+        logger.error(f"Training process failed: {str(e)}")
         return jsonify(APIResponse.error(message=f"Training process error: {str(e)}"))
 
 
@@ -202,7 +205,7 @@ def reset_progress():
 
         return jsonify(APIResponse.success(message="Progress reset successfully"))
     except Exception as e:
-        logging.error(f"Reset progress failed: {str(e)}")
+        logger.error(f"Reset progress failed: {str(e)}")
         return jsonify(APIResponse.error(message=f"Failed to reset progress: {str(e)}"))
 
 
@@ -234,7 +237,7 @@ def stop_training():
             time.sleep(wait_interval)
 
     except Exception as e:
-        logging.error(f"Error stopping training process: {str(e)}")
+        logger.error(f"Error stopping training process: {str(e)}")
         return jsonify(APIResponse.error(message=f"Error stopping training process: {str(e)}"))
 
 
@@ -260,7 +263,7 @@ def get_model_name():
         
         return jsonify(APIResponse.success(data={"model_name": model_name}))
     except Exception as e:
-        logging.error(f"Failed to get model name: {str(e)}")
+        logger.error(f"Failed to get model name: {str(e)}")
         return jsonify(APIResponse.error(message=f"Failed to get model name: {str(e)}"))
 
 
@@ -314,5 +317,5 @@ def retrain():
             )
         )
     except Exception as e:
-        logging.error(f"Retrain reset failed: {str(e)}")
+        logger.error(f"Retrain reset failed: {str(e)}")
         return jsonify(APIResponse.error(message=f"Failed to reset progress to data processing stage: {str(e)}"))

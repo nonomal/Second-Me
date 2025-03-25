@@ -1,5 +1,4 @@
 # file_data/service.py
-import logging
 from pathlib import Path
 from typing import List, Dict, Optional
 import os
@@ -18,9 +17,9 @@ from .embedding_service import EmbeddingService
 from .process_factory import ProcessorFactory
 from .process_status import ProcessStatus
 
-# from lpm_kernel.file_data.document_dto import DocumentDTO
-
-logger = logging.getLogger(__name__)
+from lpm_kernel.configs.logging import get_train_process_logger, setup_logging
+setup_logging()
+logger = get_train_process_logger()
 
 
 class DocumentService:

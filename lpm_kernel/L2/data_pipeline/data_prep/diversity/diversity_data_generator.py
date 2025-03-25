@@ -1,6 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
 import json
-import logging
 import os
 import random
 import re
@@ -14,6 +13,10 @@ from lpm_kernel.api.services.user_llm_config_service import UserLLMConfigService
 from lpm_kernel.configs.config import Config
 from lpm_kernel.L2.data_pipeline.data_prep.diversity.utils import remove_similar_dicts
 import lpm_kernel.L2.data_pipeline.data_prep.diversity.template_diversity as template_diversity
+
+from lpm_kernel.configs.logging import get_train_process_logger, setup_logging
+setup_logging()
+logger = get_train_process_logger()
 
 
 class DiversityDataGenerator:
@@ -226,7 +229,7 @@ class DiversityDataGenerator:
 
         # global questions, only process clusters with more than 8 notes, and split very large clusters
         large_clusters = [item for item in entity2desc_list if len(item["note"]) >= 8]
-        logging.info(f"Large clusters: {len(large_clusters)}")
+        logger.info(f"Large clusters: {len(large_clusters)}")
 
         exploded_clusters = []
         # split
@@ -257,12 +260,12 @@ class DiversityDataGenerator:
             if len(item["note"]) < 8 and len(item["note"]) > 1
         ]
 
-        logging.info(f"Mini clusters: {len(mini_clusters)}")
+        logger.info(f"Mini clusters: {len(mini_clusters)}")
 
         # process other clusters
         tiny_clusters = [item for item in entity2desc_list if len(item["note"]) <= 1]
 
-        logging.info(f"Tiny clusters: {len(tiny_clusters)}")
+        logger.info(f"Tiny clusters: {len(tiny_clusters)}")
 
         filtered_tiny_clusters = [
             d
@@ -271,40 +274,40 @@ class DiversityDataGenerator:
             in ["PERSON", "人", "组织", "ORGANIZATION", "人物"]
         ]
 
-        logging.info(f"Filtered tiny clusters: {len(filtered_tiny_clusters)}")
+        logger.info(f"Filtered tiny clusters: {len(filtered_tiny_clusters)}")
 
         if len(exploded_clusters) > 0:
-            logging.info("Execute large cluster generation")
+            logger.info("Execute large cluster generation")
             data_large = self._pipline(exploded_clusters, 4, q_dict, templater, language_desc, user_name)
         else:
-            logging.info("Large cluster number is 0")
+            logger.info("Large cluster number is 0")
             data_large = []
 
         if len(mini_clusters) > 0:
-            logging.info("Execute small cluster generation")
+            logger.info("Execute small cluster generation")
             data_mini = self._pipline(mini_clusters, 3, q_dict, templater, language_desc, user_name)
         else:
-            logging.info("Small cluster number is 0")
+            logger.info("Small cluster number is 0")
             data_mini = []
 
         if len(filtered_tiny_clusters) > 0:
-            logging.info("Execute single entity cluster generation")
+            logger.info("Execute single entity cluster generation")
             q_dict.pop("unanswerable")
             q_dict.pop("global")
             data_tiny = self._pipline(filtered_tiny_clusters, 2, q_dict, templater, language_desc, user_name)
         else:
-            logging.info("Single entity cluster number is 0")
+            logger.info("Single entity cluster number is 0")
             data_tiny = []
 
         combined_list = data_large + data_mini + data_tiny
         # calculate total entries
         total_entries = len(combined_list)
-        logging.info(f"Total entries: {total_entries}")
+        logger.info(f"Total entries: {total_entries}")
         # store data
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(combined_list, f, ensure_ascii=False, indent=4)
 
-        logging.info(f"Data has been stored to {output_path}")
+        logger.info(f"Data has been stored to {output_path}")
 
 
     def _pipline(self, clusters: list, aug_para: int, q_dict: dict, 
@@ -332,9 +335,9 @@ class DiversityDataGenerator:
             random_types = random.choices(list(q_dict.keys()), weights, k=aug_para)
             explode_questions_types.extend(random_types)
 
-        logging.info("Start generating data")
-        logging.info(f"Explode clusters: {len(explode_clusters)}")
-        logging.info(f"Explode questions types: {len(explode_questions_types)}")
+        logger.info("Start generating data")
+        logger.info(f"Explode clusters: {len(explode_clusters)}")
+        logger.info(f"Explode questions types: {len(explode_questions_types)}")
 
         questions, answers, answer_types, flat_question_types, flat_clusters = self._generate(
             explode_clusters, explode_questions_types, templater, q_dict, language_desc, user_name
@@ -400,10 +403,10 @@ class DiversityDataGenerator:
                     flat_clusters.extend([cluster] * len(result))
                     flat_question_types.extend([question_type] * len(result))
                 except Exception as e:
-                    logging.error(traceback.format_exc())
+                    logger.error(traceback.format_exc())
 
         # safety check
-        logging.info(f"Count: {cnt}, len(explode_clusters): {len(explode_clusters)}")
+        logger.info(f"Count: {cnt}, len(explode_clusters): {len(explode_clusters)}")
 
         with ThreadPoolExecutor(max_workers=2) as executor:
             futures = [
@@ -422,7 +425,7 @@ class DiversityDataGenerator:
                     answers.append(result)
                     answer_types.append(answer_type)
                 except Exception as e:
-                    logging.error(traceback.format_exc())
+                    logger.error(traceback.format_exc())
 
         return questions, answers, answer_types, flat_question_types, flat_clusters
 
@@ -465,7 +468,7 @@ class DiversityDataGenerator:
             pattern = r"Question\s*\d+\s*:\s*(.*?)\|\|"
             questions = re.findall(pattern, res + "||")
         except Exception as e:
-            logging.error(traceback.format_exc())
+            logger.error(traceback.format_exc())
             questions = []
             return questions
 

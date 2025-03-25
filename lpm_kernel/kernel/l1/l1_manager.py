@@ -1,4 +1,3 @@
-import logging
 from datetime import datetime
 from typing import List, Optional
 
@@ -17,7 +16,9 @@ from lpm_kernel.models.l1 import (
 )
 from lpm_kernel.models.status_biography import StatusBiography
 
-logger = logging.getLogger(__name__)
+from lpm_kernel.configs.logging import get_train_process_logger, setup_logging
+setup_logging()
+logger = get_train_process_logger()
 
 
 def extract_notes_from_documents(documents) -> tuple[List[Note], list]:

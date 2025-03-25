@@ -1,9 +1,11 @@
 from lpm_kernel.api.services.user_llm_config_service import UserLLMConfigService
 from lpm_kernel.configs.config import Config
 from typing import List, Union
-from lpm_kernel.common.logging import logger
 import requests
 import numpy as np
+from lpm_kernel.configs.logging import get_train_process_logger, setup_logging
+setup_logging()
+logger = get_train_process_logger()
 
 
 class LLMClient:

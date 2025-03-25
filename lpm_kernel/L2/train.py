@@ -1,6 +1,5 @@
 from transformers import TrainingArguments, AutoTokenizer, AutoModelForCausalLM
 import torch
-import logging
 from tqdm import tqdm
 import functools
 # Standard library imports
@@ -29,8 +28,8 @@ from lpm_kernel.L2.utils import (
     formatting_prompts_func,
     create_chat_data,
 )
-from lpm_kernel.configs.logging import LOGGING_CONFIG
-import logging.config
+from lpm_kernel.configs.logger import logger_CONFIG
+import logger.config
 
 # Configure how tqdm displays in logs
 class LogTqdm(tqdm):
@@ -42,7 +41,9 @@ class LogTqdm(tqdm):
 # Replace the default tqdm
 sys.modules["tqdm"].tqdm = LogTqdm
 
-logger = logging.getLogger(__name__)
+from lpm_kernel.configs.logging import get_train_process_logger, setup_logging
+setup_logging()
+logger = get_train_process_logger()
 
 @dataclass
 class ModelArguments:
@@ -151,13 +152,13 @@ class DataTrainingArguments:
 def main(model_args, data_args, training_args):
     logger.info(f"Python version--------------------: {sys.version}")
 
-    # Configure logging
-    logging.config.dictConfig(LOGGING_CONFIG)
+    # Configure logger
+    logger.config.dictConfig(logger_CONFIG)
 
     logger.info("Begin training...")
 
     # Ensure logs are flushed immediately
-    for handler in logging.getLogger().handlers:
+    for handler in logger.getLogger().handlers:
         handler.flush()
 
     logger.info("start 1")

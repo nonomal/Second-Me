@@ -7,7 +7,6 @@ different formats and extraction of information from notes.
 
 import graphrag
 import json
-import logging
 import os
 import pandas as pd
 import random
@@ -34,6 +33,9 @@ from lpm_kernel.L2.note_templates import OBJECTIVE_TEMPLATES, SUBJECTIVE_TEMPLAT
 from lpm_kernel.L2.utils import format_timestr
 from lpm_kernel.api.services.user_llm_config_service import UserLLMConfigService
 
+from lpm_kernel.configs.logging import get_train_process_logger, setup_logging
+setup_logging()
+logger = get_train_process_logger()
 
 class L2DataProcessor:
     """Data processor for L2 model training.
@@ -99,7 +101,7 @@ class L2DataProcessor:
             file_type="note",
         )
 
-        logging.info("Data refinement completed, preparing to extract entities and relations")
+        logger.info("Data refinement completed, preparing to extract entities and relations")
 
         lang = user_info.get("lang", "English")
 
@@ -164,11 +166,11 @@ class L2DataProcessor:
         selfqa_output_path = os.path.join(data_output_base_dir, selfqa_output_path)
         context_output_path = os.path.join(data_output_base_dir, "context_merged.json")
 
-        logging.info("---" * 30 + "\nPreference data generating\n" + "---" * 30)
+        logger.info("---" * 30 + "\nPreference data generating\n" + "---" * 30)
         self._gen_preference_data(topics_path, preference_output_path, global_bio)
-        logging.info("---" * 30 + "\nPreference data generated\n" + "---" * 30)
+        logger.info("---" * 30 + "\nPreference data generated\n" + "---" * 30)
 
-        logging.info("---" * 30 + "\nDiversity data generating\n" + "---" * 30)
+        logger.info("---" * 30 + "\nDiversity data generating\n" + "---" * 30)
         self._gen_diversity_data(
             entitys_path,
             note_list,
@@ -178,14 +180,14 @@ class L2DataProcessor:
             global_bio,
             config_path,
         )
-        logging.info("---" * 30 + "\nDiversity data generated\n" + "---" * 30)
+        logger.info("---" * 30 + "\nDiversity data generated\n" + "---" * 30)
 
-        logging.info("---" * 30 + "\nSelfQA data generating\n" + "---" * 30)
+        logger.info("---" * 30 + "\nSelfQA data generating\n" + "---" * 30)
         self._gen_selfqa_data(selfqa_output_path, user_name, user_intro, global_bio)
-        logging.info("---" * 30 + "\nSelfQA data generated\n" + "---" * 30)
+        logger.info("---" * 30 + "\nSelfQA data generated\n" + "---" * 30)
 
         if do_context:
-            logging.info("---" * 30 + "\nContext data generating\n" + "---" * 30)
+            logger.info("---" * 30 + "\nContext data generating\n" + "---" * 30)
             self._gen_context_data(
                 note_list,
                 entitys_path,
@@ -194,7 +196,7 @@ class L2DataProcessor:
                 user_intro,
                 global_bio
             )
-            logging.info("---" * 30 + "\nContext data generated\n" + "---" * 30)
+            logger.info("---" * 30 + "\nContext data generated\n" + "---" * 30)
             self._merge_context_data(data_output_base_dir, "context_merged.json")
 
         # Merge the four specified JSON files
@@ -213,7 +215,7 @@ class L2DataProcessor:
                 selfqa_output_path,
             ]
 
-        logging.info("---" * 30 + "\nMerging JSON files\n" + "---" * 30)
+        logger.info("---" * 30 + "\nMerging JSON files\n" + "---" * 30)
 
         for file_path in json_files_to_merge:
             if file_path and os.path.exists(file_path):
@@ -222,24 +224,24 @@ class L2DataProcessor:
                         file_data = json.load(f)
                         if isinstance(file_data, list):
                             merged_data.extend(file_data)
-                            logging.info(f"Added {len(file_data)} items from {file_path}")
+                            logger.info(f"Added {len(file_data)} items from {file_path}")
                         else:
                             merged_data.append(file_data)
-                            logging.info(f"Added 1 item from {file_path}")
+                            logger.info(f"Added 1 item from {file_path}")
                 except Exception as e:
-                    logging.error(f"Error merging file {file_path}: {str(e)}")
+                    logger.error(f"Error merging file {file_path}: {str(e)}")
             else:
                 if file_path == context_output_path and do_context == False:
                     continue
-                logging.warning(f"File not found or path is None: {file_path}")
+                logger.warning(f"File not found or path is None: {file_path}")
 
         # Save the merged data
         merged_output_path = os.path.join(data_output_base_dir, "merged.json")
         with open(merged_output_path, 'w', encoding='utf-8') as f:
             json.dump(merged_data, f, ensure_ascii=False, indent=2)
 
-        logging.info(f"Merged data saved to {merged_output_path} with {len(merged_data)} total items")
-        logging.info("---" * 30 + "\nJSON files merged\n" + "---" * 30)
+        logger.info(f"Merged data saved to {merged_output_path} with {len(merged_data)} total items")
+        logger.info("---" * 30 + "\nJSON files merged\n" + "---" * 30)
 
     def _merge_context_data(self, data_output_base_dir: str, context_merged_file_name: str):
         """Merge context_enhanced.json and context_final.jsonl files.
@@ -248,7 +250,7 @@ class L2DataProcessor:
             data_output_base_dir: Base directory containing the files to merge.
             context_merged_file_name: Name of the output merged file.
         """
-        logging.info("---" * 30 + "\nMerging context files\n" + "---" * 30)
+        logger.info("---" * 30 + "\nMerging context files\n" + "---" * 30)
 
         result = []
 
@@ -266,10 +268,10 @@ class L2DataProcessor:
                         "enhanced_request": enhanced_need["enhanced_request"]
                     })
                 except (json.JSONDecodeError, KeyError) as e:
-                    logging.warning(f"Failed to process enhanced item: {str(e)}")
+                    logger.warning(f"Failed to process enhanced item: {str(e)}")
                     continue
         except Exception as e:
-            logging.error(f"Error processing context_enhanced.json: {str(e)}")
+            logger.error(f"Error processing context_enhanced.json: {str(e)}")
 
         # Process context_final.jsonl
         try:
@@ -292,21 +294,21 @@ class L2DataProcessor:
                                 response['feedback'][0]
                             })
                         except (json.JSONDecodeError, KeyError) as e:
-                            logging.warning(f"Failed to process final item response: {str(e)}")
+                            logger.warning(f"Failed to process final item response: {str(e)}")
                             continue
                     except json.JSONDecodeError as e:
-                        logging.warning(f"Failed to parse line as JSON: {str(e)}")
+                        logger.warning(f"Failed to parse line as JSON: {str(e)}")
                         continue
         except Exception as e:
-            logging.error(f"Error processing context_final.jsonl: {str(e)}")
+            logger.error(f"Error processing context_final.jsonl: {str(e)}")
 
         # Save the merged results
         output_path = f"{data_output_base_dir}/{context_merged_file_name}"
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
 
-        logging.info(f"Merged context files saved to {output_path}")
-        logging.info("---" * 30 + "\nContext files merged\n" + "---" * 30)
+        logger.info(f"Merged context files saved to {output_path}")
+        logger.info("---" * 30 + "\nContext files merged\n" + "---" * 30)
 
     def split_notes_by_type(self, note_list: List[Note], basic_info: Dict):
         """Split notes into subjective and objective categories.
@@ -334,9 +336,9 @@ class L2DataProcessor:
             elif note.memory_type in OBJECT_NOTE_TYPE:
                 objective_notes.append(note)
             else:
-                logging.warning(f"Note type not supported: {note.memory_type}")
+                logger.warning(f"Note type not supported: {note.memory_type}")
                 continue
-        logging.info(
+        logger.info(
             f"Subjective notes: {len(subjective_notes)}, Objective notes: {len(objective_notes)}"
         )
         return user_info, subjective_notes, objective_notes
@@ -381,7 +383,7 @@ class L2DataProcessor:
 
                 data_filtered.append(note)
 
-        logging.info(f"Refined subjective notes: {len(data_filtered)}")
+        logger.info(f"Refined subjective notes: {len(data_filtered)}")
 
         json_data_filted = [o.to_json() for o in data_filtered]
         file_dir = os.path.dirname(json_file_remade)
@@ -425,7 +427,7 @@ class L2DataProcessor:
                     ).format(insight=note.insight)
                 new_item_list.append(new_item)
 
-        logging.info(f"Refined objective notes: {len(new_item_list)}")
+        logger.info(f"Refined objective notes: {len(new_item_list)}")
 
         file_dir = os.path.dirname(json_file_remade)
         if not os.path.exists(file_dir):
@@ -448,8 +450,8 @@ class L2DataProcessor:
         # Ensure the target directory exists
         if not os.path.exists(txt_file_base):
             os.makedirs(txt_file_base)
-            logging.warning("Currently running in function json_to_txt_each")
-            logging.warning(f"Specified directory does not exist, created: {txt_file_base}")
+            logger.warning("Currently running in function json_to_txt_each")
+            logger.warning(f"Specified directory does not exist, created: {txt_file_base}")
 
         # Clear all existing files in the target directory
         for existing_file in os.listdir(txt_file_base):
@@ -457,11 +459,11 @@ class L2DataProcessor:
             if os.path.isfile(file_path):
                 try:
                     os.remove(file_path)
-                    logging.info(f"Removed existing file: {file_path}")
+                    logger.info(f"Removed existing file: {file_path}")
                 except Exception as e:
-                    logging.error(f"Error removing file {file_path}: {str(e)}")
+                    logger.error(f"Error removing file {file_path}: {str(e)}")
 
-        logging.info(f"Cleared all existing files in {txt_file_base}")
+        logger.info(f"Cleared all existing files in {txt_file_base}")
 
         for no, item in enumerate(tqdm(list_processed_notes)):
             # Build the txt file path
@@ -472,10 +474,10 @@ class L2DataProcessor:
                     with open(txt_file, "w", encoding="utf-8") as tf:
                         tf.write(item.processed)
                 else:
-                    logging.warning(f"Warning: 'processed' key missing for item {no}")
+                    logger.warning(f"Warning: 'processed' key missing for item {no}")
 
             except Exception as e:
-                logging.error(traceback.format_exc())
+                logger.error(traceback.format_exc())
 
     def graphrag_indexing(
             self, note_list: List[Note], graph_input_dir: str, output_dir: str, lang: str
@@ -535,14 +537,14 @@ class L2DataProcessor:
 
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
-            logging.warning(f"Specified output directory does not exist, created: {output_dir}.")
+            logger.warning(f"Specified output directory does not exist, created: {output_dir}.")
 
         with open(GRAPH_CONFIG, "w", encoding="utf-8") as file:
             yaml.dump(settings, file, default_flow_style=False, allow_unicode=True)
 
-        logging.info(f"Input base_dir has been updated to {graph_input_dir} and saved.")
-        logging.info(f"Output base_dir has been updated to {output_dir} and saved.")
-        logging.info(
+        logger.info(f"Input base_dir has been updated to {graph_input_dir} and saved.")
+        logger.info(f"Output base_dir has been updated to {output_dir} and saved.")
+        logger.info(
             f"Report base_dir has been updated to {os.path.join(output_dir, 'report')} and saved."
         )
 
@@ -611,9 +613,9 @@ class L2DataProcessor:
         json_data = []
 
         # show the column names
-        logging.info(f"Entity Column names: {entities.columns}")
+        logger.info(f"Entity Column names: {entities.columns}")
 
-        logging.info(f"Document Column names: {document.columns}")
+        logger.info(f"Document Column names: {document.columns}")
 
         for e_i, e_r in tqdm(entities.iterrows(), total=len(entities)):
             json_item = {}
@@ -737,8 +739,8 @@ class L2DataProcessor:
             data_output_base_dir=data_output_base_dir,
             needs_file_name="context_needs.json"
         )
-        logging.info("---" * 30 + "\nContext needs generated\n" + "---" * 30)
-        logging.info(data_output_base_dir + "/context_needs.json")
+        logger.info("---" * 30 + "\nContext needs generated\n" + "---" * 30)
+        logger.info(data_output_base_dir + "/context_needs.json")
 
         # 2. Generate context enhanced data
         context_generator.generate_context_enhance_data(
@@ -747,8 +749,8 @@ class L2DataProcessor:
             context_enhanced_res_file_name="context_enhanced.json",
             note_list=note_list
         )
-        logging.info("---" * 30 + "\nContext enhanced generated\n" + "---" * 30)
-        logging.info(data_output_base_dir + "/context_enhanced.json")
+        logger.info("---" * 30 + "\nContext enhanced generated\n" + "---" * 30)
+        logger.info(data_output_base_dir + "/context_enhanced.json")
 
         # 3. Generate expert responses
         context_generator.expert_response_generator(
@@ -756,8 +758,8 @@ class L2DataProcessor:
             context_enhanced_res_file_name="context_enhanced.json",
             output_file_name="expert_responses.json"
         )
-        logging.info("---" * 30 + "\nExpert responses generated\n" + "---" * 30)
-        logging.info(data_output_base_dir + "/expert_responses.json")
+        logger.info("---" * 30 + "\nExpert responses generated\n" + "---" * 30)
+        logger.info(data_output_base_dir + "/expert_responses.json")
 
         # 4. Generate expert responses and critic data
         context_generator.gen_context_critic_data(
@@ -765,5 +767,5 @@ class L2DataProcessor:
             expert_response_file_name="expert_responses.json",
             out_file_name="context_final.jsonl"
         )
-        logging.info("---" * 30 + "\nContext critic generated\n" + "---" * 30)
-        logging.info(data_output_base_dir + "/context_final.jsonl")
+        logger.info("---" * 30 + "\nContext critic generated\n" + "---" * 30)
+        logger.info(data_output_base_dir + "/context_final.jsonl")

@@ -1,11 +1,12 @@
 import os
 import sys
 import time
-import logging
 import subprocess
 from typing import Optional, Dict, Any
 
-logger = logging.getLogger(__name__)
+from lpm_kernel.configs.logging import get_train_process_logger, setup_logging
+setup_logging()
+logger = get_train_process_logger()
 
 
 class ScriptRunner:
