@@ -33,8 +33,7 @@ from lpm_kernel.L2.note_templates import OBJECTIVE_TEMPLATES, SUBJECTIVE_TEMPLAT
 from lpm_kernel.L2.utils import format_timestr
 from lpm_kernel.api.services.user_llm_config_service import UserLLMConfigService
 
-from lpm_kernel.configs.logging import get_train_process_logger, setup_logging
-setup_logging()
+from lpm_kernel.configs.logging import get_train_process_logger
 logger = get_train_process_logger()
 
 class L2DataProcessor:

@@ -6,7 +6,6 @@ import re
 import time
 import psutil
 from lpm_kernel.configs.config import Config
-from lpm_kernel.configs.logging import get_train_process_logger, setup_logging
 from lpm_kernel.L1.utils import save_true_topics
 from lpm_kernel.L1.serializers import NotesStorage
 from lpm_kernel.kernel.note_service import NoteService
@@ -29,8 +28,7 @@ import threading
 from ..api.domains.trainprocess.progress import TrainProgress, Status, Step, Status
 import gc
 
-from lpm_kernel.configs.logging import get_train_process_logger, setup_logging
-setup_logging()
+from lpm_kernel.configs.logging import get_train_process_logger
 logger = get_train_process_logger()
 
 class ProcessStep(Enum):
@@ -708,7 +706,7 @@ class TrainProcessService:
             # Prepare log directory and file
             log_dir = os.path.join(os.getcwd(), "logs")
             os.makedirs(log_dir, exist_ok=True)
-            log_path = os.path.join(log_dir, "train.log")
+            log_path = os.path.join(log_dir, "train", "train.log")
             self.logger.info(f"Log file path: {log_path}")
             
             # Ensure output directory exists
@@ -730,7 +728,7 @@ class TrainProcessService:
             
             self.logger.info("Training started, monitoring progress")
             # start monitoring training progress
-            return self._monitor_training_progress()
+            return self._monitor_training_progress(log_path)
             
         except Exception as e:
             self.logger.error(f"Failed to start training: {str(e)}")
@@ -809,12 +807,9 @@ class TrainProcessService:
             self.logger.error(f"Failed to start training process: {str(e)}")
             return False
 
-    def _monitor_training_progress(self) -> bool:
+    def _monitor_training_progress(self, log_file) -> bool:
         """Monitor training progress"""
         try:
-            log_dir = os.path.join(os.getcwd(), "logs")
-            log_file = os.path.join(log_dir, "train.log")
-            
             # Initialize last_position to the end of file to only process new content
             try:
                 with open(log_file, 'r') as f:

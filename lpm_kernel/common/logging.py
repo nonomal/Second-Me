@@ -3,17 +3,22 @@ import logging
 import logging.config
 import os
 import sys
-from lpm_kernel.configs.logging import LOGGING_CONFIG, DEFAULT_LOG_DIR
+from lpm_kernel.configs.logging import LOGGING_CONFIG, LOG_BASE_DIR, TRAIN_LOG_DIR, rename_existing_log_file
 
 
 def setup_logging():
     try:
-        # Ensure log directory exists
-        os.makedirs(DEFAULT_LOG_DIR, exist_ok=True)
+        # Ensure log directories exist
+        os.makedirs(LOG_BASE_DIR, exist_ok=True)
+        os.makedirs(TRAIN_LOG_DIR, exist_ok=True)
+        
+        # Rename existing log file if needed
+        rename_existing_log_file()
         # Ensure directory permissions are correct
-        os.chmod(DEFAULT_LOG_DIR, 0o755)
+        os.chmod(TRAIN_LOG_DIR, 0o755)
+        os.chmod(LOG_BASE_DIR, 0o755)
 
-        print(f"Log directory: {DEFAULT_LOG_DIR}", file=sys.stderr)
+        print(f"Log directory: {TRAIN_LOG_DIR}", file=sys.stderr)
         print(
             f"Log file: {LOGGING_CONFIG['handlers']['file']['filename']}",
             file=sys.stderr,
@@ -51,9 +56,3 @@ def setup_logging():
 
 # Initialize global logger
 logger = setup_logging()
-
-# Test logging
-logger.debug("DEBUG: Logging module loaded")
-logger.info("INFO: Logging module loaded")
-logger.warning("WARNING: Logging module loaded")
-logger.error("ERROR: Logging module loaded")

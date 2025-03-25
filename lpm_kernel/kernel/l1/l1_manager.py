@@ -16,8 +16,7 @@ from lpm_kernel.models.l1 import (
 )
 from lpm_kernel.models.status_biography import StatusBiography
 
-from lpm_kernel.configs.logging import get_train_process_logger, setup_logging
-setup_logging()
+from lpm_kernel.configs.logging import get_train_process_logger
 logger = get_train_process_logger()
 
 

@@ -14,8 +14,7 @@ from lpm_kernel.configs.config import Config
 from lpm_kernel.L2.data_pipeline.data_prep.diversity.utils import remove_similar_dicts
 import lpm_kernel.L2.data_pipeline.data_prep.diversity.template_diversity as template_diversity
 
-from lpm_kernel.configs.logging import get_train_process_logger, setup_logging
-setup_logging()
+from lpm_kernel.configs.logging import get_train_process_logger
 logger = get_train_process_logger()
 
 

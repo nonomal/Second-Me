@@ -6,8 +6,7 @@ from .dto.chunk_dto import ChunkDTO
 from lpm_kernel.common.llm import LLMClient
 from lpm_kernel.file_data.document_dto import DocumentDTO
 from typing import List, Dict, Optional
-from lpm_kernel.configs.logging import get_train_process_logger, setup_logging
-setup_logging()
+from lpm_kernel.configs.logging import get_train_process_logger
 logger = get_train_process_logger()
 
 

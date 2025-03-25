@@ -9,8 +9,7 @@ from .progress import Status
 from ...common.responses import APIResponse
 from threading import Thread
 
-from lpm_kernel.configs.logging import get_train_process_logger, setup_logging
-setup_logging()
+from lpm_kernel.configs.logging import get_train_process_logger
 logger = get_train_process_logger()
 
 trainprocess_bp = Blueprint("trainprocess", __name__, url_prefix="/api/trainprocess")
@@ -124,7 +123,7 @@ def start_process():
 @trainprocess_bp.route("/logs", methods=["GET"])
 def stream_logs():
     """Get training logs in real-time"""
-    log_file_path = "logs/backend.log"  # Log file path
+    log_file_path = "logs/train/train.log"  # Log file path
     last_position = 0
     
     # Define keywords to exclude

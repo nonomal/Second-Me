@@ -27,8 +27,7 @@ from lpm_kernel.configs.config import Config
 
 from lpm_kernel.api.common.script_executor import ScriptExecutor
 
-from lpm_kernel.configs.logging import get_train_process_logger, setup_logging
-setup_logging()
+from lpm_kernel.configs.logging import get_train_process_logger
 logger = get_train_process_logger()
 
 class ShadeGenerator:

@@ -17,8 +17,7 @@ from .embedding_service import EmbeddingService
 from .process_factory import ProcessorFactory
 from .process_status import ProcessStatus
 
-from lpm_kernel.configs.logging import get_train_process_logger, setup_logging
-setup_logging()
+from lpm_kernel.configs.logging import get_train_process_logger
 logger = get_train_process_logger()
 
 

@@ -4,8 +4,7 @@ import time
 import subprocess
 from typing import Optional, Dict, Any
 
-from lpm_kernel.configs.logging import get_train_process_logger, setup_logging
-setup_logging()
+from lpm_kernel.configs.logging import get_train_process_logger
 logger = get_train_process_logger()
 
 
@@ -104,7 +103,7 @@ class ScriptRunner:
             from subprocess import PIPE
             
             # Open log file
-            with open(log_file, "w", buffering=1) as f:
+            with open(log_file, "a", buffering=1) as f:
                 process = subprocess.Popen(
                     command,
                     shell=False,  # Use list form of command, no need for shell=True

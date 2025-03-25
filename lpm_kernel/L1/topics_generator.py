@@ -19,9 +19,7 @@ from lpm_kernel.L1.prompt import (
 )
 from lpm_kernel.L1.utils import find_connected_components
 from lpm_kernel.api.services.user_llm_config_service import UserLLMConfigService
-from lpm_kernel.common.logging import logger
-from lpm_kernel.configs.logging import get_train_process_logger, setup_logging
-setup_logging()
+from lpm_kernel.configs.logging import get_train_process_logger
 logger = get_train_process_logger()
 
 
