@@ -92,27 +92,27 @@ cd Second-Me
 #### Option A: For users with existing conda environment
 If you already have conda installed:
 
-1. Create a new environment from our environment file:
-   ```bash
-   conda env create -f environment.yml   # This will create an environment named 'second-me'
-   conda activate second-me
-   ```
+1) Create a new environment from our environment file:
+```bash
+conda env create -f environment.yml   # This will create an environment named 'second-me'
+conda activate second-me
+```
 
-2. Set the custom conda mode in `.env`:
-    ```bash
-    CUSTOM_CONDA_MODE=true
-    ```
+2) Set the custom conda mode in `.env`:
+```bash
+CUSTOM_CONDA_MODE=true
+```
 
-3. Run setup:
-    ```bash
-    make setup
-    ```
+3) Run setup:
+```bash
+make setup
+```
 
 #### Option B: For new users
 If you're new or want a fresh environment:
-    ```bash
-    make setup
-    ```
+```bash
+make setup
+```
 
 This command will automatically:
 - Install all required system dependencies (including conda if not present)
