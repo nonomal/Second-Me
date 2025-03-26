@@ -125,12 +125,6 @@ def stream_logs():
     """Get training logs in real-time"""
     log_file_path = "logs/train/train.log"  # Log file path
     last_position = 0
-    
-    # Define keywords to exclude
-    exclude_keywords = [
-        "GET /api"
-    ]
-
     def generate_logs():
         nonlocal last_position
         while True:
@@ -143,11 +137,7 @@ def stream_logs():
                         # Skip empty lines
                         if not line.strip():
                             continue
-                            
-                        # Check if the line contains any of the exclude keywords
-                        if any(exclude_word in line for exclude_word in exclude_keywords):
-                            continue
-                            
+                        
                         yield f"data: {line.strip()}\n\n"
                             
                     last_position = log_file.tell()
