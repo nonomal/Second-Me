@@ -267,7 +267,7 @@ class TrainProcessService:
             if model_name:
                 progress_file = f"trainprocess_progress_{model_name}.json"
             self.progress = Progress(progress_file, progress_callback)
-            self.logger = logger  # 使用训练过程专用日志器
+            self.logger = logger
             self.model_name = None  # Initialize as None
             self._initialized = True
             
