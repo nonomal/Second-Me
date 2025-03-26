@@ -72,3 +72,4 @@ run/*
 #config
 .backend.pid
 .frontend.pid
+logs/train/
