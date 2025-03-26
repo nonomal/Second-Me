@@ -67,7 +67,7 @@ LOGGING_CONFIG = {
     "loggers": {
         "train_process": {
             "level": "INFO",
-            "handlers": ["train_process_file"],
+            "handlers": ["train_process_file", "console"],
             "propagate": False,
         },
     },

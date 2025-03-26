@@ -31,6 +31,9 @@ from lpm_kernel.L2.utils import (
 )
 from lpm_kernel.configs.logging import LOGGING_CONFIG
 import logging.config
+from lpm_kernel.configs.logging import get_train_process_logger
+logger = get_train_process_logger()
+
 
 # Configure how tqdm displays in logs
 class LogTqdm(tqdm):
@@ -42,7 +45,6 @@ class LogTqdm(tqdm):
 # Replace the default tqdm
 sys.modules["tqdm"].tqdm = LogTqdm
 
-logger = logging.getLogger(__name__)
 
 @dataclass
 class ModelArguments:

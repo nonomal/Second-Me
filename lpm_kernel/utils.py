@@ -8,7 +8,8 @@ import random
 import string
 from itertools import chain
 import json
-
+from lpm_kernel.configs.logging import get_train_process_logger
+logger = get_train_process_logger()
 
 class IntentType(Enum):
     Emotion = "Emotion"
@@ -187,7 +188,7 @@ class TokenTextSplitter(TextSplitter):
             parts.append(tail)
         res = "\n".join(parts)
 
-        logging.info(
+        logger.info(
             "_cut_meaningless_tail() removes redundant sentence tails from chunks, before cut: %s characters, after cut: %s characters",
             len(text),
             len(res),

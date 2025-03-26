@@ -28,7 +28,7 @@ import threading
 from ..api.domains.trainprocess.progress import TrainProgress, Status, Step, Status
 import gc
 
-from lpm_kernel.configs.logging import get_train_process_logger
+from lpm_kernel.configs.logging import get_train_process_logger, TRAIN_LOG_FILE
 logger = get_train_process_logger()
 
 class ProcessStep(Enum):
@@ -892,8 +892,9 @@ class TrainProcessService:
     def _monitor_model_download(self) -> bool:
         """Monitor model download progress"""
         try:
-            log_dir = os.path.join(os.getcwd(), "logs")
-            log_file = os.path.join(log_dir, "model_download.log")
+            # log_dir = os.path.join(os.getcwd(), "logs")
+            # log_file = os.path.join(log_dir, "model_download.log")
+            log_file = TRAIN_LOG_FILE
             
             # Initialize last_position to the end of file to only process new content
             try:

@@ -2,7 +2,6 @@
 from typing import Any, Dict, List
 import copy
 import json
-import logging
 import os
 import time
 import traceback
@@ -26,6 +25,9 @@ from lpm_kernel.utils import (
     get_summarize_title_keywords,
     select_language_desc,
 )
+
+from lpm_kernel.configs.logging import get_train_process_logger
+logger = get_train_process_logger()
 
 class L0Generator:
     def __init__(self, preferred_language="English"):
@@ -172,7 +174,7 @@ class L0Generator:
 
             return summary, title
         except Exception as e:
-            logging.error(f"Unexpected error: {e}")
+            logger.error(f"Unexpected error: {e}")
             raise RuntimeError(f"Unexpected error: {e}")
 
     def _insighter_audio(
@@ -219,7 +221,7 @@ class L0Generator:
             tmp = f"[{start_time}-{end_time}]: {segment_content}\n"
             speech += tmp
             end_point = int(end_time)
-        logging.info(f"length of speech: {end_point}")
+        logger.info(f"length of speech: {end_point}")
 
         # Split speech over 1200s into segments, maximum 1200s each
         num_segments = 1
@@ -319,7 +321,7 @@ class L0Generator:
                 insight = tmpl.format(overview, formated_breakdown)
                 return insight, title
             except Exception as e:
-                logging.error(f"Unexpected error: {e}")
+                logger.error(f"Unexpected error: {e}")
                 raise RuntimeError(f"Unexpected error: {e}")
         else:
             user_info = user_info.format(
@@ -377,7 +379,7 @@ class L0Generator:
                 return insight, title
 
             except Exception as e:
-                logging.error(f"Unexpected error: {e}")
+                logger.error(f"Unexpected error: {e}")
                 raise RuntimeError(f"Unexpected error: {e}")
 
     def _insighter_doc(
@@ -517,7 +519,7 @@ class L0Generator:
             return insight, title
 
         except Exception as e:
-            logging.error(traceback.format_exc())
+            logger.error(traceback.format_exc())
             raise RuntimeError(f"Unexpected error: {e}")
 
     def insighter(self, inputs: InsighterInput) -> Dict[str, str]:
@@ -532,14 +534,14 @@ class L0Generator:
         try:
             datatype = DataType(inputs.file_info.data_type)
         except ValueError:
-            logging.warning(
+            logger.warning(
                 "Unsupported dataType: %s. Processing as DOCUMENT by default",
                 inputs.file_info.data_type,
             )
             datatype = DataType.DOCUMENT
 
-        logging.info("input filename=%s", inputs.file_info.filename)
-        logging.info(
+        logger.info("input filename=%s", inputs.file_info.filename)
+        logger.info(
             "input content=%s (first 100 characters)",
             inputs.file_info.content.strip()[:100],
         )
@@ -590,14 +592,14 @@ class L0Generator:
                     file_content=inputs.file_info.file_content,
                 )
         else:
-            logging.warning("less than 20 characters, use filename as title")
+            logger.warning("less than 20 characters, use filename as title")
             title, insight = inputs.file_info.content, inputs.file_info.content
             if inputs.file_info.filename:
-                logging.info("use filename as title")
+                logger.info("use filename as title")
                 title = inputs.file_info.filename
 
         t1 = time.time()
-        logging.warning(
+        logger.warning(
             "Insighter: title=%s, summary=%s",
             title,
             insight,
@@ -691,7 +693,7 @@ class L0Generator:
                 for _request in _requests
             ]
 
-            logging.info("generate inputs: %s", _requests)
+            logger.info("generate inputs: %s", _requests)
 
             responses = [
                 self.client.chat.completions.create(
@@ -783,7 +785,7 @@ class L0Generator:
             responses = get_text_generate(requests)
             results = get_summarize_title_keywords(responses)
 
-        logging.debug("results: %s", results)
+        logger.debug("results: %s", results)
         if isinstance(content, str):
             return results[0]
         else:
@@ -814,11 +816,11 @@ class L0Generator:
         try:
             datatype = DataType(datatype)
         except ValueError:
-            logging.warning("Unsupported dataType: %s. Processing as DOCUMENT by default", datatype)
+            logger.warning("Unsupported dataType: %s. Processing as DOCUMENT by default", datatype)
             datatype = DataType.DOCUMENT
 
-        logging.info("input filename=%s", filename)
-        logging.info("input content=%s (first 100 characters)", md.strip()[:100])
+        logger.info("input filename=%s", filename)
+        logger.info("input content=%s (first 100 characters)", md.strip()[:100])
         t0 = time.time()
         bottom_summary = self._tokenizer.decode(
             self._tokenizer.encode(insight)[:bottom_summary_len]
@@ -834,18 +836,18 @@ class L0Generator:
                 preferred_language=self.preferred_language,
             )
             if not (title or summary or keywords):
-                logging.warning("summary failed, use insight as summary")
+                logger.warning("summary failed, use insight as summary")
                 title, summary, keywords = filename, bottom_summary, []
                 if filename:
                     title = filename
         else:
-            logging.warning("less than 20 characters, use filename as title")
+            logger.warning("less than 20 characters, use filename as title")
             title, summary, keywords = md, md, []
             if filename:
                 title = filename
 
         t1 = time.time()
-        logging.warning(
+        logger.warning(
             "MarkdownChunkAPI summarize_title_abstract_keywords(): time spent %.2f seconds, title=%s, summary=%s",
             t1 - t0,
             title,

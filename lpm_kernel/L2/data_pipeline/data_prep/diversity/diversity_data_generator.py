@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 import json
 import os
+import logging
 import random
 import re
 import traceback
@@ -16,6 +17,19 @@ import lpm_kernel.L2.data_pipeline.data_prep.diversity.template_diversity as tem
 
 from lpm_kernel.configs.logging import get_train_process_logger
 logger = get_train_process_logger()
+
+
+class TqdmLoggingHandler:
+    def __init__(self):
+        pass
+    
+    def write(self, msg):
+        logger.info(msg.strip())
+    
+    def flush(self):
+        pass
+    
+tqdm_handler = TqdmLoggingHandler()
 
 
 class DiversityDataGenerator:
@@ -389,7 +403,7 @@ class DiversityDataGenerator:
             flat_question_types = []
             cnt = 0
             for future, cluster, question_type in zip(
-                tqdm(futures, total=len(futures), desc="Q_generate"),
+                tqdm(futures, total=len(futures), desc="Q_generate", file=tqdm_handler),
                 explode_clusters,
                 explode_questions_types,
             ):
@@ -418,7 +432,7 @@ class DiversityDataGenerator:
             answers = []
             answer_types = []
 
-            for future in tqdm(futures, total=len(futures), desc="A_generate"):
+            for future in tqdm(futures, total=len(futures), desc="A_generate", file=tqdm_handler):
                 try:
                     result, answer_type = future.result()
                     answers.append(result)
