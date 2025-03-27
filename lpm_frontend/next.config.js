@@ -8,7 +8,7 @@ const nextConfig = {
       },
       {
         source: '/api/:path*', // Ensure source starts with `/api/`
-        destination: 'http://127.0.0.1:8002/api/:path*' // Need to add `/api/` here
+        destination: 'http://backend:8002/api/:path*' // Use container name "backend" instead of 127.0.0.1
       }
     ];
   },
