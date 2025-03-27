@@ -106,19 +106,19 @@ docker-build-frontend:
 docker-restart-backend:
 	docker-compose stop backend
 	docker-compose rm -f backend
-	docker-compose build backend
+	docker-compose build backend || { echo "\033[1;31m❌ Backend build failed! Aborting operation...\033[0m"; exit 1; }
 	docker-compose up -d backend
 
 docker-restart-frontend:
 	docker-compose stop frontend
 	docker-compose rm -f frontend
-	docker-compose build frontend
+	docker-compose build frontend || { echo "\033[1;31m❌ Frontend build failed! Aborting operation...\033[0m"; exit 1; }
 	docker-compose up -d frontend
 
 docker-restart-all:
 	docker-compose stop
 	docker-compose rm -f
-	docker-compose build
+	docker-compose build || { echo "\033[1;31m❌ Build failed! Aborting operation...\033[0m"; exit 1; }
 	docker-compose up -d
 
 # Commands that require conda environment
