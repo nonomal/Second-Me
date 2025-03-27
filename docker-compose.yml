@@ -1,36 +1,68 @@
 version: '3.8'
 
 services:
-  second-me:
+  backend:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: second-me
+      dockerfile: Dockerfile.backend
+    container_name: second-me-backend
     restart: unless-stopped
     ports:
-      # 后端服务端口映射
+      # Backend service port mapping
       - "8002:8002"
-      # 前端服务端口映射
-      - "3000:3000"
-      # 额外的8080端口映射
+      # Additional 8080 port mapping
       - "8080:8080"
     volumes:
-      # 数据目录映射
+      # Data directory mapping
       - ./data:/app/data
-      # 日志目录映射
+      # Logs directory mapping
       - ./logs:/app/logs
-      # .env 文件映射
+      # Run directory mapping
+      - ./run:/app/run
+      # .env file mapping
       - ./.env:/app/.env
     environment:
-      # 设置环境变量
-      - CONDA_DEFAULT_ENV=second-me
+      # Environment variables
       - LOCAL_APP_PORT=8002
-      - LOCAL_FRONTEND_PORT=3000
     deploy:
       resources:
         limits:
-          # 设置容器内存限制为32GB
-          memory: 32G
+          # Set container memory limit to 24GB
+          memory: 24G
         reservations:
-          # 预留内存
+          # Memory reservation
+          memory: 6G
+    networks:
+      - second-me-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: second-me-frontend
+    restart: unless-stopped
+    ports:
+      # Frontend service port mapping
+      - "3000:3000"
+    volumes:
+      # Logs directory mapping
+      - ./logs:/app/logs
+    environment:
+      # Environment variables
+      - VITE_API_BASE_URL=http://backend:8002
+    depends_on:
+      - backend
+    deploy:
+      resources:
+        limits:
+          # Set container memory limit to 8GB
           memory: 8G
+        reservations:
+          # Memory reservation
+          memory: 2G
+    networks:
+      - second-me-network
+
+networks:
+  second-me-network:
+    driver: bridge

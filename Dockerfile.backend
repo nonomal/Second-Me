@@ -1,0 +1,81 @@
+FROM python:3.12
+
+# Avoid interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    curl \
+    wget \
+    lsof \
+    vim \
+    unzip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Poetry
+RUN pip install poetry
+
+# Configure Poetry not to create virtual environments (unnecessary in containers)
+RUN poetry config virtualenvs.create false
+
+# Copy dependency files first, leveraging Docker cache
+COPY pyproject.toml poetry.lock* /app/
+COPY README.md /app/
+
+# Copy the entire dependencies folder
+COPY dependencies/ /app/dependencies/
+
+# Use Poetry to install dependencies
+RUN poetry install --no-interaction --no-root
+
+# Install specific version of graphrag
+RUN GRAPHRAG_TARGET="1.2.1.dev27" && \
+    GRAPHRAG_LOCAL_PATH="dependencies/graphrag-${GRAPHRAG_TARGET}.tar.gz" && \
+    if [ -f "$GRAPHRAG_LOCAL_PATH" ]; then \
+        pip install --force-reinstall "$GRAPHRAG_LOCAL_PATH"; \
+    else \
+        echo "Warning: graphrag package not found at $GRAPHRAG_LOCAL_PATH"; \
+    fi
+
+# Build llama.cpp
+RUN set -e && \
+    LLAMA_LOCAL_ZIP="dependencies/llama.cpp.zip" && \
+    echo "Using local llama.cpp archive..." && \
+    unzip -q "$LLAMA_LOCAL_ZIP" && \
+    cd llama.cpp && \
+    mkdir -p build && cd build && \
+    cmake .. && \
+    cmake --build . --config Release && \
+    if [ ! -f "bin/llama-server" ]; then \
+        echo "Build failed: llama-server executable not found" && \
+        exit 1; \
+    else \
+        echo "Successfully built llama-server" && \
+        cd ../..; \
+    fi
+
+# Copy backend files only
+COPY lpm_kernel/ /app/lpm_kernel/
+COPY scripts/docker-entrypoint-backend.sh /app/docker-entrypoint.sh
+
+# Create necessary directories
+RUN mkdir -p /app/data /app/logs /app/run
+
+# Set Python environment
+ENV PYTHONUNBUFFERED=1
+
+# Expose backend port
+EXPOSE 8002
+EXPOSE 8080
+
+# Make entrypoint script executable
+RUN chmod +x /app/docker-entrypoint.sh
+
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
