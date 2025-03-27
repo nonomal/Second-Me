@@ -29,8 +29,6 @@ RUN poetry config virtualenvs.create false
 # Copy dependency files first, leveraging Docker cache
 COPY pyproject.toml poetry.lock* /app/
 COPY README.md /app/
-
-# Copy the entire dependencies folder
 COPY dependencies/ /app/dependencies/
 
 # Use Poetry to install dependencies
@@ -62,7 +60,7 @@ RUN set -e && \
         cd ../..; \
     fi
 
-# Copy backend files only
+# Copy backend files
 COPY lpm_kernel/ /app/lpm_kernel/
 
 # Copy initialization scripts
@@ -96,19 +94,20 @@ RUN echo "Initializing ChromaDB..." && \
 
 # Set Python environment
 ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app:${PYTHONPATH}
+ENV PYTHONPATH=/app
 ENV BASE_DIR=/app/data
 ENV LOCAL_LOG_DIR=/app/logs
 ENV RUN_DIR=/app/run
 ENV RESOURCES_DIR=/app/resources
 
+# Test that the module can be imported
+RUN python -c "import lpm_kernel; print('lpm_kernel module can be imported')"
+
 # Expose backend port
 EXPOSE 8002
 EXPOSE 8080
 
-# Create logs directory and ensure it's writable
-RUN mkdir -p /app/logs
-
 # Set the startup command
 CMD bash -c 'echo "Starting application at $(date)" >> /app/logs/backend.log && \
-             exec python -m lpm_kernel.main >> /app/logs/backend.log 2>&1'
+             cd /app && \
+             python -m lpm_kernel.main >> /app/logs/backend.log 2>&1'
