@@ -109,22 +109,21 @@ RUN echo "Initializing ChromaDB..." && \
         exit 1; \
     fi
 
-# Set Python environment
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app
-ENV BASE_DIR=/app/data
-ENV LOCAL_LOG_DIR=/app/logs
-ENV RUN_DIR=/app/run
-ENV RESOURCES_DIR=/app/resources
-ENV APP_ROOT=/app
-ENV FLASK_APP=lpm_kernel.app
+# Set Python environment variables - all in one layer
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    BASE_DIR=/app/data \
+    LOCAL_LOG_DIR=/app/logs \
+    RUN_DIR=/app/run \
+    RESOURCES_DIR=/app/resources \
+    APP_ROOT=/app \
+    FLASK_APP=lpm_kernel.app
 
 # Test that the module can be imported
 RUN python -c "import lpm_kernel; print('lpm_kernel module can be imported')"
 
 # Expose backend port
-EXPOSE 8002
-EXPOSE 8080
+EXPOSE 8002 8080
 
 # Set the startup command
 CMD bash -c 'echo "Starting application at $(date)" >> /app/logs/backend.log && \
