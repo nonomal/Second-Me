@@ -27,9 +27,14 @@ class BasePromptStrategy(SystemPromptStrategy):
     """Most basic system prompt building strategy"""
     def build_prompt(self, request: ChatRequest, context: Optional[Any] = None) -> str:
         """Return the basic system prompt"""
-        prompt = request.system_prompt
-        # logger.info(f"BasePromptStrategy: {prompt}")
-        return prompt
+        # Try to find a system message in the messages
+        if request.messages:
+            for message in request.messages:
+                if message.get('role') == 'system':
+                    return message.get('content', '')
+        
+        # Default empty prompt if no system message found
+        return ""
 
 class ContextEnhancedStrategy(SystemPromptStrategy):
     """Context-enhanced system prompt building strategy"""
@@ -52,12 +57,18 @@ class RoleBasedStrategy(SystemPromptStrategy):
 
     def build_prompt(self, request: ChatRequest, context: Optional[Any] = None) -> str:
         """Build system prompt based on role"""
-        if request.role_id:
-            role = role_service.get_role_by_uuid(request.role_id)
+        # Get role_id from metadata if available
+        role_id = None
+        if hasattr(request, 'metadata') and request.metadata:
+            role_id = request.metadata.get('role_id')
+        
+        if role_id:
+            role = role_service.get_role_by_uuid(role_id)
             if role:
                 prompt = role.system_prompt
                 logger.info(f"RoleBasedStrategy (from role): {prompt}")
                 return prompt
+                
         prompt = self.base_strategy.build_prompt(request, context)
         # logger.info(f"RoleBasedStrategy (from base): {prompt}")
         return prompt
@@ -70,12 +81,8 @@ class KnowledgeEnhancedStrategy(SystemPromptStrategy):
 
     def get_user_message(self, request: ChatRequest) -> str:
         """
-        Get user message from request. If message field is present, use that.
-        Otherwise, get the last user message from messages field.
+        Get the last user message from messages field.
         """
-        if request.message:
-            return request.message
-            
         if request.messages:
             # Find the last message with role='user'
             for message in reversed(request.messages):
@@ -93,12 +100,21 @@ class KnowledgeEnhancedStrategy(SystemPromptStrategy):
         
         # Add knowledge retrieval results if enabled
         knowledge_sections = []
-        
         user_message = self.get_user_message(request)
         
+        # Get configuration from metadata if available
+        enable_l0_retrieval = False
+        enable_l1_retrieval = False
+        role_id = None
+        
+        if hasattr(request, 'metadata') and request.metadata:
+            enable_l0_retrieval = request.metadata.get('enable_l0_retrieval', False)
+            enable_l1_retrieval = request.metadata.get('enable_l1_retrieval', False)
+            role_id = request.metadata.get('role_id')
+        
         # if role exists, role config has priority
-        if request.role_id:
-            role = role_service.get_role_by_uuid(request.role_id)
+        if role_id:
+            role = role_service.get_role_by_uuid(role_id)
             if role:
                 if role.enable_l0_retrieval:
                     l0_knowledge = default_retriever.retrieve(user_message)
@@ -110,13 +126,13 @@ class KnowledgeEnhancedStrategy(SystemPromptStrategy):
                         knowledge_sections.append(f"Reference shades:\n{l1_knowledge}")
         else:
             # Retrieve L0 knowledge if enabled
-            if request.enable_l0_retrieval:
+            if enable_l0_retrieval:
                 l0_knowledge = default_retriever.retrieve(user_message)
                 if l0_knowledge:
                     knowledge_sections.append(f"Reference knowledge:\n{l0_knowledge}")
             
             # Retrieve L1 knowledge if enabled
-            if request.enable_l1_retrieval:
+            if enable_l1_retrieval:
                 l1_knowledge = default_l1_retriever.retrieve(user_message)
                 if l1_knowledge:
                     knowledge_sections.append(f"Reference shades:\n{l1_knowledge}")

@@ -1,6 +1,6 @@
 from typing import List, Dict, Any, Type, Optional
 
-from lpm_kernel.api.domains.kernel2.dto.chat_dto import ChatRequest, ChatMessage
+from lpm_kernel.api.domains.kernel2.dto.chat_dto import ChatRequest
 from lpm_kernel.api.domains.kernel2.services.prompt_builder import (
     SystemPromptBuilder,
     SystemPromptStrategy,
@@ -33,49 +33,50 @@ class MultiTurnMessageBuilder(MessageBuilder):
         
     def build_messages(self, context: Optional[Any] = None) -> List[Dict[str, Any]]:
         """Build messages for multi-turn chat"""
-        messages = []
 
-        # if OpenAI supported messages field is provided, use it directly
-        if self.chat_request.messages:
-            # get messages' system_prompt, history and tmp message
-            system_messages = []
-            history = []
-            current_message = None
+        # Since we now use standard OpenAI format, directly return the messages
+        # without any transformation
+        # if self.chat_request.messages:
+        #     # get messages' system_prompt, history and tmp message
+        #     system_messages = []
+        #     history = []
+        #     current_message = None
             
-            for msg in self.chat_request.messages:
-                role = msg.get("role", "")
-                content = msg.get("content", "")
+        #     for msg in self.chat_request.messages:
+        #         role = msg.get("role", "")
+        #         content = msg.get("content", "")
                 
-                if role == "system":
-                    system_messages.append(content)
-                elif role == "user" or role == "assistant":
-                    # if current message has been set, add to history
-                    if current_message is not None and role == "user":
-                        history.append({"role": "user", "content": current_message})
-                        current_message = content
-                    elif current_message is not None and role == "assistant":
-                        history.append({"role": "assistant", "content": content})
-                    else:
-                        # the first non-system message is the current user message
-                        if role == "user" and current_message is None:
-                            current_message = content
-                        else:
-                            # else add to chat history
-                            history.append({"role": role, "content": content})
+        #         if role == "system":
+        #             system_messages.append(content)
+        #         elif role == "user" or role == "assistant":
+        #             # if current message has been set, add to history
+        #             if current_message is not None and role == "user":
+        #                 history.append({"role": "user", "content": current_message})
+        #                 current_message = content
+        #             elif current_message is not None and role == "assistant":
+        #                 history.append({"role": "assistant", "content": content})
+        #             else:
+        #                 # the first non-system message is the current user message
+        #                 if role == "user" and current_message is None:
+        #                     current_message = content
+        #                 else:
+        #                     # else add to chat history
+        #                     history.append({"role": role, "content": content})
             
-            # update chat_request related fields
-            if system_messages:
-                self.chat_request.system_prompt = "\n".join(system_messages)
+        #     # update chat_request related fields
+        #     if system_messages:
+        #         self.chat_request.system_prompt = "\n".join(system_messages)
             
-            if history:
-                self.chat_request.history = [
-                    ChatMessage(role=msg["role"], content=msg["content"]) 
-                    for msg in history
-                ]
+        #     if history:
+        #         self.chat_request.history = [
+        #             ChatMessage(role=msg["role"], content=msg["content"]) 
+        #             for msg in history
+        #         ]
             
-            if current_message:
-                self.chat_request.message = current_message
+        #     if current_message:
+        #         self.chat_request.message = current_message
 
+        messages = self.chat_request.messages
         # 1. Build system prompt
         builder = SystemPromptBuilder()
         
@@ -95,16 +96,6 @@ class MultiTurnMessageBuilder(MessageBuilder):
             
         builder.set_strategy(current_strategy)
         system_prompt = builder.build_prompt(self.chat_request, context)
-        messages.append({"role": "system", "content": system_prompt})
+        self.chat_request.messages.append({"role": "system", "content": system_prompt})
 
-        # 2. Add history messages
-        for msg in self.chat_request.history:
-            if msg.role == "user":
-                msg.content = msg.content
-            messages.append({"role": msg.role, "content": msg.content})
-
-        # 3. Add current message
-        current_message = self.chat_request.message
-        messages.append({"role": "user", "content": current_message})
-        
         return messages

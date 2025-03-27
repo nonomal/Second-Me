@@ -8,7 +8,6 @@ from typing import Iterator, Any, Optional, Generator, Dict
 from datetime import datetime
 from flask import Response
 from openai import OpenAI
-from lpm_kernel.api.domains.kernel2.dto.chat_dto import ChatRequest
 from lpm_kernel.api.domains.kernel2.dto.server_dto import ServerStatus, ProcessInfo
 from lpm_kernel.configs.config import Config
 import uuid
@@ -259,6 +258,15 @@ class LocalLLMService:
                         logger.info("Received [DONE] marker")
                         yield b"data: [DONE]\n\n"
                         return  # Use return instead of break to ensure [DONE] in finally won't be executed
+                    
+                    # Handle OpenAI error format directly
+                    if isinstance(chunk, dict) and "error" in chunk:
+                        logger.warning(f"Received error response: {chunk}")
+                        data_str = json.dumps(chunk)
+                        yield f"data: {data_str}\n\n".encode('utf-8')
+                        # After sending error, send [DONE] marker to close the stream properly
+                        yield b"data: [DONE]\n\n"
+                        return
                     
                     response_data = self._parse_response_chunk(chunk)
                     if response_data:

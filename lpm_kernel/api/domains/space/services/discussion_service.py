@@ -193,7 +193,10 @@ class DiscussionService:
         """
         try:
             # logger.info("Starting host opening process")
-            request = ChatRequest(message="Please start hosting the discussion", enable_l0_retrieval=True)
+            request = ChatRequest(
+                messages=[{"role": "user", "content": "Please start hosting the discussion"}],
+                metadata={"enable_l0_retrieval": True}
+            )
             
             # Get the host endpoint's corresponding client
             host_endpoint = context_manager.space_dto.host
@@ -266,7 +269,10 @@ class DiscussionService:
             context_manager.current_participant = participant
             
             # Create a chat request
-            request = ChatRequest(message="Please share your thoughts", enable_l0_retrieval=True)
+            request = ChatRequest(
+                messages=[{"role": "user", "content": "Please share your thoughts"}],
+                metadata={"enable_l0_retrieval": True}
+            )
             
             # Get the participant endpoint's corresponding client
             client = self._get_client_for_endpoint(participant)
@@ -325,7 +331,9 @@ class DiscussionService:
             Created summary message, returns None if failed
         """
         try:
-            request = ChatRequest(message="Please summarize this discussion")
+            request = ChatRequest(
+                messages=[{"role": "user", "content": "Please summarize this discussion"}]
+            )
             
             # Get the host endpoint's corresponding client
             host_endpoint = context_manager.space_dto.host
