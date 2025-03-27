@@ -37,11 +37,7 @@ RUN poetry install --no-interaction --no-root
 # Install specific version of graphrag
 RUN GRAPHRAG_TARGET="1.2.1.dev27" && \
     GRAPHRAG_LOCAL_PATH="dependencies/graphrag-${GRAPHRAG_TARGET}.tar.gz" && \
-    if [ -f "$GRAPHRAG_LOCAL_PATH" ]; then \
-        pip install --force-reinstall "$GRAPHRAG_LOCAL_PATH"; \
-    else \
-        echo "Warning: graphrag package not found at $GRAPHRAG_LOCAL_PATH"; \
-    fi
+    pip install --force-reinstall "$GRAPHRAG_LOCAL_PATH"
 
 # Build llama.cpp
 RUN set -e && \
@@ -73,41 +69,55 @@ RUN mkdir -p /app/data/sqlite \
     /app/run \
     /app/resources
 
-# Create initial database structure (fail if init.sql not found)
+# Create initial database structure
 RUN echo "Creating initial database structure..." && \
-    if [ -f "/app/docker/sqlite/init.sql" ]; then \
-        mkdir -p /app/data/sqlite && \
-        cat /app/docker/sqlite/init.sql | sqlite3 /app/data/sqlite/lpm.db && \
-        echo "Initial database created" && \
+    mkdir -p /app/data/sqlite && \
+    echo "Executing SQL file with .read command..." && \
+    sqlite3 /app/data/sqlite/lpm.db ".read /app/docker/sqlite/init.sql" && \
+    echo "Initial database created" && \
+    \
+    # Show SQL file content for debugging
+    echo "First 10 lines of init.sql:" && \
+    head -10 /app/docker/sqlite/init.sql && \
+    \
+    # Verify tables were created successfully
+    echo "Verifying created tables..." && \
+    TABLES=$(sqlite3 /app/data/sqlite/lpm.db ".tables") && \
+    echo "Tables created: $TABLES" && \
+    \
+    # Check for specific tables
+    echo "Checking for specific tables..." && \
+    USER_CONFIG_COUNT=$(sqlite3 /app/data/sqlite/lpm.db "SELECT count(name) FROM sqlite_master WHERE type='table' AND name='user_llm_configs';") && \
+    echo "user_llm_configs table exists: $USER_CONFIG_COUNT" && \
+    \
+    # Check for critical tables - use grep instead of [[ ]] for sh compatibility
+    if ! echo "$TABLES" | grep -q "user_llm_configs"; then \
+        echo "ERROR: Critical table 'user_llm_configs' was not created!" && \
+        echo "Attempting to create table directly..." && \
+        sqlite3 /app/data/sqlite/lpm.db "CREATE TABLE IF NOT EXISTS user_llm_configs (id INTEGER PRIMARY KEY AUTOINCREMENT, provider_type VARCHAR(50) NOT NULL DEFAULT 'openai', key VARCHAR(200), chat_endpoint VARCHAR(200), chat_api_key VARCHAR(200), chat_model_name VARCHAR(200), embedding_endpoint VARCHAR(200), embedding_api_key VARCHAR(200), embedding_model_name VARCHAR(200), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);" && \
+        sqlite3 /app/data/sqlite/lpm.db "CREATE INDEX IF NOT EXISTS idx_user_llm_configs_created_at ON user_llm_configs(created_at);" && \
         \
-        # Verify tables were created successfully
-        TABLES=$(sqlite3 /app/data/sqlite/lpm.db ".tables") && \
-        echo "Tables created: $TABLES" && \
+        # Verify again after direct creation
+        TABLES_AFTER=$(sqlite3 /app/data/sqlite/lpm.db ".tables") && \
+        echo "Tables after direct creation: $TABLES_AFTER" && \
         \
-        # Check for critical tables - use grep instead of [[ ]] for sh compatibility
-        if ! echo "$TABLES" | grep -q "user_llm_configs"; then \
-            echo "ERROR: Critical table 'user_llm_configs' was not created!" && \
-            exit 1; \
-        elif ! echo "$TABLES" | grep -q "document"; then \
-            echo "ERROR: Critical table 'document' was not created!" && \
+        if ! echo "$TABLES_AFTER" | grep -q "user_llm_configs"; then \
+            echo "ERROR: Still could not create user_llm_configs table!" && \
             exit 1; \
         else \
-            echo "Database initialization verified successfully"; \
+            echo "Successfully created user_llm_configs table manually."; \
         fi \
-    else \
-        echo "ERROR: init.sql not found at /app/docker/sqlite/init.sql - Cannot proceed without database initialization!" && \
+    elif ! echo "$TABLES" | grep -q "document"; then \
+        echo "ERROR: Critical table 'document' was not created!" && \
         exit 1; \
+    else \
+        echo "Database initialization verified successfully"; \
     fi
 
-# Initialize ChromaDB (fail if init script not found)
+# Initialize ChromaDB
 RUN echo "Initializing ChromaDB..." && \
-    if [ -f "/app/docker/app/init_chroma.py" ]; then \
-        python /app/docker/app/init_chroma.py && \
-        echo "ChromaDB initialized"; \
-    else \
-        echo "ERROR: init_chroma.py not found - Cannot proceed without ChromaDB initialization!" && \
-        exit 1; \
-    fi
+    python /app/docker/app/init_chroma.py && \
+    echo "ChromaDB initialized"
 
 # Set Python environment variables - all in one layer
 ENV PYTHONUNBUFFERED=1 \
