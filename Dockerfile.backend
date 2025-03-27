@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y \
     lsof \
     vim \
     unzip \
+    sqlite3 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -63,19 +64,51 @@ RUN set -e && \
 
 # Copy backend files only
 COPY lpm_kernel/ /app/lpm_kernel/
-COPY scripts/docker-entrypoint-backend.sh /app/docker-entrypoint.sh
 
-# Create necessary directories
-RUN mkdir -p /app/data /app/logs /app/run
+# Copy initialization scripts
+COPY docker/ /app/docker/
+
+# Create necessary directories for data storage
+RUN mkdir -p /app/data/sqlite \
+    /app/data/chroma_db \
+    /app/logs \
+    /app/run \
+    /app/resources
+
+# Create initial database structure (will be overridden by mounted volume)
+RUN echo "Creating initial database structure..." && \
+    if [ -f "/app/docker/sqlite/init.sql" ]; then \
+        mkdir -p /app/data/sqlite && \
+        cat /app/docker/sqlite/init.sql | sqlite3 /app/data/sqlite/lpm.db && \
+        echo "Initial database created"; \
+    else \
+        echo "Warning: init.sql not found, skipping database initialization"; \
+    fi
+
+# Initialize ChromaDB (will be overridden by mounted volume)
+RUN echo "Initializing ChromaDB..." && \
+    if [ -f "/app/docker/app/init_chroma.py" ]; then \
+        python /app/docker/app/init_chroma.py && \
+        echo "ChromaDB initialized"; \
+    else \
+        echo "Warning: init_chroma.py not found, skipping ChromaDB initialization"; \
+    fi
 
 # Set Python environment
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app:${PYTHONPATH}
+ENV BASE_DIR=/app/data
+ENV LOCAL_LOG_DIR=/app/logs
+ENV RUN_DIR=/app/run
+ENV RESOURCES_DIR=/app/resources
 
 # Expose backend port
 EXPOSE 8002
 EXPOSE 8080
 
-# Make entrypoint script executable
-RUN chmod +x /app/docker-entrypoint.sh
+# Create logs directory and ensure it's writable
+RUN mkdir -p /app/logs
 
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
+# Set the startup command
+CMD bash -c 'echo "Starting application at $(date)" >> /app/logs/backend.log && \
+             exec python -m lpm_kernel.main >> /app/logs/backend.log 2>&1'
