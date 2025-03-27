@@ -45,16 +45,20 @@ RUN poetry install --no-interaction --no-root \
 COPY docker/ /app/docker/
 COPY lpm_kernel/ /app/lpm_kernel/
 
-# Initialize database
+# Initialize SQLite database
 RUN echo "Creating initial database structure..." \
     && sqlite3 /app/data/sqlite/lpm.db ".read /app/docker/sqlite/init.sql" \
     && echo "Database initialized" \
     && echo "Tables created in database:" \
-    && sqlite3 /app/data/sqlite/lpm.db ".tables" \
-    && echo "Initializing ChromaDB..." \
+    && sqlite3 /app/data/sqlite/lpm.db ".tables"
+
+# Initialize ChromaDB
+RUN echo "Initializing ChromaDB..." \
     && python /app/docker/app/init_chroma.py \
-    && echo "ChromaDB initialized" \
-    && python -c "import lpm_kernel; print('Module import check passed')"
+    && echo "ChromaDB initialized"
+
+# Check module import
+RUN python -c "import lpm_kernel; print('Module import check passed')"
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
