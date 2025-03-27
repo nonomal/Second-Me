@@ -19,6 +19,8 @@ services:
       - ./logs:/app/logs
       # Run directory mapping
       - ./run:/app/run
+      # Resources directory mapping
+      - ./resources:/app/resources
       # .env file mapping
       - ./.env:/app/.env
     environment:
@@ -47,6 +49,8 @@ services:
     volumes:
       # Logs directory mapping
       - ./logs:/app/logs
+      # Resources directory mapping for frontend
+      - ./resources:/app/resources
     environment:
       # Environment variables
       - VITE_API_BASE_URL=http://backend:8002

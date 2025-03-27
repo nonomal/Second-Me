@@ -22,4 +22,4 @@ RUN mkdir -p /app/logs
 EXPOSE 3000
 
 # Start frontend service
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+CMD ["npm", "run", "dev"]
