@@ -84,11 +84,11 @@ RUN echo "Creating initial database structure..." && \
         TABLES=$(sqlite3 /app/data/sqlite/lpm.db ".tables") && \
         echo "Tables created: $TABLES" && \
         \
-        # Check for critical tables
-        if [[ $TABLES != *"user_llm_configs"* ]]; then \
+        # Check for critical tables - use grep instead of [[ ]] for sh compatibility
+        if ! echo "$TABLES" | grep -q "user_llm_configs"; then \
             echo "ERROR: Critical table 'user_llm_configs' was not created!" && \
             exit 1; \
-        elif [[ $TABLES != *"document"* ]]; then \
+        elif ! echo "$TABLES" | grep -q "document"; then \
             echo "ERROR: Critical table 'document' was not created!" && \
             exit 1; \
         else \
