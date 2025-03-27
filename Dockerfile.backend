@@ -45,18 +45,6 @@ RUN poetry install --no-interaction --no-root \
 COPY docker/ /app/docker/
 COPY lpm_kernel/ /app/lpm_kernel/
 
-# Initialize SQLite database
-RUN echo "Creating initial database structure..." \
-    && sqlite3 /app/data/sqlite/lpm.db ".read /app/docker/sqlite/init.sql" \
-    && echo "Database initialized" \
-    && echo "Tables created in database:" \
-    && sqlite3 /app/data/sqlite/lpm.db ".tables"
-
-# Initialize ChromaDB
-RUN echo "Initializing ChromaDB..." \
-    && python /app/docker/app/init_chroma.py \
-    && echo "ChromaDB initialized"
-
 # Check module import
 RUN python -c "import lpm_kernel; print('Module import check passed')"
 
@@ -74,4 +62,4 @@ ENV PYTHONUNBUFFERED=1 \
 EXPOSE 8002 8080
 
 # Set the startup command
-CMD bash -c 'echo "Starting application at $(date)" >> /app/logs/backend.log && cd /app && python -m flask run --host=0.0.0.0 --port=${LOCAL_APP_PORT:-8002} >> /app/logs/backend.log 2>&1'
+CMD ["bash", "-c", "echo \"Checking SQLite database...\" && if [ ! -s /app/data/sqlite/lpm.db ]; then echo \"SQLite database not found or empty, initializing...\" && mkdir -p /app/data/sqlite && sqlite3 /app/data/sqlite/lpm.db \".read /app/docker/sqlite/init.sql\" && echo \"SQLite database initialized successfully\" && echo \"Tables created:\" && sqlite3 /app/data/sqlite/lpm.db \".tables\"; else echo \"SQLite database already exists, skipping initialization\"; fi && echo \"Checking ChromaDB...\" && if [ ! -d /app/data/chroma_db/documents ] || [ ! -d /app/data/chroma_db/document_chunks ]; then echo \"ChromaDB collections not found, initializing...\" && python /app/docker/app/init_chroma.py && echo \"ChromaDB initialized successfully\"; else echo \"ChromaDB already exists, skipping initialization\"; fi && echo \"Starting application at $(date)\" >> /app/logs/backend.log && cd /app && python -m flask run --host=0.0.0.0 --port=${LOCAL_APP_PORT:-8002} >> /app/logs/backend.log 2>&1"]
