@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  second-me:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: second-me
+    restart: unless-stopped
+    ports:
+      # 后端服务端口映射
+      - "8002:8002"
+      # 前端服务端口映射
+      - "3000:3000"
+      # 额外的8080端口映射
+      - "8080:8080"
+    volumes:
+      # 数据目录映射
+      - ./data:/app/data
+      # 日志目录映射
+      - ./logs:/app/logs
+      # .env 文件映射
+      - ./.env:/app/.env
+    environment:
+      # 设置环境变量
+      - CONDA_DEFAULT_ENV=second-me
+      - LOCAL_APP_PORT=8002
+      - LOCAL_FRONTEND_PORT=3000
+    deploy:
+      resources:
+        limits:
+          # 设置容器内存限制为32GB
+          memory: 32G
+        reservations:
+          # 预留内存
+          memory: 8G
