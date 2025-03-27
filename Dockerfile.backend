@@ -73,23 +73,40 @@ RUN mkdir -p /app/data/sqlite \
     /app/run \
     /app/resources
 
-# Create initial database structure (will be overridden by mounted volume)
+# Create initial database structure (fail if init.sql not found)
 RUN echo "Creating initial database structure..." && \
     if [ -f "/app/docker/sqlite/init.sql" ]; then \
         mkdir -p /app/data/sqlite && \
         cat /app/docker/sqlite/init.sql | sqlite3 /app/data/sqlite/lpm.db && \
-        echo "Initial database created"; \
+        echo "Initial database created" && \
+        \
+        # Verify tables were created successfully
+        TABLES=$(sqlite3 /app/data/sqlite/lpm.db ".tables") && \
+        echo "Tables created: $TABLES" && \
+        \
+        # Check for critical tables
+        if [[ $TABLES != *"user_llm_configs"* ]]; then \
+            echo "ERROR: Critical table 'user_llm_configs' was not created!" && \
+            exit 1; \
+        elif [[ $TABLES != *"document"* ]]; then \
+            echo "ERROR: Critical table 'document' was not created!" && \
+            exit 1; \
+        else \
+            echo "Database initialization verified successfully"; \
+        fi \
     else \
-        echo "Warning: init.sql not found, skipping database initialization"; \
+        echo "ERROR: init.sql not found at /app/docker/sqlite/init.sql - Cannot proceed without database initialization!" && \
+        exit 1; \
     fi
 
-# Initialize ChromaDB (will be overridden by mounted volume)
+# Initialize ChromaDB (fail if init script not found)
 RUN echo "Initializing ChromaDB..." && \
     if [ -f "/app/docker/app/init_chroma.py" ]; then \
         python /app/docker/app/init_chroma.py && \
         echo "ChromaDB initialized"; \
     else \
-        echo "Warning: init_chroma.py not found, skipping ChromaDB initialization"; \
+        echo "ERROR: init_chroma.py not found - Cannot proceed without ChromaDB initialization!" && \
+        exit 1; \
     fi
 
 # Set Python environment
