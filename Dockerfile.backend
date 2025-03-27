@@ -1,8 +1,5 @@
 FROM python:3.12
 
-# Avoid interactive prompts
-ENV DEBIAN_FRONTEND=noninteractive
-
 # Set working directory
 WORKDIR /app
 
@@ -14,13 +11,12 @@ RUN apt-get update && apt-get install -y \
     && pip install poetry \
     && poetry config virtualenvs.create false
 
-# Copy dependency files and install dependencies
-COPY pyproject.toml poetry.lock* README.md /app/
-COPY dependencies/ /app/dependencies/
-RUN poetry install --no-interaction --no-root \
-    && GRAPHRAG_TARGET="1.2.1.dev27" \
-    && GRAPHRAG_LOCAL_PATH="dependencies/graphrag-${GRAPHRAG_TARGET}.tar.gz" \
-    && pip install --force-reinstall "$GRAPHRAG_LOCAL_PATH"
+# Create directories
+RUN mkdir -p /app/dependencies /app/data/sqlite /app/data/chroma_db /app/logs /app/run /app/resources
+
+# Copy dependency files - 很少变化的文件
+COPY dependencies/graphrag-1.2.1.dev27.tar.gz /app/dependencies/
+COPY dependencies/llama.cpp.zip /app/dependencies/
 
 # Build llama.cpp
 RUN LLAMA_LOCAL_ZIP="dependencies/llama.cpp.zip" \
@@ -36,13 +32,20 @@ RUN LLAMA_LOCAL_ZIP="dependencies/llama.cpp.zip" \
          echo "Successfully built llama-server"; \
        fi
 
-# Copy backend files and initialization scripts
-COPY lpm_kernel/ /app/lpm_kernel/
-COPY docker/ /app/docker/
+# 
+# Copy project configuration - 偶尔变化的文件
+COPY pyproject.toml README.md /app/
 
-# Create directories and initialize database
-RUN mkdir -p /app/data/sqlite /app/data/chroma_db /app/logs /app/run /app/resources \
-    && echo "Creating initial database structure..." \
+RUN poetry install --no-interaction --no-root \
+    && pip install --force-reinstall dependencies/graphrag-1.2.1.dev27.tar.gz
+
+
+# Copy source code - 经常变化的文件
+COPY docker/ /app/docker/
+COPY lpm_kernel/ /app/lpm_kernel/
+
+# Initialize database
+RUN echo "Creating initial database structure..." \
     && sqlite3 /app/data/sqlite/lpm.db ".read /app/docker/sqlite/init.sql" \
     && echo "Database initialized" \
     && echo "Tables created in database:" \
