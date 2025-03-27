@@ -99,6 +99,8 @@ ENV BASE_DIR=/app/data
 ENV LOCAL_LOG_DIR=/app/logs
 ENV RUN_DIR=/app/run
 ENV RESOURCES_DIR=/app/resources
+ENV APP_ROOT=/app
+ENV FLASK_APP=lpm_kernel.app
 
 # Test that the module can be imported
 RUN python -c "import lpm_kernel; print('lpm_kernel module can be imported')"
@@ -110,4 +112,4 @@ EXPOSE 8080
 # Set the startup command
 CMD bash -c 'echo "Starting application at $(date)" >> /app/logs/backend.log && \
              cd /app && \
-             python -m lpm_kernel.main >> /app/logs/backend.log 2>&1'
+             python -m flask run --host=0.0.0.0 --port=${LOCAL_APP_PORT:-8002} >> /app/logs/backend.log 2>&1'
