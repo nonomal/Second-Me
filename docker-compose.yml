@@ -21,6 +21,8 @@ services:
       - ./run:/app/run
       # Resources directory mapping
       - ./resources:/app/resources
+      # Docker directory mapping (for initialization scripts)
+      - ./docker:/app/docker
       # .env file mapping
       - ./.env:/app/.env
     environment:
