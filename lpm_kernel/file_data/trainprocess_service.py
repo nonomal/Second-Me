@@ -536,7 +536,7 @@ class TrainProcessService:
             l2_generator = L2Generator(
                 data_path=os.path.join(os.getcwd(), "resources")
                 )  
-            l2_generator.gen_subjective_data(                
+            l2_generator.gen_selfqa_data(                
                     self.l2_data["notes"],
                     self.l2_data["basic_info"],
                     self.l2_data["data_output_base_dir"],
