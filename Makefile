@@ -9,7 +9,7 @@
 #   make restart-force - Force restart and reset data
 #   make status       - Show status of all services
 
-.PHONY: install test format lint all setup start stop restart restart-backend restart-force help check-conda check-env
+.PHONY: install test format lint all setup start stop restart restart-backend restart-force help check-conda check-env docker-build docker-up docker-down docker-build-backend docker-build-frontend docker-restart-backend docker-restart-frontend docker-restart-all
 
 # Show help message
 help:
@@ -32,6 +32,16 @@ help:
 	@echo "  make restart-backend       - Restart only backend service"
 	@echo "  make restart-force         - Force restart and reset data"
 	@echo "  make status                - Show status of all services"
+	@echo ""
+	@echo "\033[1;32m▶ DOCKER COMMANDS:\033[0m"
+	@echo "  make docker-build          - Build all Docker images"
+	@echo "  make docker-up             - Start all Docker containers"
+	@echo "  make docker-down           - Stop all Docker containers"
+	@echo "  make docker-build-backend  - Build only backend Docker image"
+	@echo "  make docker-build-frontend - Build only frontend Docker image"
+	@echo "  make docker-restart-backend - Restart only backend container"
+	@echo "  make docker-restart-frontend - Restart only frontend container"
+	@echo "  make docker-restart-all    - Restart all Docker containers"
 	@echo ""
 	@echo "\033[1mAll Available Commands:\033[0m"
 	@echo "  make help                  - Show this help message"
@@ -76,6 +86,42 @@ restart-force:
 
 status:
 	zsh ./scripts/status.sh
+
+# Docker commands
+# Set Docker environment variable for all Docker commands
+docker-%: export IN_DOCKER_ENV=1
+docker-build:
+	docker-compose build
+
+docker-up:
+	docker-compose up -d
+
+docker-down:
+	docker-compose down
+
+docker-build-backend:
+	docker-compose build backend
+
+docker-build-frontend:
+	docker-compose build frontend
+
+docker-restart-backend:
+	docker-compose stop backend
+	docker-compose rm -f backend
+	docker-compose build backend || { echo "\033[1;31m❌ Backend build failed! Aborting operation...\033[0m"; exit 1; }
+	docker-compose up -d backend
+
+docker-restart-frontend:
+	docker-compose stop frontend
+	docker-compose rm -f frontend
+	docker-compose build frontend || { echo "\033[1;31m❌ Frontend build failed! Aborting operation...\033[0m"; exit 1; }
+	docker-compose up -d frontend
+
+docker-restart-all:
+	docker-compose stop
+	docker-compose rm -f
+	docker-compose build || { echo "\033[1;31m❌ Build failed! Aborting operation...\033[0m"; exit 1; }
+	docker-compose up -d
 
 # Commands that require conda environment
 install: check-conda

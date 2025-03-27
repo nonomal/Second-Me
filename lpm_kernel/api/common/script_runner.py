@@ -43,6 +43,55 @@ class ScriptRunner:
         """
         return os.environ.get("CONDA_DEFAULT_ENV")
 
+    def _check_execution_env(self) -> Dict[str, str]:
+        """
+        Get current execution environment information, supporting conda, docker or regular system environment
+        Returns:
+            Dict[str, str]: Dictionary containing environment type and detailed information
+        """
+        env_info = {
+            "type": "system",
+            "details": "Unknown environment"
+        }
+        
+        # Check if in conda environment
+        conda_env = self._check_conda_env()
+        if conda_env:
+            env_info["type"] = "conda"
+            env_info["details"] = conda_env
+            return env_info
+        
+        # Check if in docker environment - first check environment variable
+        if os.environ.get("IN_DOCKER_ENV") == "1":
+            env_info["type"] = "docker"
+            env_info["details"] = "docker-env-variable"
+            return env_info
+        
+        # Then check if .dockerenv file exists
+        if os.path.exists("/.dockerenv"):
+            env_info["type"] = "docker"
+            container_id = "unknown"
+            try:
+                with open("/proc/self/cgroup", "r") as f:
+                    for line in f:
+                        if "docker" in line:
+                            container_id = line.split("/")[-1].strip()
+                            break
+            except Exception:
+                pass
+            env_info["details"] = f"container:{container_id}"
+            return env_info
+        
+        # Regular system environment
+        try:
+            import platform
+            system_info = platform.platform()
+            env_info["details"] = system_info
+        except Exception:
+            pass
+            
+        return env_info
+
     def _check_python_version(self) -> str:
         """
         Get Python version information
@@ -73,11 +122,10 @@ class ScriptRunner:
             if not os.path.exists(script_path):
                 raise FileNotFoundError(f"Script does not exist: {script_path}")
 
-            # Get conda environment
-            conda_env = self._check_conda_env()
-            if not conda_env:
-                raise EnvironmentError("Unable to get conda environment information")
-
+            # Get execution environment information
+            env_info = self._check_execution_env()
+            logger.info(f"Running in environment: {env_info['type']} ({env_info['details']})")
+            
             # Prepare log file
             log_file = self.base_log_path
             logger.info(f"Starting {script_type} task, log file: {log_file}")
@@ -139,7 +187,7 @@ class ScriptRunner:
 
             return {
                 "pid": pid,
-                "conda_env": conda_env,
+                "environment": env_info,
                 "log_file": log_file,
                 "exit_code": exit_code,
             }

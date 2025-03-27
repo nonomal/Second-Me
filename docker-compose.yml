@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: second-me-backend
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./run:/app/run
+      - ./resources:/app/resources
+      - ./docker:/app/docker
+      - ./.env:/app/.env
+    environment:
+      # Environment variables
+      - LOCAL_APP_PORT=8002
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        limits:
+          # Set container memory limit to 24GB
+          memory: 24G
+        reservations:
+          # Memory reservation
+          memory: 6G
+    networks:
+      - second-me-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: second-me-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./logs:/app/logs
+      - ./resources:/app/resources
+    environment:
+      - VITE_API_BASE_URL=http://backend:8002
+    depends_on:
+      - backend
+    deploy:
+      resources:
+        limits:
+          # Set container memory limit to 8GB
+          memory: 8G
+        reservations:
+          # Memory reservation
+          memory: 2G
+    networks:
+      - second-me-network
+
+networks:
+  second-me-network:
+    driver: bridge

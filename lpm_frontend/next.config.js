@@ -1,14 +1,19 @@
 const nextConfig = {
   reactStrictMode: false,
   async rewrites() {
+    const dockerApiBaseUrl = process.env.DOCKER_API_BASE_URL;
+    const localApiBaseUrl = `${process.env.HOST_ADDRESS || 'http://127.0.0.1'}:${process.env.LOCAL_APP_PORT || 8002}`;
+
     return [
       {
         source: '/',
         destination: '/home'
       },
       {
-        source: '/api/:path*', // Ensure source starts with `/api/`
-        destination: 'http://127.0.0.1:8002/api/:path*' // Need to add `/api/` here
+        source: '/api/:path*',
+        destination: dockerApiBaseUrl
+          ? `${dockerApiBaseUrl}/api/:path*`
+          : `${localApiBaseUrl}/api/:path*`
       }
     ];
   },
@@ -35,7 +40,7 @@ const nextConfig = {
     ];
   },
   experimental: {
-    proxyTimeout: 0 // Disable proxy timeout
+    proxyTimeout: 0
   },
   compiler: {
     styledComponents: true

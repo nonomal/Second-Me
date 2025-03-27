@@ -230,6 +230,16 @@ start_services() {
         
         log_info "Starting frontend service..."
         cd lpm_frontend
+
+        # Copy environment variables from root directory to frontend directory
+        log_info "Copying environment variables to frontend directory..."
+        if [[ -f "../.env" ]]; then
+            # Extract required environment variables and create frontend .env file
+            grep -E "^(HOST_ADDRESS|LOCAL_APP_PORT)=" "../.env" > .env
+            log_success "Environment variables copied to frontend .env file"
+        else
+            log_warning "Root directory .env file does not exist, cannot copy environment variables"
+        fi
         
         # Check if node_modules exists
         if [ ! -d "node_modules" ]; then
