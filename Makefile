@@ -88,6 +88,8 @@ status:
 	zsh ./scripts/status.sh
 
 # Docker commands
+# Set Docker environment variable for all Docker commands
+docker-%: export IN_DOCKER_ENV=1
 docker-build:
 	docker-compose build
 

@@ -61,7 +61,13 @@ class ScriptRunner:
             env_info["details"] = conda_env
             return env_info
         
-        # Check if in docker environment
+        # Check if in docker environment - first check environment variable
+        if os.environ.get("IN_DOCKER_ENV") == "1":
+            env_info["type"] = "docker"
+            env_info["details"] = "docker-env-variable"
+            return env_info
+        
+        # Then check if .dockerenv file exists
         if os.path.exists("/.dockerenv"):
             env_info["type"] = "docker"
             container_id = "unknown"

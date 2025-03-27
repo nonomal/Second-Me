@@ -13,49 +13,16 @@ logger.error("ERROR: ScriptExecutor module loaded")
 
 class ScriptExecutor:
     def __init__(self):
-        self.environment = self._detect_environment()
-
-    def _detect_environment(self) -> Dict[str, str]:
-        """
-        Detect the current execution environment (conda, docker, system)
+        # Check if running in Docker environment
+        self.in_docker = os.getenv("IN_DOCKER_ENV") == "1" or os.path.exists("/.dockerenv")
         
-        Returns:
-            Dict with environment type and details
-        """
-        env_info = {
-            "type": "system",
-            "details": "unknown"
-        }
-        
-        # Check if in conda environment
-        conda_env = os.getenv("CONDA_DEFAULT_ENV")
-        if conda_env:
-            env_info["type"] = "conda"
-            env_info["details"] = conda_env
-            return env_info
-        
-        # Check if in docker environment
-        if os.path.exists("/.dockerenv"):
-            env_info["type"] = "docker"
-            try:
-                with open("/proc/self/cgroup", "r") as f:
-                    for line in f:
-                        if "docker" in line:
-                            container_id = line.split("/")[-1].strip()
-                            env_info["details"] = f"container:{container_id}"
-                            break
-            except:
-                env_info["details"] = "unknown-container"
-            return env_info
-            
-        # Regular system environment
-        try:
-            import platform
-            env_info["details"] = platform.platform()
-        except:
-            pass
-            
-        return env_info
+        # Only check conda environment if not in Docker
+        if not self.in_docker:
+            self.conda_env = os.getenv("CONDA_DEFAULT_ENV")
+            if not self.conda_env:
+                raise ValueError("CONDA_DEFAULT_ENV environment variable is not set and not running in Docker")
+        else:
+            self.conda_env = "docker-env"  # Use a placeholder for Docker
 
     def execute(
         self,
@@ -66,7 +33,7 @@ class ScriptExecutor:
         log_file: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Execute scripts in the appropriate environment (conda, docker, or system)
+        Execute scripts in the specified conda environment or directly in Docker
 
         Args:
             script_path: Script path or command
@@ -79,53 +46,40 @@ class ScriptExecutor:
             Execution result
         """
         try:
-            # Build the complete command based on environment
-            if script_path.endswith(".py"):
-                # Python script execution varies by environment
-                if self.environment["type"] == "conda":
-                    cmd = [
-                        "conda",
-                        "run",
-                        "-n",
-                        self.environment["details"],
-                        "python",
-                        script_path,
-                    ]
-                else:  # docker or system
-                    cmd = [
-                        "python",
-                        script_path,
-                    ]
-            elif script_path.endswith(".sh"):
-                # Shell script execution varies by environment
-                if self.environment["type"] == "conda":
-                    cmd = [
-                        "conda",
-                        "run",
-                        "-n",
-                        self.environment["details"],
-                        "bash",
-                        script_path,
-                    ]
-                else:  # docker or system
-                    cmd = [
-                        "bash",
-                        script_path,
-                    ]
+            # Build the complete command
+            if self.in_docker:
+                # In Docker, directly execute Python or the command
+                if script_path.endswith(".py"):
+                    cmd = ["python", script_path]
+                else:
+                    cmd = [script_path]
             else:
-                # Other commands
-                if self.environment["type"] == "conda":
+                # In conda environment
+                if script_path.endswith(".py"):
+                    # Python script
                     cmd = [
                         "conda",
                         "run",
                         "-n",
-                        self.environment["details"],
+                        self.conda_env,
+                        "python",
+                        "-u",
                         script_path,
-                    ]
-                else:  # docker or system
+                    ]  # Add -u parameter to disable output buffering
+                elif script_path.endswith(".sh"):
+                    # Shell script
                     cmd = [
+                        "conda",
+                        "run",
+                        "-n",
+                        self.conda_env,
+                        "bash",
+                        "-x",
                         script_path,
-                    ]
+                    ]  # Add -x parameter to display executed commands
+                else:
+                    # Other commands
+                    cmd = ["conda", "run", "-n", self.conda_env, script_path]
 
             # Add additional parameters
             if args:
