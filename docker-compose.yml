@@ -20,6 +20,8 @@ services:
     environment:
       # Environment variables
       - LOCAL_APP_PORT=8002
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     deploy:
       resources:
         limits:
