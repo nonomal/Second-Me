@@ -240,15 +240,10 @@ export default function TrainingPage() {
 
   // Monitor training status changes and manage log connections
   useEffect(() => {
-    let cleanupEventSource: (() => void) | undefined;
-
     // If training is in progress, start polling and establish log connection
     if (trainingProgress.status === 'in_progress') {
       startPolling();
       setIsTraining(true);
-
-      // Create EventSource connection to get logs
-      cleanupEventSource = getDetails();
 
       if (firstLoadRef.current) {
         scrollPageToBottom();
@@ -263,14 +258,21 @@ export default function TrainingPage() {
       // Keep EventSource open to preserve received logs
       // If resource cleanup is needed, EventSource could be closed here
     }
+  }, [trainingProgress]);
 
-    // Return cleanup function to ensure EventSource is closed when component unmounts or dependencies change
+  useEffect(() => {
+    let cleanupEventSource: (() => void) | undefined;
+
+    if (isTraining) {
+      cleanupEventSource = getDetails();
+    }
+
     return () => {
       if (cleanupEventSource) {
         cleanupEventSource();
       }
     };
-  }, [trainingProgress]);
+  }, [isTraining]);
 
   // Handle stop training request
   useEffect(() => {
