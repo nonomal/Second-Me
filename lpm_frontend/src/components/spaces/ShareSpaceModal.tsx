@@ -1,5 +1,6 @@
 'use client';
 
+import { copyToClipboard } from '@/utils/copy';
 import { Modal, message } from 'antd';
 import { useEffect, useState } from 'react';
 
@@ -31,16 +32,17 @@ export default function ShareSpaceModal({
   }, [isRegistered, space_id]);
 
   const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      messageApi.success({
-        content: 'Link copied to clipboard'
+    copyToClipboard(shareUrl)
+      .then(() => {
+        messageApi.success({
+          content: 'Link copied.'
+        });
+      })
+      .catch(() => {
+        messageApi.error({
+          content: 'Copy failed, please copy manually.'
+        });
       });
-    } catch (error: any) {
-      messageApi.error({
-        content: error.message || 'Copy failed, please copy manually'
-      });
-    }
   };
 
   return (
