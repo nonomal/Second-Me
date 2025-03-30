@@ -5,6 +5,7 @@ import type { RoleRes, UpdateRoleReq } from '@/service/role';
 import { Modal, message } from 'antd';
 import { MoreOutlined } from '@ant-design/icons';
 import { useLoadInfoStore } from '@/store/useLoadInfoStore';
+import { copyToClipboard } from '@/utils/copy';
 
 interface RoleCardProps {
   role: RoleRes;
@@ -289,16 +290,17 @@ export default function RoleCard({ role, onClick, onEdit, onDelete }: RoleCardPr
             <button
               className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
               onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText('https://secondme.ai/share/123456');
-                  messageApi.success({
-                    content: 'Link copied to clipboard'
+                copyToClipboard('https://secondme.ai/share/123456')
+                  .then(() => {
+                    messageApi.success({
+                      content: 'Link copied.'
+                    });
+                  })
+                  .catch(() => {
+                    messageApi.error({
+                      content: 'Failed to copy, please copy manually'
+                    });
                   });
-                } catch (error: any) {
-                  messageApi.error({
-                    content: error.message || 'Failed to copy, please copy manually'
-                  });
-                }
               }}
             >
               Copy Link

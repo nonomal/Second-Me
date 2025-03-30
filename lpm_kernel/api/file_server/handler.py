@@ -57,13 +57,14 @@ class FileServerHandler:
         for item in os.scandir(target_dir):
             item_type = "directory" if item.is_dir() else "file"
             item_size = os.path.getsize(item.path) if item.is_file() else None
+            file_path = (Path(path) / item.name).as_posix()
             items.append(
                 FileItem(
                     name=item.name,
                     type=item_type,
                     size=item_size,
-                    path=os.path.join(path, item.name).replace("\\", "/"),
-                    url=f"/raw_content/{os.path.join(path, item.name).replace('\\', '/')}"
+                    path=file_path,
+                    url=f"/raw_content/{file_path}"
                     if item.is_file()
                     else None,
                 )

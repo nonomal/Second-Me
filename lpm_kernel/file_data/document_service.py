@@ -368,11 +368,6 @@ class DocumentService:
                 logger.info(f"No chunks found for document {document_id}")
                 return []
 
-            # limit each chunk length to 8000
-            for chunk_dto in chunks_dtos:
-                if len(chunk_dto.content) > 8000:
-                    chunk_dto.content = chunk_dto.content[:8000]
-
             # handle embeddings
             processed_chunks = self.embedding_service.generate_chunk_embeddings(
                 chunks_dtos
@@ -449,14 +444,6 @@ class DocumentService:
                     document_id, ProcessStatus.FAILED
                 )
                 return None
-
-            # limit content length to 8000
-            content = (
-                document.raw_content[:8000]
-                if len(document.raw_content) > 8000
-                else document.raw_content
-            )
-            document.raw_content = content
 
             # gen doc embedding
             embedding = self.embedding_service.generate_document_embedding(document)

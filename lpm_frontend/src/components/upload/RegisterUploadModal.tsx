@@ -19,6 +19,7 @@ import { updateRegisteredUpload } from '@/utils/localRegisteredUpload';
 import NetWorkMemberList from './NetWorkMemberList';
 import { useLoadInfoStore } from '@/store/useLoadInfoStore';
 import { getCurrentInfo } from '@/service/info';
+import { copyToClipboard } from '@/utils/copy';
 
 interface RegisterUploadModalProps {
   open: boolean;
@@ -237,10 +238,15 @@ export default function RegisterUploadModal({ open, onClose }: RegisterUploadMod
           <button
             className="absolute top-1/2 -translate-y-1/2 right-2 p-1.5 bg-indigo-100 text-indigo-600 rounded-md hover:bg-indigo-200 transition-colors"
             onClick={() => {
-              navigator.clipboard.writeText(
+              copyToClipboard(
                 `https://app.secondme.io/${currentUpload.upload_name}/${currentUpload.instance_id}`
-              );
-              message.success('Copied to clipboard');
+              )
+                .then(() => {
+                  message.success('Copied.');
+                })
+                .catch(() => {
+                  message.error('Copy failed, please copy manually.');
+                });
             }}
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -262,10 +268,15 @@ export default function RegisterUploadModal({ open, onClose }: RegisterUploadMod
           <button
             className="absolute top-1/2 -translate-y-1/2 right-2 p-1.5 bg-indigo-100 text-indigo-600 rounded-md hover:bg-indigo-200 transition-colors"
             onClick={() => {
-              navigator.clipboard.writeText(
+              copyToClipboard(
                 `https://app.secondme.io/api/chat/${currentUpload.instance_id}/chat/completions`
-              );
-              message.success('Copied to clipboard');
+              )
+                .then(() => {
+                  message.success('Copied.');
+                })
+                .catch(() => {
+                  message.error('Copy failed, please copy manually.');
+                });
             }}
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

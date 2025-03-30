@@ -1,6 +1,7 @@
 'use client';
 
 import { useLoadInfoStore } from '@/store/useLoadInfoStore';
+import { copyToClipboard } from '@/utils/copy';
 import { Modal, message } from 'antd';
 import { useEffect, useState } from 'react';
 
@@ -29,16 +30,17 @@ export default function ShareRoleModal({ open, onClose, uuid, isRegistered }: Sh
   }, [isRegistered, uuid, loadInfo]);
 
   const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      message.success({
-        content: 'Link copied to clipboard'
+    copyToClipboard(shareUrl)
+      .then(() => {
+        message.success({
+          content: 'Link copied.'
+        });
+      })
+      .catch(() => {
+        message.error({
+          content: 'Copy failed, please copy manually.'
+        });
       });
-    } catch (error: any) {
-      message.error({
-        content: error.message || 'Copy failed, please copy manually'
-      });
-    }
   };
 
   return (

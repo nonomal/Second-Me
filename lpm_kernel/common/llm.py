@@ -13,6 +13,7 @@ class LLMClient:
     def __init__(self):
         self.config = Config.from_env()
         self.user_llm_config_service = UserLLMConfigService()
+        self.embedding_max_text_length = int(self.config.get('EMBEDDING_MAX_TEXT_LENGTH', 8000))
         # self.user_llm_config = self.user_llm_config_service.get_available_llm()
 
         # self.chat_api_key = self.user_llm_config.chat_api_key
@@ -36,6 +37,21 @@ class LLMClient:
         if isinstance(texts, str):
             texts = [texts]
 
+        # Split long texts into chunks using configured max length
+        chunked_texts = []
+        text_chunk_counts = []  # Keep track of how many chunks each text was split into
+        
+        for text in texts:
+            if len(text) > self.embedding_max_text_length:
+                # Split into chunks of embedding_max_text_length
+                chunks = [text[i:i + self.embedding_max_text_length] 
+                         for i in range(0, len(text), self.embedding_max_text_length)]
+                chunked_texts.extend(chunks)
+                text_chunk_counts.append(len(chunks))
+            else:
+                chunked_texts.append(text)
+                text_chunk_counts.append(1)
+
         user_llm_config = self.user_llm_config_service.get_available_llm()
         if not user_llm_config:
             raise Exception("No LLM configuration found")
@@ -45,9 +61,9 @@ class LLMClient:
             "Content-Type": "application/json",
         }
 
-        data = {"input": texts, "model": user_llm_config.embedding_model_name}
+        data = {"input": chunked_texts, "model": user_llm_config.embedding_model_name}
 
-        logger.info(f"Getting embedding for {data}")
+        logger.info(f"Getting embedding for {data}, total chunks: {len(chunked_texts)}")
         try:
             # Send request to embedding endpoint
             response = requests.post(
@@ -60,7 +76,24 @@ class LLMClient:
 
             # Extract embedding vectors
             embeddings = [item["embedding"] for item in result["data"]]
-            return np.array(embeddings)
+            embeddings_array = np.array(embeddings)
+
+            # If we split any texts, we need to merge their embeddings back
+            if sum(text_chunk_counts) > len(texts):
+                final_embeddings = []
+                start_idx = 0
+                for chunk_count in text_chunk_counts:
+                    if chunk_count > 1:
+                        # Average embeddings for split text
+                        chunk_embeddings = embeddings_array[start_idx:start_idx + chunk_count]
+                        avg_embedding = np.mean(chunk_embeddings, axis=0)
+                        final_embeddings.append(avg_embedding)
+                    else:
+                        final_embeddings.append(embeddings_array[start_idx])
+                    start_idx += chunk_count
+                return np.array(final_embeddings)
+            
+            return embeddings_array
 
         except requests.exceptions.RequestException as e:
             raise Exception(f"Failed to get embeddings: {str(e)}")
