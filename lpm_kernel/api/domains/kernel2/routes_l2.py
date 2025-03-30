@@ -110,6 +110,12 @@ def downloadModel():
 def username():
     return jsonify(APIResponse.success(data={"username": LoadService.get_current_upload_name()}))
 
+# read IN_DOCKER_ENV and output
+@kernel2_bp.route("/docker/env", methods=["GET"])
+def docker_env():
+    return jsonify(APIResponse.success(data={"in_docker_env": os.getenv("IN_DOCKER_ENV")}))
+    
+
 
 @kernel2_bp.route("/data/prepare", methods=["POST"])
 def all():
