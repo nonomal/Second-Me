@@ -31,17 +31,24 @@ You can choose from a variety of pre-trained models available in the [MLX Commun
 The training process involves the following steps:
 
 1. **Data Conversion**: 
-   Run the data conversion script to transform your previously processed training data into MLX-compatible format:
+   Run the data conversion script to transform your previously processed training data into MLX-compatible format(run from the project root directory default):
    ```bash
-   # Data conversion script (coming soon)
+   python lpm_kernel/L2/mlx_training/data_transform.py
    ```
+   Before running the data conversion script, ensure that your raw data (`merged.json`) is located in the `resources/data/` directory. The converted data will be stored in the `resources/data/mlx_train_data` directory.
+   Please verify that the username, COT mode, and data read/write paths are correctly configured in the data conversion script.
+   You can customize the COT mode, username, and data paths in the script according to your preferences.
 
 2. **Training**:
-   Execute the MLX training script to fine-tune your model (run from the project root directory):
+   Execute the MLX training script to fine-tune your model (run from the project root directory default):
    ```bash
    ./lpm_kernel/L2/mlx_training/train_by_mlx.sh
    ```
    You can modify the train_by_mlx.sh script to use your selected model from the MLX Community.
+
+   You can start the training process using two methods: either by configuring the training parameters in a `.yaml` file or by specifying them directly in the command line. Both methods are demonstrated in the `train_by_mlx.sh` script. We recommend using the `.yaml` file method, especially for LoRA fine-tuning, as the LoRA parameters are only supported in the `.yaml` configuration.
+   
+   Additionally, if you encounter path errors during training, please verify that the paths in the `lora_config.yaml` file are correctly configured.
 
 
 3. **Model Conversion and Serving**:
