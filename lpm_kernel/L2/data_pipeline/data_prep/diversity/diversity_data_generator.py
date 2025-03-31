@@ -9,7 +9,7 @@ import traceback
 import openai
 import pandas as pd
 from tqdm import tqdm
-
+from dotenv import load_dotenv
 from lpm_kernel.api.services.user_llm_config_service import UserLLMConfigService
 from lpm_kernel.configs.config import Config
 from lpm_kernel.L2.data_pipeline.data_prep.diversity.utils import remove_similar_dicts
@@ -39,7 +39,7 @@ class DiversityDataGenerator:
     entities, and configurations. It leverages LLMs to generate questions and answers.
     """
     
-    def __init__(self, preference_language: str):
+    def __init__(self, preference_language: str, is_cot: bool = True):
         """Initialize the diversity data generator.
         
         Args:
@@ -58,6 +58,25 @@ class DiversityDataGenerator:
                 base_url=user_llm_config.chat_endpoint,
             )
         self.preference_language = preference_language
+        self.is_cot = is_cot
+        if self.is_cot:
+            logger.info("generate diversity data in longcot pattern!!!")
+            self.env_path = os.path.join(os.getcwd(), "lpm_kernel/L2/.env")
+            if os.path.exists(self.env_path):
+                load_dotenv(self.env_path)
+            else:
+                raise FileNotFoundError(f"Config file not found: {self.env_path}")
+            self.model_name = os.getenv("DEEPSEEK_MODEL_NAME", "")
+            self.api_key = os.getenv("DEEPSEEK_API_KEY", "")
+            self.base_url = os.getenv("DEEPSEEK_BASE_URL", "")
+            if self.model_name.startswith("deepseek"):
+                    self.client = openai.OpenAI(
+                    api_key=self.api_key,
+                    base_url=self.base_url,
+                )
+            else:
+                logger.error(f"Error model_name, longcot data generating model_name: deepseek series")
+                raise
 
 
     def _preprocess(self, entities_path: str, note_list: list, config_path: str, graph_path: str, user_name: str):
@@ -235,7 +254,7 @@ class DiversityDataGenerator:
         a_dict = {item["type"]: {k: item[k] for k in item if k != "type"} for item in tmp}
 
         templater = template_diversity.templater(
-            q_dict, a_dict, user_name, global_bio
+            q_dict, a_dict, user_name, global_bio, self.is_cot
         )
 
         entity2desc_list = [{**{"entity_name": k}, **v} for k, v in entity2desc.items()]
@@ -469,12 +488,18 @@ class DiversityDataGenerator:
             },
             {"role": "user", "content": user_input + language_desc},
         ]
-
-        response = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=messages,
-        )
-        res = response.choices[0].message.content
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+            )
+            if self.is_cot:
+                response_message = response.choices[0].message
+                res = "<think>" + response_message.reasoning_content + "</think>" + response_message.content
+            else:
+                res = response.choices[0].message.content
+        except Exception as e:
+            logging.error(traceback.format_exc())
         
         # post-processing
         try:
@@ -514,11 +539,17 @@ class DiversityDataGenerator:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_input + language_desc},
         ]
-
-        response = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=messages,
-        )
-        res = response.choices[0].message.content
-
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+            )
+            if self.is_cot:
+                response_message = response.choices[0].message
+                res = "<think>" + response_message.reasoning_content + "</think>" + response_message.content
+            else:
+                res = response.choices[0].message.content
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            
         return res, answer_type
