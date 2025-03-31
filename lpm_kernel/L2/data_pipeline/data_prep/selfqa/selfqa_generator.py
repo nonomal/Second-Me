@@ -1,16 +1,30 @@
 import concurrent.futures
-import logging
 import traceback
-
+from dotenv import load_dotenv
+import os
 import openai
 from tqdm import tqdm
 
 from lpm_kernel.L2.data_pipeline.data_prep.selfqa.selfqa_prompt import (
-    system_prompt_cn,
-    system_prompt_en,
+    system_prompt_cn, system_cot_prompt_cn,
+    system_prompt_en, system_cot_prompt_en
 )
 from lpm_kernel.api.services.user_llm_config_service import UserLLMConfigService
 from lpm_kernel.configs.config import Config
+from lpm_kernel.configs.logging import get_train_process_logger
+logger = get_train_process_logger()
+
+class TqdmLoggingHandler:
+    def __init__(self):
+        pass
+    
+    def write(self, msg):
+        logger.info(msg.strip())
+    
+    def flush(self):
+        pass
+    
+tqdm_handler = TqdmLoggingHandler()
 
 
 def is_english(text: str) -> bool:
@@ -32,6 +46,7 @@ class SelfQA:
         user_input_introduction: str,
         user_global_bio: str,
         preferred_language: str = "en",
+        is_cot: bool = True
     ):
         """Initialize the SelfQA instance.
         
@@ -45,6 +60,7 @@ class SelfQA:
         self.user_input_introduction = user_input_introduction
         self.user_global_bio = user_global_bio
         self.preferred_language = preferred_language
+        self.is_cot = is_cot
         user_llm_config_service = UserLLMConfigService()
         user_llm_config = user_llm_config_service.get_available_llm()
         if user_llm_config is None:
@@ -57,6 +73,24 @@ class SelfQA:
                 api_key=user_llm_config.chat_api_key,
                 base_url=user_llm_config.chat_endpoint,
             )
+        if self.is_cot:
+            logger.info("generate selfQA data in longcot pattern!!!")
+            self.env_path = os.path.join(os.getcwd(), "lpm_kernel/L2/.env")
+            if os.path.exists(self.env_path):
+                load_dotenv(self.env_path)
+            else:
+                raise FileNotFoundError(f"Config file not found: {self.env_path}")
+            self.model_name = os.getenv("DEEPSEEK_MODEL_NAME", "")
+            self.api_key = os.getenv("DEEPSEEK_API_KEY", "")
+            self.base_url = os.getenv("DEEPSEEK_BASE_URL", "")
+            if self.model_name.startswith("deepseek"):
+                self.client = openai.OpenAI(
+                    api_key=self.api_key,
+                    base_url=self.base_url,
+                )
+            else:
+                logger.error(f"Error model_name, longcot data generating model_name: deepseek series")
+                raise
 
 
     def _get_question_list(self) -> list:
@@ -138,11 +172,16 @@ class SelfQA:
 
         q_a_list = []
 
-        system_prompt = (
-            system_prompt_en
-            if self.preferred_language != "Chinese"
-            else system_prompt_cn
-        )
+        if self.preferred_language == "Chinese":
+            if self.is_cot:
+                system_prompt = system_cot_prompt_cn
+            else:
+                system_prompt = system_prompt_cn
+        else:
+            if self.is_cot:
+                system_prompt = system_cot_prompt_en
+            else:
+                system_prompt = system_prompt_en
 
         # Process a single question and return the result
         def process_question(q):
@@ -165,7 +204,7 @@ class SelfQA:
                 },
                 {"role": "user", "content": q},
             ]
-            a = self.get_openai_response(messages)
+            a = self.get_remote_response(messages)
 
             if a is None:
                 return None
@@ -178,7 +217,7 @@ class SelfQA:
             future_to_question = {executor.submit(process_question, q): q for q in q_list}
             
             # Process results as they complete
-            for future in tqdm(concurrent.futures.as_completed(future_to_question), total=len(q_list)):
+            for future in tqdm(concurrent.futures.as_completed(future_to_question), total=len(q_list), desc="QA_generate", file=tqdm_handler):
                 result = future.result()
                 if result is not None:
                     q_a_list.append(result)
@@ -186,21 +225,25 @@ class SelfQA:
         return q_a_list
 
 
-    def get_openai_response(self, messages: list) -> str:
-        """Get response from OpenAI API.
+    def get_remote_response(self, messages: list) -> str:
+        """Get response from OpenAI / DeepSeek API.
         
         Args:
-            messages: The messages to send to the OpenAI API.
+            messages: The messages to send to the OpenAI / DeepSeek API.
             
         Returns:
-            The response content from OpenAI, or None if an error occurs.
+            The response content from OpenAI / DeepSeek, or None if an error occurs.
         """
         try:
             res = self.client.chat.completions.create(
                 messages=messages,
                 model=self.model_name,
             )
-            return res.choices[0].message.content
+            response_message = res.choices[0].message
+            if self.is_cot:
+                return "<think>" + response_message.reasoning_content + "</think>" + response_message.content
+            else:
+                return response_message.content
         except Exception as e:
-            logging.error(traceback.format_exc())
+            logger.error(traceback.format_exc())
         return None
