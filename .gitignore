@@ -76,5 +76,3 @@ logs/train/
 
 # env
 lpm_kernel/L2/.env
-lpm_kernel/L2/data_pipeline/graphrag_indexing/.env
-lpm_kernel/L2/data_pipeline/graphrag_indexing/settings.yaml
