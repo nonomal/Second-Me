@@ -593,7 +593,7 @@ class TrainProcessService:
                 self.l2_data["graph_path"],
                 self.l2_data["config_path"]
             )
-            
+            l2_generator.merge_json_files(self.l2_data["data_output_base_dir"])
             # Mark step as completed
             self.logger.info("Content retention augmentation completed successfully")
             self.progress.mark_step_completed(ProcessStep.AUGMENT_CONTENT_RETENTION)
