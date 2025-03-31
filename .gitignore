@@ -73,6 +73,3 @@ run/*
 .backend.pid
 .frontend.pid
 logs/train/
-
-# env
-lpm_kernel/L2/.env
