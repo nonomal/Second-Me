@@ -62,15 +62,21 @@ Star and join us, and you will receive all release notifications from GitHub wit
 
 ## Quick Start
 
-### Installation and Setup
 
-#### Prerequisites
-- macOS operating system
-- Python 3.8 or higher
-- Node.js 16 or higher (for frontend)
+
+
+### 🍎 Option 1: Local Setup (macOS with Apple Silicon)
+
+<!-- > **Special Note: This section is specifically for Mac (Apple Silicon) users** -->
+
+<details open>
+<summary><b>Click to expand/collapse Mac setup details</b></summary>
+
+##### Prerequisites
+- Python 3.12 or higher
 - Xcode Command Line Tools
 
-#### Installing Xcode Command Line Tools
+##### Installing Xcode Command Line Tools
 If you haven't installed Xcode Command Line Tools yet, you can install them by running:
 ```bash
 xcode-select --install
@@ -81,70 +87,144 @@ After installation, you may need to accept the license agreement:
 sudo xcodebuild -license accept
 ```
 
+##### Setup Steps
+
+1. **Clone the repository**
+   ```bash
+   git clone git@github.com:Mindverse/Second-Me.git
+   cd Second-Me
+   ```
+
+2. **Set up the environment**
+
+   Choose one of the following options:
+
+   <details>
+   <summary><b>Option A: For users with existing conda environment</b></summary>
+   
+   If you already have conda installed:
+   
+   1. Create a new environment from our environment file:
+      ```bash
+      conda env create -f environment.yml   # This will create an environment named 'second-me'
+      conda activate second-me
+      ```
+   
+   2. Set the custom conda mode in `.env`:
+      ```bash
+      CUSTOM_CONDA_MODE=true
+      ```
+   
+   3. Run setup:
+      ```bash
+      make setup
+      ```
+   </details>
+
+   <details>
+   <summary><b>Option B: For new users</b></summary>
+   
+   If you're new or want a fresh environment:
+   ```bash
+   make setup
+   ```
+   
+   This command will automatically:
+   - Install all required system dependencies (including conda if not present)
+   - Create a new Python environment named 'second-me'
+   - Build llama.cpp
+   - Set up frontend environment
+   </details>
+
+3. **Start the service**
+   ```bash
+   make start
+   ```
+
+</details>
+
+### 🐳 Option 2: Docker Setup (For Linux & Windows users)
+
+
+<details>
+<summary><b>Click to expand/collapse Docker setup details</b></summary>
+
+Docker provides a consistent environment across different operating systems.
+
+##### Prerequisites
+- Docker and Docker Compose installed on your system
+
+> **Important:** You must install both Docker and Docker Compose before proceeding. If you haven't installed them yet:
+> - For Docker installation: [Get Docker](https://docs.docker.com/get-docker/)
+> - For Docker Compose installation: [Install Docker Compose](https://docs.docker.com/compose/install/)
+
+##### Setup Steps
+
 1. Clone the repository
 ```bash
 git clone git@github.com:Mindverse/Second-Me.git
 cd Second-Me
 ```
 
-2. Set up the environment
-
-#### Option A: For users with existing conda environment
-If you already have conda installed:
-
-1) Create a new environment from our environment file:
+2. Build the Docker images
 ```bash
-conda env create -f environment.yml   # This will create an environment named 'second-me'
-conda activate second-me
+make docker-build
 ```
 
-2) Set the custom conda mode in `.env`:
+3. Start the containers
 ```bash
-CUSTOM_CONDA_MODE=true
+make docker-up
 ```
 
-3) Run setup:
+4. To stop the containers when you're done
 ```bash
-make setup
+make docker-down
 ```
 
-#### Option B: For new users
-If you're new or want a fresh environment:
+##### Other Useful Docker Commands
+
+- Restart all services
 ```bash
-make setup
+make docker-restart-all
 ```
 
-This command will automatically:
-- Install all required system dependencies (including conda if not present)
-- Create a new Python environment named 'second-me'
-- Build llama.cpp
-- Set up frontend environment
-
-3. Start the service
+- Rebuild and restart only the backend
 ```bash
-make start
+make docker-restart-backend
 ```
 
-4. Access the service
-Open your browser and visit `http://localhost:3000`
+- Rebuild and restart only the frontend
+```bash
+make docker-restart-frontend
+```
 
-5. View help and more commands
+</details>
+
+### Accessing the Service
+
+After starting the service (either with local setup or Docker), open your browser and visit:
+```
+http://localhost:3000
+```
+
+### View help and more commands
 ```bash
 make help
 ```
 
 ### Important Notes
 1. Ensure you have sufficient disk space (at least 10GB recommended)
-2. If using an existing conda environment, ensure there are no conflicting package versions
+2. If using local setup with an existing conda environment, ensure there are no conflicting package versions
 3. First startup may take a few minutes to download and install dependencies
 4. Some commands may require sudo privileges
 
 ### Troubleshooting
 If you encounter issues, check:
-1. Python and Node.js versions meet requirements
-2. You're in the correct conda environment
+1. For local setup: Python and Node.js versions meet requirements
+2. For local setup: You're in the correct conda environment
 3. All dependencies are properly installed
 4. System firewall allows the application to use required ports
+5. For Docker setup: Docker daemon is running and you have sufficient permissions
 
 ## Tutorial and Use Cases
 🛠️ Feel free to follow [User tutorial](https://second-me.gitbook.io/a-new-ai-species-making-we-matter-again) to build your Second Me.
