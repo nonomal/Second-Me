@@ -34,10 +34,6 @@ mkdir -p "${BASE_DIR}/data/sqlite"
 if [ ! -f "$SQLITE_DB_PATH" ]; then
     echo "Initializing database..."
     cat docker/sqlite/init.sql | sqlite3 "$SQLITE_DB_PATH"
-    
-    # Set default configurations
-    python -c "from lpm_kernel.api.services.config_service import ConfigService; ConfigService().ensure_default_configs()"
-    
     echo "Database initialization completed"
 else
     echo "Database already exists"
