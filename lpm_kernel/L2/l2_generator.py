@@ -130,34 +130,6 @@ class L2Generator:
             entities_path, note_list, config_path, graph_path, user_name, global_bio, output_path
         )
 
-        preference_output_path = os.path.join(data_output_base_dir, "preference.json")
-        selfqa_output_path = os.path.join(data_output_base_dir, "selfqa.json")
-
-        json_files_to_merge = [
-                preference_output_path,
-                output_path,
-                selfqa_output_path,
-        ]
-
-        merged_data = []
-
-        for file_path in json_files_to_merge:
-            if file_path and os.path.exists(file_path):
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        file_data = json.load(f)
-                        if isinstance(file_data, list):
-                            merged_data.extend(file_data)
-                        else:
-                            merged_data.append(file_data)
-                except Exception as e:
-                    logging.error(f"Error merging file {file_path}: {str(e)}")
-
-        # Save the merged data
-        merged_output_path = os.path.join(data_output_base_dir, "merged.json")
-        with open(merged_output_path, 'w', encoding='utf-8') as f:
-            json.dump(merged_data, f, ensure_ascii=False, indent=2)
-
     def gen_selfqa_data(
         self, 
         note_list: List[Note], 
@@ -182,6 +154,37 @@ class L2Generator:
         q_a_list = selfqa.generate_qa()
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(q_a_list, f, ensure_ascii=False, indent=4)
+    
+    def merge_json_files(self, data_output_base_dir: str):
+        preference_output_path = os.path.join(data_output_base_dir, "preference.json")
+        diversity_output_path = os.path.join(data_output_base_dir, "diversity.json")
+        selfqa_output_path = os.path.join(data_output_base_dir, "selfqa.json")
+
+        json_files_to_merge = [
+                preference_output_path,
+                diversity_output_path,
+                selfqa_output_path,
+        ]
+
+        merged_data = []
+
+        for file_path in json_files_to_merge:
+            if file_path and os.path.exists(file_path):
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        file_data = json.load(f)
+                        if isinstance(file_data, list):
+                            merged_data.extend(file_data)
+                        else:
+                            merged_data.append(file_data)
+                except Exception as e:
+                    logging.error(f"Error merging file {file_path}: {str(e)}")
+
+        # Save the merged data
+        merged_output_path = os.path.join(data_output_base_dir, "merged.json")
+        with open(merged_output_path, 'w', encoding='utf-8') as f:
+            json.dump(merged_data, f, ensure_ascii=False, indent=2)
+    
 
     def clean_graphrag_keys(self):
         GRAPH_CONFIG = os.path.join(
