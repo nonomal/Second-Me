@@ -527,11 +527,11 @@ class L2DataProcessor:
 
         if chat_model_name.startswith("openai"):
             settings["models"]["default_chat_model"]["model"] = chat_model_name.replace("openai/", "")
-        else:
-            settings["models"]["default_chat_model"]["model"] = chat_model_name
 
         if embedding_model_name.startswith("openai"):
             settings["models"]["default_embedding_model"]["model"] = embedding_model_name.replace("openai/", "")
+        else:
+            settings["models"]["default_embedding_model"]["model"] = embedding_model_name
 
         settings["models"]["default_embedding_model"]["api_base"] = embedding_base_url
         settings["models"]["default_embedding_model"]["api_key"] = embedding_api_key
