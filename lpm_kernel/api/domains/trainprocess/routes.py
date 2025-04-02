@@ -14,44 +14,6 @@ logger = get_train_process_logger()
 
 trainprocess_bp = Blueprint("trainprocess", __name__, url_prefix="/api/trainprocess")
 
-
-def progress_callback(progress_update):
-    """Progress callback function to update training progress"""
-    if not isinstance(progress_update, dict):
-        return
-
-    try:
-        # Get current progress status
-        train_service = TrainProcessService()
-        progress = train_service.progress.progress
-
-        # Update progress
-        stage = progress_update.get("stage")
-        step = progress_update.get("step")
-        status = Status[progress_update.get("status", "IN_PROGRESS").upper()]
-        prog = progress_update.get("progress")
-
-        if stage and step:
-            progress.update_progress(stage, step, status, prog)
-    except Exception as e:
-        logger.error(f"Progress callback error: {str(e)}")
-
-
-def clear_specific_logs():
-    """Clear specific log files (backend.log and train.log)"""
-    log_dir = Path(__file__).parent.parent.parent.parent.parent / 'logs'
-    specific_logs = ['backend.log', 'train.log']
-    
-    for log_name in specific_logs:
-        log_file = log_dir / log_name
-        if log_file.exists():
-            try:
-                with open(log_file, 'w') as f:
-                    f.truncate(0)
-            except Exception as e:
-                logger.error(f"Failed to clear log file {log_file}: {e}")
-
-
 @trainprocess_bp.route("/start", methods=["POST"])
 def start_process():
     """
@@ -93,15 +55,12 @@ def start_process():
 
         model_name = data["model_name"]
 
-        # Create service instance, pass in progress callback and model name
+        # Create service instance with model name
         train_service = TrainProcessService(
-            progress_callback=progress_callback,
             model_name=model_name
         )
         if not train_service.check_training_condition():
-            # Reset progress
-            clear_specific_logs()
-            train_service.set_retrian_progress()
+            train_service.reset_progress()
 
         thread = Thread(target=train_service.start_process)
         thread.daemon = True
@@ -210,7 +169,7 @@ def stop_training():
         train_service.stop_process()
         
         # Wait for the status to change to FAILED
-        wait_interval = 5  # Check interval in seconds
+        wait_interval = 1  # Check interval in seconds
         
         while True:
             # Get the current progress
@@ -277,9 +236,6 @@ def retrain():
         }
     """
     try:
-        # Clear log files first
-        clear_specific_logs()
-        
         # get request parameters
         data = request.get_json() or {}
         model_name = data.get("model_name")
@@ -289,10 +245,9 @@ def retrain():
         
         # Create training service instance
         train_service = TrainProcessService(
-            progress_callback=progress_callback,
             model_name=model_name
         )
-        train_service.set_retrian_progress()
+        train_service.reset_progress()
 
         thread = Thread(target=train_service.start_process)
         thread.daemon = True

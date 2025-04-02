@@ -69,23 +69,7 @@ class ProcessStep(Enum):
         
     def get_method_name(self) -> str:
         """Get the corresponding method name for this step"""
-        # Map from step value to method name
-        method_name_mapping = {
-            "model_download": "model_download",
-            "list_documents": "list_documents",
-            "generate_document_embeddings": "generate_document_embeddings",
-            "process_chunks": "process_chunks",
-            "chunk_embedding": "chunk_embedding",
-            "extract_dimensional_topics": "extract_dimensional_topics",
-            "map_your_entity_network": "map_entity_network",
-            "decode_preference_patterns": "decode_preference_patterns",
-            "reinforce_identity": "reinforce_identity",
-            "augment_content_retention": "augment_content_retention",
-            "train": "train",
-            "merge_weights": "merge_weights",
-            "convert_model": "convert_model",
-        }
-        return method_name_mapping[self.value]
+        return self.value
 
 
 class Progress:
@@ -268,7 +252,7 @@ class TrainProcessService:
             # Generate a unique progress file name based on model name
             if model_name:
                 progress_file = f"trainprocess_progress_{model_name}.json"
-            self.progress = Progress(progress_file, progress_callback)
+            self.progress = Progress(progress_file, self.progress_callback)
             self.logger = logger
             self.model_name = None  # Initialize as None
             self._initialized = True
@@ -291,16 +275,15 @@ class TrainProcessService:
             }
             self.l2_data_prepared = False
         
-        # Update callback function
-        if progress_callback is not None:
-            self.progress.progress_callback = progress_callback
+        # Always use our internal callback
+        self.progress.progress_callback = self.progress_callback
             
         # Update model name and progress instance if model name changes
         if model_name is not None and model_name != self.model_name:
             self.model_name = model_name
             # Create new progress instance with updated progress file name
             progress_file = f"trainprocess_progress_{model_name}.json"
-            self.progress = Progress(progress_file, progress_callback)
+            self.progress = Progress(progress_file, self.progress_callback)
 
     def list_documents(self):
         """List all documents"""
@@ -469,7 +452,7 @@ class TrainProcessService:
             self.progress.mark_step_failed(ProcessStep.MODEL_DOWNLOAD)
             return False
 
-    def map_entity_network(self)->bool:
+    def map_your_entity_network(self)->bool:
         """Map entity network using notes and basic info"""
         try:
             # Mark step as in progress
@@ -1205,19 +1188,41 @@ class TrainProcessService:
             self.progress.mark_step_failed(step)
             return False
 
-    def set_retrian_progress(self):
+    def reset_progress(self):
         """Save current progress
         
         This method saves the current progress to the progress file and triggers the progress callback if available.
         """
         try:
             self.progress.reset_progress()
-            for step_name in self.progress.progress.stages["downloading_the_base_model"].steps:
-                self.progress.progress.update_progress("downloading_the_base_model", step_name, Status.COMPLETED)
             self.progress._save_progress()
             self.logger.info("Progress saved successfully")
         except Exception as e:
             self.logger.error(f"Failed to save progress: {str(e)}")
+            
+    def progress_callback(self, progress_update):
+        """Progress callback function to update training progress
+        
+        Args:
+            progress_update: Dictionary containing progress update information
+        """
+        if not isinstance(progress_update, dict):
+            return
+
+        try:
+            # Get current progress
+            progress = self.progress.progress
+
+            # Update progress
+            stage = progress_update.get("stage")
+            step = progress_update.get("step")
+            status = Status[progress_update.get("status", "IN_PROGRESS").upper()]
+            prog = progress_update.get("progress")
+
+            if stage and step:
+                progress.update_progress(stage, step, status, prog)
+        except Exception as e:
+            self.logger.error(f"Progress callback error: {str(e)}")
     
     def stop_process(self):
         """Stop training process
