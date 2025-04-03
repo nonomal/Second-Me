@@ -25,7 +25,6 @@
 
 # Force Dockerfile to always use LF line endings
 Dockerfile.* text eol=lf
-
 # Binary files should not be modified
 *.png binary
 *.jpg binary
