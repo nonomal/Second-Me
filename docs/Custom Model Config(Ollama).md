@@ -72,8 +72,17 @@ License
   Version 2.0, January 2004
 ```
 
-3. Modify `EMBEDDING_MAX_TEXT_LENGTH` in `Second_Me/.env` to match your embedding model's context window. This prevents chunk length overflow and avoids server-side errors (500 Internal Server Error).
+3. Update EMBEDDING_MAX_TEXT_LENGTH in Second_Me/.env to match your embedding model's context window.
 
+    For example:
+
+   - If using snowflake-arctic-embed:110m, set it to 512
+
+   - If using OpenAI text-embedding-3-large, set it to 8191
+
+   - If using Cohere embed-english-v3.0, set it to 512
+
+    Proper configuration prevents chunk overflow errors (e.g., 500 Internal Server Error).
 ```bash
 # Embedding configurations
 
