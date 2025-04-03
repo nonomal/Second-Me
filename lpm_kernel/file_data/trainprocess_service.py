@@ -239,6 +239,15 @@ class TrainProcessService:
     
     _instance = None
     _initialized = False
+    
+    # Static variable to store the latest training parameters
+    _latest_training_params = {
+        "model_name": None,
+        "learning_rate": None,
+        "number_of_epochs": None,
+        "concurrency_threads": None,
+        "data_synthesis_mode": None
+    }
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
@@ -783,6 +792,28 @@ class TrainProcessService:
             # Reset stop flag before starting
             self.is_stopped = False
             
+            # Get the latest training parameters from the class
+            training_params = self.__class__.get_latest_training_params()
+            learning_rate = training_params.get("learning_rate")
+            num_train_epochs = training_params.get("number_of_epochs")
+            concurrency_threads = training_params.get("concurrency_threads")
+            data_synthesis_mode = training_params.get("data_synthesis_mode")
+            
+            # Log training parameters
+            self.logger.info("Training parameters from latest settings:")
+            if learning_rate:
+                self.logger.info(f"  Learning rate: {learning_rate}")
+            if num_train_epochs:
+                self.logger.info(f"  Number of epochs: {num_train_epochs}")
+            if concurrency_threads:
+                self.logger.info(f"  Concurrency threads: {concurrency_threads}")
+            if data_synthesis_mode:
+                self.logger.info(f"  Data synthesis mode: {data_synthesis_mode}")
+            
+            # 修改训练脚本命令以包含新参数
+            # 注意：这里我们不修改脚本本身，而是通过环境变量传递参数
+            # 训练脚本会从环境变量中读取这些参数
+            
             # Start the training process
             training_process = runner.execute_script(
                 script_path=script_path,
@@ -1292,3 +1323,25 @@ class TrainProcessService:
         except Exception as e:
             self.logger.error(f"Error stopping training process: {str(e)}")
             return False
+            
+    @classmethod
+    def update_training_params(cls, params):
+        """
+        Update the latest training parameters
+        
+        Args:
+            params: Dictionary containing training parameters
+        """
+        for key, value in params.items():
+            if key in cls._latest_training_params:
+                cls._latest_training_params[key] = value
+                
+    @classmethod
+    def get_latest_training_params(cls):
+        """
+        Get the latest training parameters
+        
+        Returns:
+            dict: Dictionary containing the latest training parameters
+        """
+        return cls._latest_training_params.copy()
