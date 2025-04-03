@@ -55,6 +55,15 @@ export default function RoleChat() {
           setRole(res.data.data);
           // Load chat history
           const storedMessages = roleplayChatStorage.getMessages(role_id);
+          const systemMessage: IChatMessage = {
+            id: generateMessageId(),
+            content: role?.system_prompt ||'',
+            role: 'system',
+            timestamp: new Date().toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit'
+            })
+          };
 
           if (storedMessages.length === 0) {
             // If no history messages, add welcome message
@@ -69,9 +78,9 @@ export default function RoleChat() {
             };
 
             roleplayChatStorage.saveMessages(role_id, [welcomeMessage]);
-            setMessages([welcomeMessage]);
+            setMessages([systemMessage, welcomeMessage]);
           } else {
-            setMessages(storedMessages);
+            setMessages([systemMessage, ...storedMessages]);
           }
         } else {
           message.error('Failed to load role');
@@ -114,7 +123,29 @@ export default function RoleChat() {
     };
 
     // Update message list, add user message and empty assistant message
-    const newMessages = [...messages, userMessage, assistantMessage];
+    let newMessages = [...messages, userMessage, assistantMessage];
+
+    const systemMessage: IChatMessage = {
+      id: generateMessageId(),
+      content: role?.system_prompt ||'',
+      role: 'system',
+      timestamp: new Date().toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    };
+
+    if (!newMessages.find((item) => item.role === 'system')) {
+      newMessages = [systemMessage, ...newMessages]
+    } else {
+      newMessages = newMessages.map((msg) => {
+        if (msg.role === 'system') {
+          return { ...msg, content: role?.system_prompt ||'' };
+        }
+        return msg;
+      });
+    }
+
 
     setMessages(newMessages);
     // Save messages
@@ -122,16 +153,17 @@ export default function RoleChat() {
 
     // Send request
     const chatRequest: ChatRequest = {
-      message: content,
-      system_prompt: role.system_prompt,
-      role_id: role.uuid,
-      enable_l0_retrieval: role.enable_l0_retrieval,
-      enable_l1_retrieval: role.enable_l1_retrieval || true,
-      temperature: 0.01,
-      history: messages.map((msg) => ({
-        role: msg.role === 'user' ? 'user' : 'assistant',
+      messages: newMessages.map((msg) => ({
+        role: msg.role,
         content: msg.content
-      }))
+      })),
+      metadata: {
+        enable_l0_retrieval: role.enable_l0_retrieval,
+        enable_l1_retrieval: role.enable_l1_retrieval || true,
+        role_id: role.uuid
+      },
+      temperature: 0.01,
+      stream: true
     };
 
     await sendStreamMessage(chatRequest);
@@ -231,7 +263,7 @@ export default function RoleChat() {
                   index === messages.length - 1 &&
                   msg.role === 'assistant'
                 }
-                isUser={msg.role === 'user'}
+                role={msg.role}
                 message={msg.content}
                 timestamp={msg.timestamp}
               />

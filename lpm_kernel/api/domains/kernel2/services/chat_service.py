@@ -323,12 +323,8 @@ class ChatService:
             "tool_choice": None,  # Optional: If function calling or similar features are needed
             "max_tokens": request.max_tokens,
             "stream": stream,
-            "model": "models/lpm",
-            "metadata": {
-                "enable_l0_retrieval": request.enable_l0_retrieval,
-                "enable_l1_retrieval": request.enable_l1_retrieval,
-                "role_id": request.role_id
-            }
+            "model": request.model or "models/lpm",
+            "metadata": request.metadata
         }
         
         # Add JSON format requirement (if needed)

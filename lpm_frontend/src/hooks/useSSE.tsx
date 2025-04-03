@@ -1,17 +1,20 @@
 import { useState, useRef } from 'react';
 
 export interface ChatRequest {
-  message: string;
-  system_prompt: string;
+  messages: ChatHistory[];
+  metadata: ChatMetadata;
+  temperature: number;
+  max_tokens?: number;
+  stream: boolean;
+}
+
+interface ChatMetadata {
   role_id?: string;
   enable_l0_retrieval: boolean;
   enable_l1_retrieval: boolean;
-  temperature: number;
-  history: ChatHistory[];
 }
-
 interface ChatHistory {
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
 }
 

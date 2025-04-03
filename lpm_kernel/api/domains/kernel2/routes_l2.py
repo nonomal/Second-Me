@@ -690,71 +690,107 @@ def test_version():
 @validate()
 def chat(body: ChatRequest):
     """
-    Chat interface - Stream response
+    Chat interface - Stream response (OpenAI API compatible)
 
-    Request parameters: ChatRequest class JSON representation, containing:
-    - message: str, current user message
-    - system_prompt: str, optional system prompt, default is "You are a helpful assistant."
-    - role_id: str, optional role UUID, if provided, use corresponding role's system_prompt, if not found, return error
-    - history: List[ChatMessage], history message list
-    - messages: List[Dict[str, str]], optional OpenAI compatible format message list, if provided, prioritize and automatically parse into system_prompt, history, and message
-    - enable_l0_retrieval: bool, whether to enable L0 knowledge retrieval, default is True
-    - enable_l1_retrieval: bool, whether to enable L1 knowledge retrieval, default is True
-    - temperature: float, temperature parameter, controls randomness, default is 0.01
-    - max_tokens: int, maximum generated token count, default is 2000
+    Request parameters: Compatible with OpenAI Chat Completions API format
+    - messages: List[Dict[str, str]], standard OpenAI message list with format:
+        [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Hello, who are you?"},
+            {"role": "assistant", "content": "I am a helpful assistant."},
+            {"role": "user", "content": "What can you do for me?"}  
+        ]
+    - metadata: Dict[str, Any], additional parameters for request processing (optional):
+        {
+            "enable_l0_retrieval": true,  // whether to enable knowledge retrieval
+            "enable_l1_retrieval": false, // whether to enable advanced knowledge retrieval
+            "role_id": "uuid-string"      // optional role UUID for system customization
+        }
+    - stream: bool, whether to stream the response (default: True)
+    - model: str, model identifier (optional, default uses configured model)
+    - temperature: float, controls randomness (default: 0.1)
+    - max_tokens: int, maximum tokens to generate (default: 2000)
 
-    Response:
-    Server-Sent Events stream, each event is a JSON object, containing:
+    Response: Standard OpenAI Chat Completions API format
+    For stream=true (Server-Sent Events):
     - id: str, response unique identifier
-    - object: str, object type, usually "chat.completion.chunk"
-    - created: int, creation timestamp
-    - model: str, used model name
+    - object: "chat.completion.chunk"
+    - created: int, timestamp
+    - model: str, model identifier
     - system_fingerprint: str, system fingerprint
-    - choices: List[Dict], containing generated content, each choice contains:
-        - index: int, option index
-        - delta: Dict, containing generated content fragment
-            - content: str, generated text content
-        - finish_reason: str, end reason (if already ended)
+    - choices: [
+        {
+          "index": 0,
+          "delta": {"content": str},
+          "finish_reason": null or "stop"
+        }
+      ]
     
-    If an error occurs, the event will contain:
-    - error: str, error message
-
-    The last event will be:
-    data: [DONE]
+    The last event will be: data: [DONE]
+    
+    For stream=false:
+    - Complete response object with full message content
     """
     try:
         logger.info(f"Starting chat request: {body}")
         # 1. Check service status
         status = local_llm_service.get_server_status()
         if not status.is_running:
-            error_response = APIResponse.error("LLama server is not running")
-            return local_llm_service.handle_stream_response(iter([{"error": error_response}]))
+            # Format error response in OpenAI-compatible format
+            error_msg = "LLama server is not running"
+            logger.error(error_msg)
+            error_response = {
+                "error": {
+                    "message": error_msg,
+                    "type": "server_error",
+                    "code": "service_unavailable"
+                }
+            }
+            # Return as regular JSON response for non-stream or stream-compatible error
+            if not body.stream:
+                return APIResponse.error(message="服务暂时不可用", code=503), 503
+            return local_llm_service.handle_stream_response(iter([error_response]))
 
         try:
-            # if role_id is provided, get corresponding role's enable_l0_retrieval and enable_l1_retrieval value
-            if body.role_id:
-                role = role_service.get_role_by_uuid(body.role_id)
-                if role:
-                    # use enable_l0_retrieval and enable_l1_retrieval in role to replace value in request body
-                    body.enable_l0_retrieval = role.enable_l0_retrieval
-                    body.enable_l1_retrieval = role.enable_l1_retrieval
-                else:
-                    logger.warning(f"Role with UUID {body.role_id} not found, using default retrieval settings")
-
-            # 2. Use chat_service to process request
+            # Use chat_service to process request with OpenAI-compatible format
             response = chat_service.chat(
                 request=body,
-                stream=True,
+                stream=body.stream,  # Respect the stream parameter from request
                 json_response=False,
                 strategy_chain=[BasePromptStrategy, RoleBasedStrategy, KnowledgeEnhancedStrategy]
             )
-            return local_llm_service.handle_stream_response(response)
+            
+            # Handle streaming or non-streaming response appropriately
+            if body.stream:
+                return local_llm_service.handle_stream_response(response)
+            else:
+                # For non-streaming, return the complete response as JSON
+                return jsonify(response)
 
         except ValueError as e:
-            error_response = APIResponse.error(str(e))
-            return local_llm_service.handle_stream_response(iter([{"error": error_response}]))
+            error_msg = str(e)
+            logger.error(f"Value error: {error_msg}")
+            error_response = {
+                "error": {
+                    "message": error_msg,
+                    "type": "invalid_request_error",
+                    "code": "bad_request"
+                }
+            }
+            if not body.stream:
+                return jsonify(error_response), 400
+            return local_llm_service.handle_stream_response(iter([error_response]))
 
     except Exception as e:
-        logger.error(f"Request processing failed: {str(e)}", exc_info=True)
-        error_response = APIResponse.error(f"Request processing failed: {str(e)}")
-        return local_llm_service.handle_stream_response(iter([{"error": error_response}]))
+        error_msg = f"Request processing failed: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        error_response = {
+            "error": {
+                "message": error_msg,
+                "type": "server_error",
+                "code": "internal_server_error"
+            }
+        }
+        if not getattr(body, 'stream', True):  # Default to stream if attribute missing
+            return jsonify(error_response), 500
+        return local_llm_service.handle_stream_response(iter([error_response]))

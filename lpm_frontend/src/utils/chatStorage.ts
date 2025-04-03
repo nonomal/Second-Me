@@ -8,7 +8,7 @@ const STORAGE_KEYS = {
 export interface ChatMessage {
   id: string;
   content: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   timestamp: string;
 }
 

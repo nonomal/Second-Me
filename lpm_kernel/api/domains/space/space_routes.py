@@ -195,9 +195,6 @@ def share_space(space_id: str) -> dict:
         Only spaces with finished status can be shared
     """
     try:
-
-       
-        
         # Share the space
         space_share_id = space_service.share_space(space_id)
         

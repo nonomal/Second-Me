@@ -11,6 +11,19 @@
 
 .PHONY: install test format lint all setup start stop restart restart-backend restart-force help check-conda check-env docker-build docker-up docker-down docker-build-backend docker-build-frontend docker-restart-backend docker-restart-frontend docker-restart-all
 
+# Detect Apple Silicon without printing
+ifeq ($(shell uname -s),Darwin)
+  ifeq ($(shell uname -m),arm64)
+    APPLE_SILICON := 1
+    # Set PLATFORM=apple for all docker commands
+    docker-%: export PLATFORM=apple
+  else
+    APPLE_SILICON := 0
+  endif
+else
+  APPLE_SILICON := 0
+endif
+
 # Show help message
 help:
 	@echo "\033[0;36m"
@@ -53,6 +66,11 @@ help:
 	@echo "  make format                - Format code"
 	@echo "  make lint                  - Check code style"
 	@echo "  make all                   - Run format, lint and test"
+	@if [ "$(APPLE_SILICON)" = "1" ]; then \
+		echo ""; \
+		echo "\033[1;32m▶ PLATFORM INFORMATION:\033[0m"; \
+		echo "  Apple Silicon detected - Docker commands will use PLATFORM=apple"; \
+	fi
 
 # Check if in conda environment
 check-conda:

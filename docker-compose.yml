@@ -4,7 +4,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: Dockerfile.backend
+      dockerfile: Dockerfile.backend${PLATFORM:+.${PLATFORM}}
     container_name: second-me-backend
     restart: unless-stopped
     ports:
@@ -21,6 +21,7 @@ services:
       # Environment variables
       - LOCAL_APP_PORT=8002
       - IN_DOCKER_ENV=1
+      - PLATFORM=${PLATFORM:-linux}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     deploy:

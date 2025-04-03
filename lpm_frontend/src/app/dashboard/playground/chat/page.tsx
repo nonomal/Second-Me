@@ -173,7 +173,28 @@ export default function PlaygroundChat() {
     };
 
     // Update message list, adding user message and empty assistant message
-    const newMessages = [...messages, userMessage, assistantMessage];
+    let newMessages = [...messages, userMessage, assistantMessage];
+
+    const systemMessage: Message = {
+      id: generateMessageId(),
+      content: originPrompt,
+      role: 'system',
+      timestamp: new Date().toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    };
+
+    if (!newMessages.find((item) => item.role === 'system')) {
+      newMessages = [systemMessage, ...newMessages]
+    } else {
+      newMessages = newMessages.map((msg) => {
+        if (msg.role === 'system') {
+          return { ...msg, content: originPrompt };
+        }
+        return msg;
+      });
+    }
 
     setMessages(newMessages);
 
@@ -192,15 +213,16 @@ export default function PlaygroundChat() {
 
     // Send request
     const chatRequest: ChatRequest = {
-      message: content,
-      system_prompt: settings.systemPrompt || '',
-      enable_l0_retrieval: settings.enableL0Retrieval,
-      enable_l1_retrieval: settings.enableL1Retrieval,
-      temperature: settings.temperature,
-      history: messages.map((msg) => ({
-        role: msg.role === 'user' ? 'user' : 'assistant',
+      messages: newMessages.map((msg) => ({
+        role: msg.role,
         content: msg.content
-      }))
+      })),
+      metadata: {
+        enable_l0_retrieval: settings.enableL0Retrieval,
+        enable_l1_retrieval: settings.enableL1Retrieval
+      },
+      temperature: settings.temperature,
+      stream: true
     };
 
     await sendStreamMessage(chatRequest);
@@ -284,7 +306,7 @@ export default function PlaygroundChat() {
                       index === messages.length - 1 &&
                       message.role === 'assistant'
                     }
-                    isUser={message.role === 'user'}
+                    role={message.role}
                     message={message.content}
                     timestamp={message.timestamp}
                   />

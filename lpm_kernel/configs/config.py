@@ -53,9 +53,7 @@ class Config:
             return cls._instance
 
         # Load .env file
-        env_path = (
-            env_file if env_file else Path(__file__).parent.parent.parent / ".env"
-        )
+        env_path = Path(env_file) if env_file else Path(__file__).parent.parent.parent / ".env"
 
         if env_path.exists():
             load_dotenv(env_path)

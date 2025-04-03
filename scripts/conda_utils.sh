@@ -73,6 +73,7 @@ find_and_source_conda_sh() {
         "$HOME/anaconda/etc/profile.d/conda.sh"
         "$HOME/opt/anaconda3/etc/profile.d/conda.sh"
         "$HOME/opt/miniconda3/etc/profile.d/conda.sh"
+        "/opt/homebrew/anaconda3/etc/profile.d/conda.sh"
         "/opt/homebrew/Caskroom/miniconda/base/etc/profile.d/conda.sh"
         "/opt/anaconda3/etc/profile.d/conda.sh"
         "/opt/miniconda3/etc/profile.d/conda.sh"

@@ -5,6 +5,7 @@ import { Fragment } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
 import { PlayIcon, StopIcon } from '@heroicons/react/24/outline';
 import { EVENT } from '@/utils/event';
+import { Spin } from 'antd';
 
 interface BaseModelOption {
   value: string;
@@ -315,7 +316,11 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
           >
             {isTraining ? (
               <>
-                <StopIcon className="h-5 w-5 mr-2" />
+                {trainActionLoading ? (
+                  <Spin className="h-5 w-5 mr-2" />
+                ) : (
+                  <StopIcon className="h-5 w-5 mr-2" />
+                )}
                 Stop Training
               </>
             ) : (
