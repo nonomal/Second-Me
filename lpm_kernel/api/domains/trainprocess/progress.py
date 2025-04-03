@@ -142,26 +142,52 @@ class TrainProgress:
 
     def to_dict(self) -> dict:
         """Convert progress status to dictionary format"""
+        # Create result dictionary with basic properties
         result = {
-            "stages": {},
+            "stages": [],
             "overall_progress": self.overall_progress,
             "current_stage": self.current_stage,
             "status": self.status.value
         }
         
-        for stage_name, stage in self.stages.items():
-            stage_dict = asdict(stage)
-            # Convert enum values to strings
-            stage_dict["status"] = stage.status.value
-            stage_dict["steps"] = {
-                step_key: {
-                    "name": step.name,
-                    "completed": step.completed,
-                    "status": step.status.value
-                }
-                for step_key, step in stage.steps.items()
-            }
-            result["stages"][stage_name] = stage_dict
+        # Define the order of stages
+        stage_order = [
+            "downloading_the_base_model",
+            "activating_the_memory_matrix",
+            "synthesize_your_life_narrative",
+            "prepare_training_data_for_deep_comprehension",
+            "training_to_create_second_me"
+        ]
+        
+        # Process stages in the defined order
+        for stage_name in stage_order:
+            if stage_name in self.stages:
+                stage = self.stages[stage_name]
+                stage_dict = asdict(stage)
+                
+                # Convert enum values to strings
+                stage_dict["status"] = stage.status.value
+                
+                # Create steps as a list of dictionaries
+                steps_list = []
+                for step_key, step in stage.steps.items():
+                    steps_list.append({
+                        "name": step.name,
+                        "completed": step.completed,
+                        "status": step.status.value
+                    })
+                
+                # Replace steps dict with steps list
+                stage_dict["steps"] = steps_list
+                
+                # Add stage to stages list with its name
+                result["stages"].append({
+                    "name": stage.name,
+                    "progress": stage.progress,
+                    "status": stage.status.value,
+                    "current_step": stage.current_step,
+                    "steps": steps_list
+                })
         
         return result
     
