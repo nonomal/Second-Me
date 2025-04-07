@@ -73,7 +73,8 @@ Star and join us, and you will receive all release notifications from GitHub wit
 > **Note:** If your Docker installation doesn't have the `docker-compose` command, use `docker compose` instead and modify the Makefile accordingly.
 >
 > **For Windows Users:** You can use [MinGW](https://www.mingw-w64.org/) to run `make` commands. You may need to modify the Makefile by replacing Unix-specific commands with Windows-compatible alternatives.
-
+>
+> **For Mac Users with Apple Silicon:** If you're using Docker Desktop as your container runtime environment locally, please be mindful of resource usage limits. You can configure these settings at: Dashboard -> Settings -> Resources. **Important Note:** Make sure to allocate sufficient memory resources (at least 8GB recommended) to ensure the service runs properly. Insufficient memory may cause container crashes or severe performance degradation.
 ##### Setup Steps
 
 1. Clone the repository
