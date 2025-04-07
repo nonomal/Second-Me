@@ -8,7 +8,7 @@ import re
 
 from tqdm import tqdm
 import openai
-
+from enum import Enum
 from lpm_kernel.api.services.user_llm_config_service import UserLLMConfigService
 from lpm_kernel.configs.config import Config
 from lpm_kernel.L2.data_pipeline.data_prep.preference.prompts import (
@@ -18,6 +18,14 @@ from lpm_kernel.L2.data_pipeline.data_prep.preference.prompts import (
     EN_SYS_TEMPLATES,
 )
 import traceback
+
+
+class LowMode(Enum):
+    cluster_nums = 2
+    
+
+class HighMode(Enum):
+    cluster_nums = 1
 
 
 class PreferenceQAGenerator:
@@ -52,6 +60,8 @@ class PreferenceQAGenerator:
         self.preference_language = preference_language
         self.prompt_templates = self._get_prompt_templates(preference_language)
         self.sys_templates = self._get_sys_templates(preference_language)
+        self.max_workers = 1
+        self.data_synthesis_mode = os.environ.get("DATA_SYNTHESIS_MODE", "standard")
 
 
     def generate_response(self, sys: str, prompt: str) -> str:
@@ -65,7 +75,7 @@ class PreferenceQAGenerator:
             The generated response text or None if an error occurred.
         """
         try:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 future = executor.submit(
                     self.client.chat.completions.create,
                     model=self.model_name,
@@ -133,8 +143,9 @@ class PreferenceQAGenerator:
         """
         cluster_items = list(self.pre_msg.items())
         count = 0
-
-        for _, cluster in tqdm(cluster_items):
+        new_cluster_items = random.sample(cluster_items, len(cluster_items) // HighMode.cluster_nums.value 
+                                          if self.data_synthesis_mode == "standard" else len(cluster_items) // LowMode.cluster_nums.value)
+        for _, cluster in tqdm(new_cluster_items):
             chunk_concat = self._get_chunk_concat(cluster["contents"])
 
             tags = " ".join(cluster["tags"])

@@ -489,6 +489,13 @@ class TrainProcessService:
     def decode_preference_patterns(self)->bool:
         """Decode preference patterns using notes and related data"""
         try:
+            # Get the latest training parameters from the class
+            training_params = self.__class__.get_latest_training_params()
+            concurrency_threads = training_params.get("concurrency_threads")
+            data_synthesis_mode = training_params.get("data_synthesis_mode")
+            os.environ["CONCURRENCY_THREADS"] = concurrency_threads
+            os.environ["DATA_SYNTHESIS_MODE"] = data_synthesis_mode
+            
             # Mark step as in progress
             self.progress.mark_step_in_progress(ProcessStep.DECODE_PREFERENCE_PATTERNS)
             self.logger.info("Starting preference patterns decoding...")

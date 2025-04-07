@@ -1,10 +1,22 @@
 #!/bin/bash
 
-# 设置默认值
-LEARNING_RATE=${LEARNING_RATE:-"2e-4"}
-NUM_TRAIN_EPOCHS=${NUM_TRAIN_EPOCHS:-"3"}
-CONCURRENCY_THREADS=${CONCURRENCY_THREADS:-"1"}
-DATA_SYNTHESIS_MODE=${DATA_SYNTHESIS_MODE:-"standard"}
+# 初始化变量
+LEARNING_RATE="2e-4"
+NUM_TRAIN_EPOCHS="3"
+CONCURRENCY_THREADS="1"
+DATA_SYNTHESIS_MODE="standard"  # low or standard
+
+# 处理参数
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --lr) LEARNING_RATE="$2"; shift ;;
+        --epochs) NUM_TRAIN_EPOCHS="$2"; shift ;;
+        --threads) CONCURRENCY_THREADS="$2"; shift ;;
+        --mode) DATA_SYNTHESIS_MODE="$2"; shift ;;
+        *) echo "未知参数: $1"; exit 1 ;;
+    esac
+    shift
+done
 
 # 记录使用的参数
 echo "Using training parameters:"

@@ -9,7 +9,7 @@ import traceback
 import openai
 import pandas as pd
 from tqdm import tqdm
-
+from enum import Enum
 from lpm_kernel.api.services.user_llm_config_service import UserLLMConfigService
 from lpm_kernel.configs.config import Config
 from lpm_kernel.L2.data_pipeline.data_prep.diversity.utils import remove_similar_dicts
@@ -17,6 +17,18 @@ import lpm_kernel.L2.data_pipeline.data_prep.diversity.template_diversity as tem
 
 from lpm_kernel.configs.logging import get_train_process_logger
 logger = get_train_process_logger()
+
+
+class LowMode(Enum):
+    large_aug_para = 1
+    tiny_aug_para = 1
+    mini_aug_para = 1
+    
+
+class HighMode(Enum):
+    large_aug_para = 4
+    tiny_aug_para = 3
+    mini_aug_para = 2
 
 
 class TqdmLoggingHandler:
@@ -58,6 +70,8 @@ class DiversityDataGenerator:
                 base_url=user_llm_config.chat_endpoint,
             )
         self.preference_language = preference_language
+        self.max_workers = os.environ.get("concurrency_threads", 2)
+        self.data_synthesis_mode = os.environ.get("DATA_SYNTHESIS_MODE", "standard")
 
 
     def _preprocess(self, entities_path: str, note_list: list, config_path: str, graph_path: str, user_name: str):
@@ -291,14 +305,16 @@ class DiversityDataGenerator:
 
         if len(exploded_clusters) > 0:
             logger.info("Execute large cluster generation")
-            data_large = self._pipline(exploded_clusters, 4, q_dict, templater, language_desc, user_name)
+            data_large = self._pipline(exploded_clusters, HighMode.large_aug_para.value if self.data_synthesis_mode == "standard" else LowMode.large_aug_para.value, 
+                                       q_dict, templater, language_desc, user_name)
         else:
             logger.info("Large cluster number is 0")
             data_large = []
 
         if len(mini_clusters) > 0:
             logger.info("Execute small cluster generation")
-            data_mini = self._pipline(mini_clusters, 3, q_dict, templater, language_desc, user_name)
+            data_mini = self._pipline(mini_clusters, HighMode.mini_aug_para.value if self.data_synthesis_mode == "standard" else LowMode.mini_aug_para.value, 
+                                      q_dict, templater, language_desc, user_name)
         else:
             logger.info("Small cluster number is 0")
             data_mini = []
@@ -307,7 +323,8 @@ class DiversityDataGenerator:
             logger.info("Execute single entity cluster generation")
             q_dict.pop("unanswerable")
             q_dict.pop("global")
-            data_tiny = self._pipline(filtered_tiny_clusters, 2, q_dict, templater, language_desc, user_name)
+            data_tiny = self._pipline(filtered_tiny_clusters, HighMode.tiny_aug_para.value if self.data_synthesis_mode == "standard" else LowMode.tiny_aug_para.value, 
+                                      q_dict, templater, language_desc, user_name)
         else:
             logger.info("Single entity cluster number is 0")
             data_tiny = []
@@ -391,7 +408,7 @@ class DiversityDataGenerator:
         Returns:
             Tuple of (questions, answers, answer_types, flat_question_types, flat_clusters).
         """
-        with ThreadPoolExecutor(max_workers=2) as executor:
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = [
                 executor.submit(self._Q_generate, cluster, question_type, templater, q_dict, language_desc, user_name)
                 for cluster, question_type in zip(
@@ -421,7 +438,7 @@ class DiversityDataGenerator:
         # safety check
         logger.info(f"Count: {cnt}, len(explode_clusters): {len(explode_clusters)}")
 
-        with ThreadPoolExecutor(max_workers=2) as executor:
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = [
                 executor.submit(self._A_generate, cluster, question, question_type, templater, language_desc, user_name)
                 for cluster, question, question_type in zip(
