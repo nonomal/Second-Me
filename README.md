@@ -198,9 +198,9 @@ make docker-restart-backend
 make docker-restart-frontend
 ```
 
-- Please notice that if you are using Apple Silicon and you want to run docker commands directly, you need to set the `PLATFORM` environment variable to `apple`. For example:
+- Please notice that if you are using Apple Silicon and you want to run docker commands directly, you need to set the `PLATFORM` environment variable to `apple` and the `DOCKER_BACKEND_DOCKERFILE` environment variable to `Dockerfile.backend.apple`. For example:
 ```bash
-PLATFORM=apple docker-compose up -d --build
+PLATFORM=apple DOCKER_BACKEND_DOCKERFILE=Dockerfile.backend.apple docker-compose up -d --build
 ```
 
 
