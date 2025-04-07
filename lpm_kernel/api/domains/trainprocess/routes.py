@@ -59,6 +59,15 @@ def start_process():
         train_service = TrainProcessService(
             model_name=model_name
         )
+            
+        # Check if training is already in progress
+        if train_service.progress.progress.status == Status.IN_PROGRESS:
+            logger.warning(f"Training for model '{model_name}' is already in progress. Cannot start a new training session.")
+            return jsonify(APIResponse.error(
+                message="Training is already in progress. Please wait for the current training to complete or stop it before starting a new one.",
+                code=409  # Conflict status code
+            ))
+
         if not train_service.check_training_condition():
             train_service.reset_progress()
 
