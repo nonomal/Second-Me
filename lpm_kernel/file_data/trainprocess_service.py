@@ -27,6 +27,8 @@ from lpm_kernel.kernel.l1.l1_manager import generate_l1_from_l0
 import threading
 from ..api.domains.trainprocess.progress import TrainProgress, Status, Step, Status
 import gc
+import subprocess
+import shlex
 
 from lpm_kernel.configs.logging import get_train_process_logger, TRAIN_LOG_FILE
 logger = get_train_process_logger()
@@ -489,13 +491,6 @@ class TrainProcessService:
     def decode_preference_patterns(self)->bool:
         """Decode preference patterns using notes and related data"""
         try:
-            # Get the latest training parameters from the class
-            training_params = self.__class__.get_latest_training_params()
-            concurrency_threads = training_params.get("concurrency_threads")
-            data_synthesis_mode = training_params.get("data_synthesis_mode")
-            os.environ["CONCURRENCY_THREADS"] = concurrency_threads
-            os.environ["DATA_SYNTHESIS_MODE"] = data_synthesis_mode
-            
             # Mark step as in progress
             self.progress.mark_step_in_progress(ProcessStep.DECODE_PREFERENCE_PATTERNS)
             self.logger.info("Starting preference patterns decoding...")
@@ -792,10 +787,6 @@ class TrainProcessService:
             bool: True if the training process started successfully, False otherwise
         """
         try:
-            # Use ScriptRunner to execute the script
-            from lpm_kernel.api.common.script_runner import ScriptRunner
-            runner = ScriptRunner(log_path=log_path)
-            
             # Reset stop flag before starting
             self.is_stopped = False
             
@@ -808,27 +799,33 @@ class TrainProcessService:
             
             # Log training parameters
             self.logger.info("Training parameters from latest settings:")
-            if learning_rate:
-                self.logger.info(f"  Learning rate: {learning_rate}")
-            if num_train_epochs:
-                self.logger.info(f"  Number of epochs: {num_train_epochs}")
-            if concurrency_threads:
-                self.logger.info(f"  Concurrency threads: {concurrency_threads}")
-            if data_synthesis_mode:
-                self.logger.info(f"  Data synthesis mode: {data_synthesis_mode}")
+            self.logger.info(f"  Learning rate: {learning_rate}")
+            self.logger.info(f"  Number of epochs: {num_train_epochs}")
+            self.logger.info(f"  Concurrency threads: {concurrency_threads}")
+            self.logger.info(f"  Data synthesis mode: {data_synthesis_mode}")
             
-            # 修改训练脚本命令以包含新参数
-            # 注意：这里我们不修改脚本本身，而是通过环境变量传递参数
-            # 训练脚本会从环境变量中读取这些参数
+            # Build command to directly call bash script
+            bash_command = f"bash {script_path} --lr {learning_rate} --epochs {num_train_epochs} --threads {concurrency_threads} --mode {data_synthesis_mode}"
+            self.logger.info(f"Executing command: {bash_command}")
+        
+            # Ensure log directory exists
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
             
-            # Start the training process
-            training_process = runner.execute_script(
-                script_path=script_path,
-                script_type="training",
-                is_python=False,  # This is a bash script
-            )
+            # Open log file for writing
+            with open(log_path, 'w') as log_file:
+                # Use Popen to execute command and redirect output to log file
+                process = subprocess.Popen(
+                    shlex.split(bash_command),
+                    stdout=log_file,
+                    stderr=subprocess.STDOUT,
+                    cwd=os.getcwd(),
+                    env=os.environ.copy()
+                )
+                
+                # Save process object for later status checking
+                self.training_process = process
             
-            self.logger.info(f"Training process started: {training_process}")
+            self.logger.info(f"Training process started with PID: {process.pid}")
             return True
             
         except Exception as e:
@@ -1285,8 +1282,7 @@ class TrainProcessService:
                         step = ProcessStep(current_step)
                         self.progress.mark_step_failed(step)
                 return True
-                
-            import psutil
+
             try:
                 self.logger.info(f"Attempting to terminate process with PID: {self.current_pid}")
                 

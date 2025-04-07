@@ -1,31 +1,31 @@
 #!/bin/bash
 
-# 初始化变量
+# Initialize variables
 LEARNING_RATE="2e-4"
 NUM_TRAIN_EPOCHS="3"
 CONCURRENCY_THREADS="1"
 DATA_SYNTHESIS_MODE="standard"  # low or standard
 
-# 处理参数
+# Process parameters
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --lr) LEARNING_RATE="$2"; shift ;;
         --epochs) NUM_TRAIN_EPOCHS="$2"; shift ;;
         --threads) CONCURRENCY_THREADS="$2"; shift ;;
         --mode) DATA_SYNTHESIS_MODE="$2"; shift ;;
-        *) echo "未知参数: $1"; exit 1 ;;
+        *) echo "Unknown parameter: $1"; exit 1 ;;
     esac
     shift
 done
 
-# 记录使用的参数
+# Log the parameters being used
 echo "Using training parameters:"
 echo "  Learning rate: $LEARNING_RATE"
 echo "  Number of epochs: $NUM_TRAIN_EPOCHS"
 echo "  Concurrency threads: $CONCURRENCY_THREADS"
 echo "  Data synthesis mode: $DATA_SYNTHESIS_MODE"
 
-# 如果设置了并发线程数，配置相关环境变量
+# If concurrency threads are set, configure related environment variables
 if [ "$CONCURRENCY_THREADS" != "1" ]; then
   export OMP_NUM_THREADS=$CONCURRENCY_THREADS
   export MKL_NUM_THREADS=$CONCURRENCY_THREADS
@@ -33,7 +33,7 @@ if [ "$CONCURRENCY_THREADS" != "1" ]; then
   echo "Set thread environment variables to $CONCURRENCY_THREADS"
 fi
 
-# 执行训练脚本，传入环境变量中的参数
+# Execute training script with parameters from environment variables
 python lpm_kernel/L2/train.py \
   --seed 42 \
   --model_name_or_path "${MODEL_BASE_PATH}" \
