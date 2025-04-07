@@ -13,7 +13,7 @@
 
 ## Our Vision
 
-Companies like OpenAI built "Super AI" that threatens human independence. We crave individuality: AI that amplifies, not erases, you.
+Companies like OpenAI built "Super AI" that threatens human independence. We crave individuality: AI that amplifies, not erases, YOU.
 
 We’re challenging that with "**Second Me**": an open-source prototype where you craft your own **AI self**—a new AI species that preserves you, delivers your context, and defends your interests.
 
