@@ -13,13 +13,13 @@
 
 ## Our Vision
 
-Companies like OpenAI built "Super AI" that threatens human independence. We crave individuality: AI that amplifies, not erases, YOU.
+Companies like OpenAI built "Super AI" that threatens human independence. We crave individuality: AI that amplifies, not erases, **YOU**.
 
 We’re challenging that with "**Second Me**": an open-source prototype where you craft your own **AI self**—a new AI species that preserves you, delivers your context, and defends your interests.
 
 It’s **locally trained and hosted**—your data, your control—yet **globally connected**, scaling your intelligence across an AI network. Beyond that, it’s your AI identity interface—a bold standard linking your AI to the world, sparks collaboration among AI selves, and builds tomorrow’s truly native AI apps.
 
-Join us. Tech enthusiasts, AI pros, domain experts—Second Me is your launchpad to extend your mind into the digital horizon.
+Tech enthusiasts, AI pros, domain experts, Join us! Second Me is your launchpad to extend your mind into the digital horizon.
 
 ## Key Features
 
