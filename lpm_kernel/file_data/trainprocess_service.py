@@ -1139,11 +1139,6 @@ class TrainProcessService:
     def start_process(self) -> bool:
         """Start training process"""
         try:
-            # Check if training is already in progress
-            if self.progress.progress.status == Status.IN_PROGRESS:
-                self.logger.warning(f"Training for model '{self.model_name}' is already in progress. Cannot start a new training session.")
-                return False
-                
             self.is_stopped = False
             # Store the current process PID
             self.current_pid = os.getpid()  # Store the PID

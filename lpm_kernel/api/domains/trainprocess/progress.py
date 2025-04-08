@@ -107,9 +107,11 @@ class TrainProgress:
             total_steps = len(stage_obj.steps)
             stage_obj.progress = (completed_steps / total_steps) * 100
         
-        # Update stage status
-        if all(s.completed for s in stage_obj.steps.values()):
-            stage_obj.status = Status.COMPLETED
+        # Update stage status directly with the provided status
+        stage_obj.status = status
+        
+        # Update stage current step based on status
+        if status == Status.COMPLETED:
             stage_obj.current_step = None
             
             # If current stage is completed, find the next uncompleted stage
@@ -119,10 +121,7 @@ class TrainProgress:
                     next_stage = stage_name
                     break
             self.current_stage = next_stage
-        elif any(s.status == Status.FAILED for s in stage_obj.steps.values()):
-            stage_obj.status = Status.FAILED
         else:
-            stage_obj.status = Status.IN_PROGRESS
             stage_obj.current_step = step
             self.current_stage = stage
         
