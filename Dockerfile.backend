@@ -37,8 +37,8 @@ RUN LLAMA_LOCAL_ZIP="dependencies/llama.cpp.zip" \
 # Copy project configuration - Files that occasionally change
 COPY pyproject.toml README.md /app/
 
-RUN poetry install --no-interaction --no-root \
-    && pip install --force-reinstall dependencies/graphrag-1.2.1.dev27.tar.gz
+RUN poetry install --no-interaction --no-root
+RUN pip install --force-reinstall dependencies/graphrag-1.2.1.dev27.tar.gz
 
 
 # Copy source code - Files that frequently change

@@ -245,7 +245,7 @@ class TrainProcessService:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, base_url: str = None, progress_file: str = "trainprocess_progress.json", progress_callback=None, model_name: str = None):
+    def __init__(self, base_url: str = None, progress_file: str = "trainprocess_progress.json", progress_callback=None, model_name: str = None, is_cot: bool = False):
         if not self._initialized:
             config = Config.from_env()
             self.base_url = base_url or config.KERNEL2_SERVICE_URL
@@ -283,7 +283,9 @@ class TrainProcessService:
             self.model_name = model_name
             # Create new progress instance with updated progress file name
             progress_file = f"trainprocess_progress_{model_name}.json"
+        
             self.progress = Progress(progress_file, self.progress_callback)
+        self.is_cot = is_cot
 
     def list_documents(self):
         """List all documents"""
@@ -487,7 +489,7 @@ class TrainProcessService:
             self._prepare_l2_data()
 
             # Use data from l2_data dictionary
-            L2Generator().gen_preference_data(                
+            L2Generator(is_cot=self.is_cot).gen_preference_data(                
                     self.l2_data["notes"],
                     self.l2_data["basic_info"],
                     self.l2_data["data_output_base_dir"],
@@ -517,7 +519,7 @@ class TrainProcessService:
 
             # Use data from l2_data dictionary
             l2_generator = L2Generator(
-                data_path=os.path.join(os.getcwd(), "resources")
+                data_path=os.path.join(os.getcwd(), "resources"), is_cot=self.is_cot
                 )  
             l2_generator.gen_selfqa_data(
                     self.l2_data["notes"],
@@ -566,7 +568,7 @@ class TrainProcessService:
             self._prepare_l2_data()
 
             # Use data from l2_data dictionary
-            l2_generator = L2Generator(data_path=os.path.join(os.getcwd(), "resources"))
+            l2_generator = L2Generator(data_path=os.path.join(os.getcwd(), "resources"), is_cot=self.is_cot)
             l2_generator.gen_diversity_data(
                 self.l2_data["notes"],
                 self.l2_data["basic_info"],

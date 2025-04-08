@@ -15,8 +15,9 @@
 ifeq ($(shell uname -s),Darwin)
   ifeq ($(shell uname -m),arm64)
     APPLE_SILICON := 1
-    # Set PLATFORM=apple for all docker commands
-    docker-%: export PLATFORM=apple
+    # Set environment variables for Apple Silicon
+    export DOCKER_BACKEND_DOCKERFILE=Dockerfile.backend.apple
+    export PLATFORM=apple
   else
     APPLE_SILICON := 0
   endif

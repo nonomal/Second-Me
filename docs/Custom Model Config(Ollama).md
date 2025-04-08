@@ -32,7 +32,7 @@ First, download and install Ollama from the official website:
 #### Chat Request
 
 ```bash
-curl http://localhost:11434/v1/chat/completions -H "Content-Type: application/json" -d '{
+curl http://127.0.0.1:11434/v1/chat/completions -H "Content-Type: application/json" -d '{
   "model": "qwen2.5:0.5b",
   "messages": [
     {"role": "user", "content": "Why is the sky blue?"}
@@ -43,7 +43,7 @@ curl http://localhost:11434/v1/chat/completions -H "Content-Type: application/js
 #### Embedding Request
 
 ```bash
-curl http://localhost:11434/v1/embeddings -d '{
+curl http://127.0.0.1:11434/v1/embeddings -d '{
   "model": "snowflake-arctic-embed:110m",
   "input": "Why is the sky blue?"
 }'
@@ -86,15 +86,15 @@ EMBEDDING_MAX_TEXT_LENGTH=embedding_model_context_length
 Chat:
 Model Name: qwen2.5:0.5b
 API Key: ollama
-API Endpoint: http://localhost:11434/v1
+API Endpoint: http://127.0.0.1:11434/v1
 
 Embedding:
 Model Name: snowflake-arctic-embed:110m
 API Key: ollama
-API Endpoint: http://localhost:11434/v1
+API Endpoint: http://127.0.0.1:11434/v1
 ```
 
-**When running Second Me in Docker environments**, please replace `localhost` in API Endpoint with `host.docker.internal`:
+**When running Second Me in Docker environments**, please replace `127.0.0.1` in API Endpoint with `host.docker.internal`:
 
 ```
 Chat:

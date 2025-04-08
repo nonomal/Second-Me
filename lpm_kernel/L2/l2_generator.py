@@ -29,7 +29,7 @@ class L2Generator:
         data_processor: Instance of L2DataProcessor for handling data processing.
     """
 
-    def __init__(self, data_path: str = "../raw_data", preferred_lang: str = "English"):
+    def __init__(self, data_path: str = "../raw_data", preferred_lang: str = "English", is_cot: bool = True):
         """Initialize the L2Generator with data path and preferred language.
         
         Args:
@@ -39,6 +39,7 @@ class L2Generator:
         self.data_path = data_path
         self.data_processor = L2DataProcessor(data_path, preferred_lang)
         self.preferred_lang = preferred_lang
+        self.is_cot = is_cot
         
     def data_preprocess(self, note_list: List[Note], basic_info: Dict):
         """Preprocess the input notes and basic information.
@@ -107,7 +108,7 @@ class L2Generator:
         preference_output_path = os.path.join(data_output_base_dir, "preference.json")
 
         processor = PreferenceQAGenerator(
-            filename=topics_path, bio=global_bio, preference_language=self.preferred_lang
+            filename=topics_path, bio=global_bio, preference_language=self.preferred_lang, is_cot=self.is_cot
         )
         processor.process_clusters(preference_output_path)
     
@@ -125,7 +126,7 @@ class L2Generator:
         user_name = basic_info["username"]
         output_path = os.path.join(data_output_base_dir, "diversity.json")
 
-        processor = DiversityDataGenerator(self.preferred_lang)
+        processor = DiversityDataGenerator(self.preferred_lang, is_cot=self.is_cot)
         processor.generate_data(
             entities_path, note_list, config_path, graph_path, user_name, global_bio, output_path
         )
@@ -150,6 +151,7 @@ class L2Generator:
             user_input_introduction=user_intro,
             user_global_bio= global_bio,
             preferred_language=self.preferred_lang,
+            is_cot=self.is_cot
         )
         q_a_list = selfqa.generate_qa()
         with open(output_path, "w", encoding="utf-8") as f:

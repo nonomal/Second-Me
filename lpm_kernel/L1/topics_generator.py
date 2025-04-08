@@ -51,7 +51,71 @@ class TopicsGenerator:
             self.model_name = self.user_llm_config.chat_model_name
         logger.info(f"user_llm_config: {self.user_llm_config}")
         self.threshold = 0.85
+        self._top_p_adjusted = False  # Flag to track if top_p has been adjusted
 
+    def _fix_top_p_param(self, error_message: str) -> bool:
+        """Fixes the top_p parameter if an API error indicates it's invalid.
+        
+        Some LLM providers don't accept top_p=0 and require values in specific ranges.
+        This function checks if the error is related to top_p and adjusts it to 0.001,
+        which is close enough to 0 to maintain deterministic behavior while satisfying
+        API requirements.
+        
+        Args:
+            error_message: Error message from the API response.
+            
+        Returns:
+            bool: True if top_p was adjusted, False otherwise.
+        """
+        if not self._top_p_adjusted and "top_p" in error_message.lower():
+            logger.warning("Fixing top_p parameter from 0 to 0.001 to comply with model API requirements")
+            self.topic_params["top_p"] = 0.001
+            self._top_p_adjusted = True
+            return True
+        return False
+
+    def _call_llm_with_retry(self, messages: List[Dict[str, str]], **kwargs) -> Any:
+        """Calls the LLM API with automatic retry for parameter adjustments.
+        
+        This function handles making API calls to the language model while
+        implementing automatic parameter fixes when errors occur. If the API
+        rejects the call due to invalid top_p parameter, it will adjust the
+        parameter value and retry the call once.
+        
+        Args:
+            messages: List of messages for the API call.
+            **kwargs: Additional parameters to pass to the API call.
+            
+        Returns:
+            API response object from the language model.
+            
+        Raises:
+            Exception: If the API call fails after all retries or for unrelated errors.
+        """
+        try:
+            return self.client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+                **self.topic_params,
+                **kwargs
+            )
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"API Error: {error_msg}")
+            
+            # Try to fix top_p parameter if needed
+            if hasattr(e, 'response') and hasattr(e.response, 'status_code') and e.response.status_code == 400:
+                if self._fix_top_p_param(error_msg):
+                    logger.info("Retrying LLM API call with adjusted top_p parameter")
+                    return self.client.chat.completions.create(
+                        model=self.model_name,
+                        messages=messages,
+                        **self.topic_params,
+                        **kwargs
+                    )
+            
+            # Re-raise the exception
+            raise
 
     def __find_nearest_cluster(self, cluster_list: List[Cluster], memory: Memory) -> tuple:
         """
@@ -539,9 +603,7 @@ class TopicsGenerator:
             {"role": "system", "content": SYS_COMB},
             {"role": "user", "content": USR_COMB.format(topics=c_topics, tags=c_tags)},
         ]
-        res = self.client.chat.completions.create(
-            model=self.model_name, messages=messages, **self.topic_params
-        )
+        res = self._call_llm_with_retry(messages)
         new_topic, new_tags = self.__parse_response(
             res.choices[0].message.content, "topic", "tags"
         )
@@ -580,9 +642,7 @@ class TopicsGenerator:
                         f"Request messages: {json.dumps(tmp_msg, ensure_ascii=False)}"
                     )
 
-                    answer = self.client.chat.completions.create(
-                        model=self.model_name, messages=tmp_msg, **self.topic_params
-                    )
+                    answer = self._call_llm_with_retry(tmp_msg)
                     content = answer.choices[0].message.content
                     logger.info(f"Generated content: {content}")
 

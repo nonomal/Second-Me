@@ -52,6 +52,7 @@ models:
     retry_strategy: native
     tokens_per_minute: 0
     type: openai_embedding
+    encoding_model: cl100k_base
 output:
   base_dir: /your_dir
   type: file
