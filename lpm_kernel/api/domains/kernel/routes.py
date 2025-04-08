@@ -230,7 +230,7 @@ def list_l1_versions():
                 {
                     "version": v.version,
                     "create_time": v.create_time.isoformat(),
-                    "status": v.status,
+                    "status": v.overall_status,
                     "description": v.description,
                 }
                 for v in versions

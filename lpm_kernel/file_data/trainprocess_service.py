@@ -71,10 +71,8 @@ class ProcessStep(Enum):
         """Get the corresponding method name for this step"""
         return self.value
 
-
 class Progress:
     """Progress management class"""
-
     def __init__(
         self, progress_file: str = "trainprocess_progress.json", progress_callback=None
     ):
@@ -104,7 +102,7 @@ class Progress:
                                 stage.progress = stage_data["progress"]
                             # Restore stage status
                             if "status" in stage_data:
-                                stage.status = Status[stage_data["status"].upper()]
+                                stage.overall_status = Status[stage_data["status"].upper()]
                             # Restore current step
                             if "current_step" in stage_data:
                                 stage.current_step = stage_data["current_step"]
@@ -130,7 +128,7 @@ class Progress:
                         self.progress.current_stage = saved_progress["current_stage"]
                     # Restore overall status
                     if "status" in saved_progress:
-                        self.progress.status = Status[saved_progress["status"].upper()]
+                        self.progress.overall_status = Status[saved_progress["status"].upper()]
             except json.JSONDecodeError as e:
                 self.logger.error(f"Failed to load progress file: {str(e)}")
             except Exception as e:
@@ -143,7 +141,6 @@ class Progress:
             json.dump(progress_dict, f, indent=2)
         if self.progress_callback:
             self.progress_callback(progress_dict)
-        self._load_progress()
 
     def _get_stage_and_step(self, step: ProcessStep) -> tuple:
         """Get the stage and step name corresponding to the step"""
@@ -256,13 +253,11 @@ class TrainProcessService:
             self.logger = logger
             self.model_name = None  # Initialize as None
             self._initialized = True
-            
-            # Initialize stop flag
-            self.is_stopped = False
-            # Initialize training process tracking
-            self.training_process = None
-            self.current_step = None
-            
+            # 0.5 B 干了一坨屎
+            # 3B
+            self.is_stopped = xxx
+            self.training_process = cc
+            self.current_step = dd
             # Initialize L2 data dictionary
             self.l2_data = {
                 "notes": None,
@@ -277,15 +272,17 @@ class TrainProcessService:
         
         # Always use our internal callback
         self.progress.progress_callback = self.progress_callback
+        self.is_cot = is_cot
             
         # Update model name and progress instance if model name changes
         if model_name is not None and model_name != self.model_name:
+            # 重新初始化？？？
             self.model_name = model_name
             # Create new progress instance with updated progress file name
             progress_file = f"trainprocess_progress_{model_name}.json"
         
             self.progress = Progress(progress_file, self.progress_callback)
-        self.is_cot = is_cot
+
 
     def list_documents(self):
         """List all documents"""
@@ -430,8 +427,7 @@ class TrainProcessService:
             # Mark step as in progress
             self.progress.mark_step_in_progress(ProcessStep.MODEL_DOWNLOAD)
             # Directly call save_hf_model function to download model
-            self.logger.info(f"Starting model download: {self.model_name}")
-            
+
             # Start monitoring the download progress in a separate thread
             monitor_thread = threading.Thread(target=self._monitor_model_download)
             monitor_thread.daemon = True
@@ -687,11 +683,9 @@ class TrainProcessService:
             # Check if the model directory exists and has the necessary files
             config_file = os.path.join(paths["base_path"], "config.json")
             if not os.path.exists(paths["base_path"]) or not os.path.exists(config_file):
-                self.logger.info(f"Model '{self.model_name}' needs to be downloaded or is missing config.json")
                 # Call model_download to download the model
                 download_success = self.model_download()
                 if not download_success:
-                    self.logger.error(f"Failed to download model '{self.model_name}'")
                     self.progress.mark_step_failed(ProcessStep.MODEL_DOWNLOAD)
                     return False
             
@@ -812,8 +806,6 @@ class TrainProcessService:
                 last_position = 0
             
             # variable to track training status
-            total_steps = None
-            current_step = 0
             last_update_time = time.time()
             training_started = False
             
@@ -843,7 +835,6 @@ class TrainProcessService:
                             # Update progress at most once per second
                             current_time = time.time()
                             if current_time - last_update_time >= 1.0:
-                                # self.logger.info(f"Training progress: {percentage}% ({current_step}/{total_steps})")
                                 if percentage == 100.0:
                                     self.progress.mark_step_completed(ProcessStep.TRAIN)
                                     return True
@@ -991,7 +982,6 @@ class TrainProcessService:
             
             # Check if model exists
             if not os.path.exists(paths["base_path"]):
-                self.logger.error(f"Model '{self.model_name}' does not exist, please download first")
                 self.progress.mark_step_failed(ProcessStep.MERGE_WEIGHTS)
                 return False
             
@@ -1057,7 +1047,6 @@ class TrainProcessService:
             merged_model_dir = paths["merged_dir"]
             self.logger.info(f"Merged model path: {merged_model_dir}")
             if not os.path.exists(merged_model_dir):
-                self.logger.error(f"Model '{self.model_name}' merged output does not exist, please merge model first")
                 self.progress.mark_step_failed(ProcessStep.CONVERT_MODEL)
                 return False
             
@@ -1136,11 +1125,14 @@ class TrainProcessService:
                     step = ProcessStep(current_step)
                     self.progress.mark_step_failed(step)
 
+# flask work thread ?
+    # daemon thread ?
+        # subProcess ?
+            # 父进程死了，子进程一定会死么
     def start_process(self) -> bool:
         """Start training process"""
         try:
             self.is_stopped = False
-            # Store the current process PID
             self.current_pid = os.getpid()  # Store the PID
             self.logger.info(f"Training process started with PID: {self.current_pid}")
             # Get the ordered list of all steps

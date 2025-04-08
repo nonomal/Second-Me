@@ -228,7 +228,7 @@ class SpaceRepository(BaseRepository[Space]):
             db_space.host = space_dto.host
             db_space.participants = space_dto.participants
             db_space.conclusion = space_dto.conclusion
-            db_space.status = getattr(space_dto, "status", 1)
+            db_space.overall_status = getattr(space_dto, "status", 1)
             db_space.space_share_id = space_dto.space_share_id
             
             # Process messages
