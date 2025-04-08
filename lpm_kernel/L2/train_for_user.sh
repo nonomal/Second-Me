@@ -48,7 +48,8 @@ python lpm_kernel/L2/train.py \
   --logging_steps 20 \
   --log_level "info" \
   --logging_strategy "steps" \
-  --save_strategy "epoch" \
+  --save_strategy "steps" \
+  --save_steps 5 \
   --push_to_hub False \
   --bf16 True \
   --packing False \
