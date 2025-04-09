@@ -244,11 +244,11 @@ class TrainProcessService:
     
     # Static variable to store the latest training parameters
     _latest_training_params = {
-        "model_name": None,
-        "learning_rate": None,
-        "number_of_epochs": None,
-        "concurrency_threads": None,
-        "data_synthesis_mode": None
+        "model_name": "Qwen2.5-0.5B-Instruct",
+        "learning_rate": 2e-4,
+        "number_of_epochs": 3,
+        "concurrency_threads": 2,
+        "data_synthesis_mode": "low"
     }
 
     def __new__(cls, *args, **kwargs):
