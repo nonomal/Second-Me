@@ -95,17 +95,13 @@ class Progress:
             try:
                 with open(self.progress_file, "r") as f:
                     saved_progress = json.load(f)
-                    # 直接将加载的进度数据设置为 TrainProgress 的 data 属性
                     self.progress.data = saved_progress
                     
-                    # 重新创建映射字典
-                    # 创建阶段名称到阶段数据的映射
                     self.progress.stage_map = {}
                     for stage in self.progress.data["stages"]:
                         stage_name = stage["name"].lower().replace(" ", "_")
                         self.progress.stage_map[stage_name] = stage
-                        
-                    # 创建步骤名称到步骤数据的映射
+                    
                     self.progress.steps_map = {}
                     for stage_name, stage in self.progress.stage_map.items():
                         self.progress.steps_map[stage_name] = {}
@@ -115,8 +111,14 @@ class Progress:
                             
             except json.JSONDecodeError as e:
                 self.logger.error(f"Failed to load progress file: {str(e)}")
+                # Reset progress if JSON is invalid
+                self.progress = TrainProgress()
+                # Save a valid progress file to prevent future errors
+                self._save_progress()
             except Exception as e:
                 self.logger.error(f"Error loading progress: {str(e)}")
+                # Reset progress on any error
+                self.progress = TrainProgress()
 
     def _save_progress(self):
         """Save progress"""
@@ -156,7 +158,7 @@ class Progress:
         """Check if a step is completed"""
         stage_name, step_name = self._get_stage_and_step(step)
         
-        # 使用新的TrainProgress数据结构
+        # Using the new TrainProgress data structure
         if stage_name not in self.progress.stage_map:
             return False
             

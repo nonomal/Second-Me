@@ -219,3 +219,76 @@ class TrainProgress:
     def reset(self):
         """Reset all progress statuses"""
         self.__init__()
+        
+    @property
+    def status(self):
+        """Get the current overall status"""
+        return self.data["status"]
+        
+    @status.setter
+    def status(self, value):
+        """Set the current overall status"""
+        if isinstance(value, Status):
+            self.data["status"] = value.value
+        else:
+            self.data["status"] = value
+            
+    @property
+    def overall_progress(self):
+        """Get the overall progress"""
+        return self.data["overall_progress"]
+        
+    @overall_progress.setter
+    def overall_progress(self, value):
+        """Set the overall progress"""
+        self.data["overall_progress"] = value
+        
+    @property
+    def current_stage(self):
+        """Get the current stage"""
+        return self.data["current_stage"]
+        
+    @current_stage.setter
+    def current_stage(self, value):
+        """Set the current stage"""
+        self.data["current_stage"] = value
+        
+    @property
+    def stages(self):
+        """Get stages in a dictionary-like format for backward compatibility"""
+        # Create a dictionary-like object for compatibility with old code
+        class StageDict(dict):
+            def __init__(self, train_progress):
+                self.train_progress = train_progress
+                
+            def __getitem__(self, key):
+                # Find the corresponding stage data
+                for stage in self.train_progress.data["stages"]:
+                    if stage["name"] == key:
+                        # Create a dictionary-like object similar to the old Stage object
+                        class StageObj:
+                            def __init__(self, stage_data):
+                                self.stage_data = stage_data
+                                
+                            @property
+                            def current_step(self):
+                                # Return the step name in snake_case format instead of the original name
+                                step_name = self.stage_data["current_step"]
+                                if not step_name:
+                                    return None
+                                    
+                                # Convert the original step name to snake_case format
+                                import re
+                                return re.sub(r'(?<!^)(?=[A-Z])', '_', step_name).lower()
+                        
+                        return StageObj(stage)
+                return None
+                
+            def get(self, key, default=None):
+                try:
+                    result = self[key]
+                    return result if result is not None else default
+                except:
+                    return default
+                    
+        return StageDict(self)
