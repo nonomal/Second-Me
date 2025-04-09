@@ -26,14 +26,10 @@ def is_english(text: str) -> bool:
     return text.isascii() and text.isalpha()
 
 
-class LowMode(Enum):
-    user_question_nums = 3
-    user_bind_question_nums = 3
-    
-
-class HighMode(Enum):
-    user_question_nums = 1
-    user_bind_question_nums = 1
+class DataSynthesisMode(Enum):
+    LOW = {"user_question_nums":3, "user_bind_question_nums":3}
+    MEDIUM = {"user_question_nums":2, "user_bind_question_nums":2}
+    HIGH = {"user_question_nums":1, "user_bind_question_nums":1}
 
 
 class SelfQA:
@@ -69,7 +65,7 @@ class SelfQA:
                 base_url=user_llm_config.chat_endpoint,
             )
         self.max_workers = os.environ.get("concurrency_threads", 2)
-        self.data_synthesis_mode = os.environ.get("DATA_SYNTHESIS_MODE", "standard")
+        self.data_synthesis_mode = os.environ.get("DATA_SYNTHESIS_MODE", "low")
 
 
     def _get_question_list(self) -> list:
@@ -135,17 +131,11 @@ class SelfQA:
             f"{self.user_name}这个名字对你来说有印象吗？",
         ]
         if self.preferred_language != "Chinese":
-            return random.sample(question_list_en, len(question_list_en) // HighMode.user_question_nums.value) + \
-                   random.sample(user_bind_question_en, len(user_bind_question_en) // HighMode.user_bind_question_nums.value)  \
-                if self.data_synthesis_mode == "standard" else \
-                   random.sample(question_list_en, len(question_list_en) // LowMode.user_question_nums.value) + \
-                   random.sample(user_bind_question_en, len(user_bind_question_en) // LowMode.user_bind_question_nums.value)
+            return random.sample(question_list_en, len(question_list_en) // DataSynthesisMode[self.data_synthesis_mode.upper()].value["user_question_nums"]) + \
+                   random.sample(user_bind_question_en, len(user_bind_question_en) // DataSynthesisMode[self.data_synthesis_mode.upper()].value["user_bind_question_nums"])
         else:
-            return random.sample(question_list_cn, len(question_list_cn) // HighMode.user_question_nums.value) + \
-                   random.sample(user_bind_question_cn, len(user_bind_question_cn) // HighMode.user_bind_question_nums.value)  \
-                if self.data_synthesis_mode == "standard" else \
-                   random.sample(question_list_cn, len(question_list_cn) // LowMode.user_question_nums.value) + \
-                   random.sample(user_bind_question_cn, len(user_bind_question_cn) // LowMode.user_bind_question_nums.value)
+            return random.sample(question_list_cn, len(question_list_cn) // DataSynthesisMode[self.data_synthesis_mode.upper()].value["user_question_nums"]) + \
+                   random.sample(user_bind_question_cn, len(user_bind_question_cn) // DataSynthesisMode[self.data_synthesis_mode.upper()].value["user_bind_question_nums"])
 
 
     def generate_qa(self) -> list:

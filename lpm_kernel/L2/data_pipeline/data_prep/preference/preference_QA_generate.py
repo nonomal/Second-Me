@@ -21,8 +21,12 @@ import traceback
 
 
 class LowMode(Enum):
+    cluster_nums = 3
+
+
+class MediumMode(Enum):
     cluster_nums = 2
-    
+
 
 class HighMode(Enum):
     cluster_nums = 1
@@ -61,7 +65,7 @@ class PreferenceQAGenerator:
         self.prompt_templates = self._get_prompt_templates(preference_language)
         self.sys_templates = self._get_sys_templates(preference_language)
         self.max_workers = 1
-        self.data_synthesis_mode = os.environ.get("DATA_SYNTHESIS_MODE", "standard")
+        self.data_synthesis_mode = os.environ.get("DATA_SYNTHESIS_MODE", "low")
 
 
     def generate_response(self, sys: str, prompt: str) -> str:
@@ -143,8 +147,14 @@ class PreferenceQAGenerator:
         """
         cluster_items = list(self.pre_msg.items())
         count = 0
-        new_cluster_items = random.sample(cluster_items, len(cluster_items) // HighMode.cluster_nums.value 
-                                          if self.data_synthesis_mode == "standard" else len(cluster_items) // LowMode.cluster_nums.value)
+        if self.data_synthesis_mode == "low":
+            sample_num = max(1, len(cluster_items) // LowMode.cluster_nums.value) if 0 < len(cluster_items) < 3 else len(cluster_items) // LowMode.cluster_nums.value
+            new_cluster_items = random.sample(cluster_items, sample_num)
+        elif self.data_synthesis_mode == "medium":
+            sample_num = max(1, len(cluster_items) // MediumMode.cluster_nums.value) if 0 < len(cluster_items) < 2 else len(cluster_items) // MediumMode.cluster_nums.value
+            new_cluster_items = random.sample(cluster_items, sample_num)
+        else: # high or other case
+            new_cluster_items = cluster_items
         for _, cluster in tqdm(new_cluster_items):
             chunk_concat = self._get_chunk_concat(cluster["contents"])
 

@@ -3,8 +3,8 @@
 # Initialize variables
 LEARNING_RATE="2e-4"
 NUM_TRAIN_EPOCHS="3"
-CONCURRENCY_THREADS="1"
-DATA_SYNTHESIS_MODE="standard"  # low or standard
+CONCURRENCY_THREADS="2"
+DATA_SYNTHESIS_MODE="low"
 
 # Process parameters
 while [[ "$#" -gt 0 ]]; do

@@ -19,16 +19,10 @@ from lpm_kernel.configs.logging import get_train_process_logger
 logger = get_train_process_logger()
 
 
-class LowMode(Enum):
-    large_aug_para = 1
-    tiny_aug_para = 1
-    mini_aug_para = 1
-    
-
-class HighMode(Enum):
-    large_aug_para = 4
-    tiny_aug_para = 3
-    mini_aug_para = 2
+class DataSynthesisMode(Enum):
+    LOW = {"large_aug_para":1, "tiny_aug_para":1, "mini_aug_para":1}
+    MEDIUM = {"large_aug_para":2, "tiny_aug_para":2, "mini_aug_para":2}
+    HIGH = {"large_aug_para":4, "tiny_aug_para":3, "mini_aug_para":2}
 
 
 class TqdmLoggingHandler:
@@ -71,7 +65,7 @@ class DiversityDataGenerator:
             )
         self.preference_language = preference_language
         self.max_workers = os.environ.get("concurrency_threads", 2)
-        self.data_synthesis_mode = os.environ.get("DATA_SYNTHESIS_MODE", "standard")
+        self.data_synthesis_mode = os.environ.get("DATA_SYNTHESIS_MODE", "low")
 
 
     def _preprocess(self, entities_path: str, note_list: list, config_path: str, graph_path: str, user_name: str):
@@ -305,7 +299,7 @@ class DiversityDataGenerator:
 
         if len(exploded_clusters) > 0:
             logger.info("Execute large cluster generation")
-            data_large = self._pipline(exploded_clusters, HighMode.large_aug_para.value if self.data_synthesis_mode == "standard" else LowMode.large_aug_para.value, 
+            data_large = self._pipline(exploded_clusters, DataSynthesisMode[self.data_synthesis_mode.upper()].value["large_aug_para"], 
                                        q_dict, templater, language_desc, user_name)
         else:
             logger.info("Large cluster number is 0")
@@ -313,7 +307,7 @@ class DiversityDataGenerator:
 
         if len(mini_clusters) > 0:
             logger.info("Execute small cluster generation")
-            data_mini = self._pipline(mini_clusters, HighMode.mini_aug_para.value if self.data_synthesis_mode == "standard" else LowMode.mini_aug_para.value, 
+            data_mini = self._pipline(mini_clusters, DataSynthesisMode[self.data_synthesis_mode.upper()].value["mini_aug_para"], 
                                       q_dict, templater, language_desc, user_name)
         else:
             logger.info("Small cluster number is 0")
@@ -323,7 +317,7 @@ class DiversityDataGenerator:
             logger.info("Execute single entity cluster generation")
             q_dict.pop("unanswerable")
             q_dict.pop("global")
-            data_tiny = self._pipline(filtered_tiny_clusters, HighMode.tiny_aug_para.value if self.data_synthesis_mode == "standard" else LowMode.tiny_aug_para.value, 
+            data_tiny = self._pipline(filtered_tiny_clusters, DataSynthesisMode[self.data_synthesis_mode.upper()].value["tiny_aug_para"], 
                                       q_dict, templater, language_desc, user_name)
         else:
             logger.info("Single entity cluster number is 0")
