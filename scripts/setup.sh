@@ -59,14 +59,48 @@ display_stage() {
 
 # Setup and configure package managers (npm)
 check_npm() {
-    # Check if npm is already installed
     log_step "Checking npm installation..."
+    
+    # Check if npm is already installed
     if ! command -v npm &>/dev/null; then
-        log_error "npm not found - please install Node.js and npm manually"
+        log_error "npm not found - please install npm manually"
+        
+        # Get system identification and show installation recommendations
+        local system_id=$(get_system_id)
+        get_npm_recommendation "$system_id"
+        
         return 1
     fi
 
     log_success "npm check passed"
+    return 0
+}
+
+# Check Node.js installation
+check_node() {
+    log_step "Checking Node.js installation..."
+    
+    local node_cmd=""
+    
+    # Check for node command
+    if command -v node &>/dev/null; then
+        node_cmd="node"
+    # Also check for nodejs command as it's used on some Linux distributions
+    elif command -v nodejs &>/dev/null; then
+        node_cmd="nodejs"
+    else
+        log_error "Node.js is not installed, please install Node.js manually"
+        
+        # Get system identification and show installation recommendations
+        local system_id=$(get_system_id)
+        get_node_recommendation "$system_id"
+        
+        return 1
+    fi
+    
+    # Check version (if needed)
+    local version=$($node_cmd --version 2>&1 | sed 's/v//')
+    log_success "Node.js check passed, using $node_cmd version $version"
     return 0
 }
 
@@ -395,6 +429,11 @@ check_potential_conflicts() {
 
     if ! check_python; then
         log_error "python check failed, please install python first"
+        exit 1
+    fi
+    
+    if ! check_node; then
+        log_error "Node.js check failed"
         exit 1
     fi
     
