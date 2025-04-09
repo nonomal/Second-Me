@@ -138,27 +138,61 @@ install_python_dependency() {
         return 1
     fi
     
-    # Get the appropriate Python command
-    local python_cmd=$(get_python_command)
-    if [ -z "$python_cmd" ]; then
-        log_error "No Python command found to verify packages"
-        return 1
-    fi
-    
-    # Verify key packages are installed
-    log_info "Verifying key packages using $python_cmd..."
+    # Verify key packages are installed using Poetry's own environment
+    log_info "Verifying key packages using Poetry environment..."
     local required_packages=("flask" "chromadb" "langchain")
     for pkg in "${required_packages[@]}"; do
-        if ! $python_cmd -c "import $pkg" 2>/dev/null; then
-            log_error "Package '$pkg' is not installed correctly"
+        if ! poetry run python -c "import $pkg" 2>/dev/null; then
+            log_error "Package '$pkg' is not installed correctly in Poetry environment"
             return 1
         else
-            log_info "Package '$pkg' is installed correctly"
+            log_info "Package '$pkg' is installed correctly in Poetry environment"
         fi
     done
+    
+    # Get and save the Poetry environment path
+    local poetry_env_path=$(poetry env info -p 2>/dev/null)
+    if [ -n "$poetry_env_path" ]; then
+        log_info "Poetry virtual environment is located at: $poetry_env_path"
+        # Create an activation script for convenience
+        create_poetry_activate_script "$poetry_env_path"
+    fi
 
     log_success "Python environment setup completed"
+    log_info "------------------------------------------------------------------------------"
+    log_info "To use this Python environment, you can:"
+    log_info "1. Run 'poetry shell' to open a new shell with the virtual environment activated"
+    log_info "2. Run 'source .poetry-venv/activate' to activate the environment in your current shell"
+    log_info "3. Use 'poetry run python script.py' to run a single command without activating the environment"
+    log_info "------------------------------------------------------------------------------"
     return 0
+}
+
+# Create a convenient activation script for the Poetry environment
+create_poetry_activate_script() {
+    local env_path="$1"
+    local activate_dir=".poetry-venv"
+    local activate_script="$activate_dir/activate"
+    
+    # Create directory if it doesn't exist
+    mkdir -p "$activate_dir"
+    
+    # Create activation script
+    cat > "$activate_script" << EOF
+#!/bin/bash
+# Activation script for Poetry virtual environment
+
+# Source the actual virtual environment activate script
+source "$env_path/bin/activate"
+
+# Print confirmation message
+echo "Poetry virtual environment activated: $env_path"
+echo "Use 'deactivate' command to exit this environment"
+EOF
+    
+    # Make script executable
+    chmod +x "$activate_script"
+    log_info "Created Poetry environment activation script at: $activate_script"
 }
 
 install_graphrag() {
