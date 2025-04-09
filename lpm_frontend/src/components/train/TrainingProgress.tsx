@@ -16,7 +16,9 @@ const descriptionMap = [
 const TrainingProgress = (props: TrainingProgressProps) => {
   const { trainingProgress, status } = props;
 
-  const formatUnderscoreToName = (str: string) => {
+  const formatUnderscoreToName = (_str: string) => {
+    const str = _str || '';
+
     return str
       .split('_')
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
