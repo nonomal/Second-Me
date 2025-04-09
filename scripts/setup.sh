@@ -198,24 +198,17 @@ EOF
 install_graphrag() {
     log_step "Installing graphrag"
     
-    # Get the appropriate pip command
-    local pip_cmd=$(get_pip_command)
-    if [ -z "$pip_cmd" ]; then
-        log_error "pip command not found, cannot install graphrag"
-        return 1
-    fi
-    
-    # Check and ensure correct version of graphrag is installed
-    log_step "Checking graphrag version"
-    GRAPHRAG_VERSION=$($pip_cmd show graphrag 2>/dev/null | grep "Version:" | cut -d " " -f2)
+    # Check the current graphrag version in Poetry environment
+    log_step "Checking graphrag version in Poetry environment"
+    GRAPHRAG_VERSION=$(poetry run pip show graphrag 2>/dev/null | grep "Version:" | cut -d " " -f2)
     GRAPHRAG_TARGET="1.2.1.dev27"
     GRAPHRAG_LOCAL_PATH="dependencies/graphrag-${GRAPHRAG_TARGET}.tar.gz"
 
     if [ "$GRAPHRAG_VERSION" != "$GRAPHRAG_TARGET" ]; then
-        log_info "Installing correct version of graphrag..."
+        log_info "Installing correct version of graphrag in Poetry environment..."
         if [ -f "$GRAPHRAG_LOCAL_PATH" ]; then
-            log_info "Installing graphrag from local file using $pip_cmd..."
-            if ! $pip_cmd install --force-reinstall "$GRAPHRAG_LOCAL_PATH"; then
+            log_info "Installing graphrag from local file using Poetry..."
+            if ! poetry run pip install --force-reinstall "$GRAPHRAG_LOCAL_PATH"; then
                 log_error "Failed to install graphrag from local file"
                 return 1
             fi
