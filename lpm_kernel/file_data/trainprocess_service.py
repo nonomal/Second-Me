@@ -179,7 +179,7 @@ class Progress:
                 "step": step_name,
                 "status": Status.COMPLETED.value
             })
-
+            
     def mark_step_failed(self, step: ProcessStep):
         """Mark a step as failed"""
         stage_name, step_name = self._get_stage_and_step(step)
