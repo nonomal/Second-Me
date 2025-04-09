@@ -52,10 +52,20 @@ export const tabs = [
     ]
   },
   {
-    name: 'Second Me Apps',
+    name: 'Second Me Services',
     path: ROUTER_PATH.APPLICATIONS,
     icon: <AppsIcon className="w-5 h-5" />,
     subTabs: [
+      {
+        name: 'API + MCP',
+        path: ROUTER_PATH.APPLICATIONS_API_MCP,
+        icon: <RoleplayIcon className="w-4 h-4" />
+      },
+      {
+        name: 'Intergrations',
+        path: ROUTER_PATH.APPLICATIONS_INTERGRATIONS,
+        icon: <RoleplayIcon className="w-4 h-4" />
+      },
       {
         name: 'Roleplay Apps',
         path: ROUTER_PATH.APPLICATIONS_ROLEPLAY,

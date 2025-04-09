@@ -164,7 +164,7 @@ const Menu = () => {
                 {/* Main tab item */}
                 <div className="flex items-center">
                   <Link
-                    className={`group flex flex-1 items-center gap-2 px-3 py-2 text-sm rounded-lg transition-all duration-200 ${
+                    className={`group flex flex-1 items-center justify-between gap-2 px-3 py-2 text-sm rounded-lg transition-all duration-200 ${
                       pathname.startsWith(tab.path)
                         ? 'bg-blue-50 text-blue-600 font-medium'
                         : 'text-gray-600 hover:bg-blue-50/50 hover:text-blue-600'
@@ -177,31 +177,33 @@ const Menu = () => {
                       }
                     }}
                   >
-                    <span
-                      className={`transition-colors duration-200 ${
-                        pathname.startsWith(tab.path)
-                          ? 'text-blue-600'
-                          : 'text-gray-400 group-hover:text-blue-500'
-                      }`}
-                    >
-                      {tab.icon}
-                    </span>
-                    <span
-                      className={classNames(
-                        'font-medium transition-opacity line-clamp-1',
-                        isSidebarCollapsed ? 'opacity-0' : 'opacity-100'
-                      )}
-                    >
-                      {tab.name}
-                    </span>
-                  </Link>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`transition-colors duration-200 ${
+                          pathname.startsWith(tab.path)
+                            ? 'text-blue-600'
+                            : 'text-gray-400 group-hover:text-blue-500'
+                        }`}
+                      >
+                        {tab.icon}
+                      </span>
+                      <span
+                        className={classNames(
+                          'font-medium transition-opacity line-clamp-1',
+                          isSidebarCollapsed ? 'opacity-0' : 'opacity-100'
+                        )}
+                      >
+                        {tab.name}
+                      </span>
+                    </div>
 
-                  {/* Dropdown arrow for items with submenus */}
-                  {!isSidebarCollapsed && tab.subTabs && (
-                    <button className="p-1 rounded-md hover:bg-blue-50/50 mr-1">
-                      <ArrowIcon className={pathname.startsWith(tab.path) ? 'rotate-90' : ''} />
-                    </button>
-                  )}
+                    {/* Dropdown arrow for items with submenus */}
+                    {!isSidebarCollapsed && tab.subTabs && (
+                      <button className="p-1 rounded-md hover:bg-blue-50/50 mr-1">
+                        <ArrowIcon className={pathname.startsWith(tab.path) ? 'rotate-90' : ''} />
+                      </button>
+                    )}
+                  </Link>
                 </div>
 
                 {/* Sub Tabs with improved styling */}
