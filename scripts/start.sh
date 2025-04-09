@@ -3,43 +3,9 @@
 # Script version
 VERSION="1.0.0"
 
-
-# Color definitions
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-MAGENTA='\033[0;35m'
-CYAN='\033[0;36m'
-GRAY='\033[0;90m'
-BOLD='\033[1m'
-NC='\033[0m' # No Color
-
-# Get current timestamp
-get_timestamp() {
-    date "+%Y-%m-%d %H:%M:%S"
-}
-
-# Print formatted log messages
-log_info() {
-    echo -e "${GRAY}[$(get_timestamp)]${NC} ${GREEN}[INFO]${NC}    $1"
-}
-
-log_success() {
-    echo -e "${GRAY}[$(get_timestamp)]${NC} ${GREEN}[SUCCESS]${NC} $1"
-}
-
-log_warning() {
-    echo -e "${GRAY}[$(get_timestamp)]${NC} ${YELLOW}[WARNING]${NC} $1"
-}
-
-log_error() {
-    echo -e "${GRAY}[$(get_timestamp)]${NC} ${RED}[ERROR]${NC}   $1"
-}
-
-log_section() {
-    echo -e "${GRAY}[$(get_timestamp)]${NC} ${BOLD}[SECTION]${NC} $1"
-}
+# Source the logging utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/utils/logging.sh"
 
 # Check if port is available
 check_port() {
@@ -50,38 +16,97 @@ check_port() {
     return 0
 }
 
-# Check if backend is healthy
+# Check if backend is healthy with real-time log display
 check_backend_health() {
     local max_attempts=$1
     local attempt=1
     local backend_url="http://127.0.0.1:${LOCAL_APP_PORT}/health"
+    local backend_log="logs/start.log"
+    local log_pid=0
+    
+    log_info "Waiting for backend service to be ready (showing real-time logs)..."
+    
+    # Start real-time log display in background if log file exists
+    if [ -f "$backend_log" ]; then
+        echo -e "${GRAY}---Backend logs begin (real-time)---${NC}"
+        tail -f "$backend_log" &
+        log_pid=$!
+    fi
     
     while [ $attempt -le $max_attempts ]; do
+        # Non-blocking health check
         if curl -s -f "$backend_url" &>/dev/null; then
+            # Stop the log display process
+            if [ $log_pid -ne 0 ]; then
+                kill $log_pid >/dev/null 2>&1
+                echo -e "${GRAY}---Backend logs end---${NC}"
+            fi
             return 0
         fi
+        
         sleep 1
         attempt=$((attempt + 1))
     done
+    
+    # Stop the log display process if it's still running
+    if [ $log_pid -ne 0 ]; then
+        kill $log_pid >/dev/null 2>&1
+        echo -e "${GRAY}---Backend logs end---${NC}"
+    fi
+    
     return 1
 }
 
-# Check if frontend is ready
+# Check if frontend is ready with real-time log display
 check_frontend_ready() {
+    
     local max_attempts=$1
     local attempt=1
-    local frontend_log="../logs/frontend.log"
+    local frontend_log="logs/frontend.log"
+    local log_pid=0
+    
+    log_info "Waiting for frontend service to be ready (showing real-time logs)..."
+    
+    # Don't wait for file to exist, just start tail which will wait for the file
+    echo -e "${GRAY}---Frontend logs begin (real-time)---${NC}"
+    tail -f "$frontend_log" 2>/dev/null &
+    log_pid=$!
+    
+    # Give a small delay to allow initial logs to appear
+    sleep 1
     
     while [ $attempt -le $max_attempts ]; do
-        if grep -q "Local:" "$frontend_log" 2>/dev/null; then
+        # Non-blocking ready check - check for "Local:" in the file or the existence of the frontend URL
+        if grep -q "Local:" "$frontend_log" 2>/dev/null || curl -s -f "http://localhost:${LOCAL_FRONTEND_PORT}" &>/dev/null; then
+            # Frontend is ready! Stop the log display process
+            if [ $log_pid -ne 0 ]; then
+                kill $log_pid >/dev/null 2>&1
+                echo -e "${GRAY}---Frontend logs end---${NC}"
+            fi
+            
+            # Display the frontend URL that was found in the logs
+            if grep -q "Local:" "$frontend_log" 2>/dev/null; then
+                local frontend_url=$(grep "Local:" "$frontend_log" | head -n 1)
+                log_success "Frontend URL detected: $frontend_url"
+            else
+                log_success "Frontend is responding at http://localhost:${LOCAL_FRONTEND_PORT}"
+            fi
+            
             return 0
         fi
+        
         sleep 1
         attempt=$((attempt + 1))
     done
+    
+    # Stop the log display process if it's still running
+    if [ $log_pid -ne 0 ]; then
+        kill $log_pid >/dev/null 2>&1
+        echo -e "${GRAY}---Frontend logs end---${NC}"
+    fi
+    
     return 1
 }
-
 
 # Check if setup is complete
 check_setup_complete() {
@@ -116,6 +141,8 @@ start_services() {
     if ! check_setup_complete; then
         return 1
     fi
+
+    log_step "Loading environment variables"
     
     # Load environment variables
     if [[ -f .env ]]; then
@@ -133,8 +160,10 @@ start_services() {
         return 1
     fi
     
+    log_success "Environment variables loaded"
+    
     # Check if ports are available
-    log_info "Checking port availability..."
+    log_step "Checking port availability..."
     if ! check_port ${LOCAL_APP_PORT}; then
         log_error "Backend port ${LOCAL_APP_PORT} is already in use!"
         return 1
@@ -150,7 +179,7 @@ start_services() {
     mkdir -p run
     
     # Start backend service
-    log_info "Starting backend service..."
+    log_step "Starting backend service..."
     
     nohup bash -c ./scripts/start_local.sh > logs/start.log 2>&1 &
 
@@ -173,19 +202,9 @@ start_services() {
             return 1
         fi
         
-        log_info "Starting frontend service..."
+        log_step "Starting frontend service..."
         cd lpm_frontend
 
-        # Copy environment variables from root directory to frontend directory
-        log_info "Copying environment variables to frontend directory..."
-        if [[ -f "../.env" ]]; then
-            # Extract required environment variables and create frontend .env file
-            grep -E "^(HOST_ADDRESS|LOCAL_APP_PORT)=" "../.env" > .env
-            log_success "Environment variables copied to frontend .env file"
-        else
-            log_warning "Root directory .env file does not exist, cannot copy environment variables"
-        fi
-        
         # Copy environment variables from root directory to frontend directory
         log_info "Copying environment variables to frontend directory..."
         if [[ -f "../.env" ]]; then

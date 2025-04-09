@@ -1,7 +1,11 @@
 #!/bin/bash
 
+# Source the logging utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/utils/logging.sh"
+
 # Set environment variables
-echo "Setting environment variables..."
+log_info "Setting environment variables..."
 export PYTHONPATH=$(pwd):${PYTHONPATH}
 
 # Load environment variables from .env file
@@ -13,49 +17,49 @@ set +a
 export BASE_DIR=${LOCAL_BASE_DIR}
 
 # Ensure using the correct Python environment
-echo "Checking Python environment..."
+log_info "Checking Python environment..."
 PYTHON_PATH=$(which python)
-echo "Using Python: $PYTHON_PATH"
+log_info "Using Python: $PYTHON_PATH"
 PYTHON_VERSION=$(python --version)
-echo "Python version: $PYTHON_VERSION"
+log_info "Python version: $PYTHON_VERSION"
 
 # Check necessary Python packages
-echo "Checking necessary Python packages..."
-python -c "import flask" || { echo "Error: Missing flask package"; exit 1; }
-python -c "import chromadb" || { echo "Error: Missing chromadb package"; exit 1; }
+log_info "Checking necessary Python packages..."
+python -c "import flask" || { log_error "Error: Missing flask package"; exit 1; }
+python -c "import chromadb" || { log_error "Error: Missing chromadb package"; exit 1; }
 
 # Initialize database
-echo "Initializing database..."
+log_info "Initializing database..."
 SQLITE_DB_PATH="${BASE_DIR}/data/sqlite/lpm.db"
 mkdir -p "${BASE_DIR}/data/sqlite"
 
 if [ ! -f "$SQLITE_DB_PATH" ]; then
-    echo "Initializing database..."
+    log_info "Initializing database..."
     cat docker/sqlite/init.sql | sqlite3 "$SQLITE_DB_PATH"
-    echo "Database initialization completed"
+    log_success "Database initialization completed"
 else
-    echo "Database already exists"
+    log_info "Database already exists"
 fi
 
 # Ensure necessary directories exist
-echo "Checking necessary directories..."
+log_info "Checking necessary directories..."
 mkdir -p ${BASE_DIR}/data/chroma_db
 mkdir -p ${LOCAL_LOG_DIR}
 #mkdir -p ${BASE_DIR}/raw_content
 #mkdir -p ${BASE_DIR}/data_pipeline
 
 # Initialize ChromaDB
-echo "Initializing ChromaDB..."
+log_info "Initializing ChromaDB..."
 python docker/app/init_chroma.py
 
 # Get local IP address (excluding localhost and docker networks)
 LOCAL_IP=$(ifconfig | grep "inet " | grep -v "127.0.0.1" | grep "192.168" | awk '{print $2}' | head -n 1)
 
 # Start Flask application
-echo "Starting Flask application..."
-echo "Application will run at the following addresses:"
-echo "- Local access: http://localhost:${LOCAL_APP_PORT}"
-echo "- LAN access: http://${LOCAL_IP}:${LOCAL_APP_PORT}"
+log_info "Starting Flask application..."
+log_info "Application will run at the following addresses:"
+log_info "- Local access: http://localhost:${LOCAL_APP_PORT}"
+log_info "- LAN access: http://${LOCAL_IP}:${LOCAL_APP_PORT}"
 
 # Output logs to file
 exec python -m flask run --host=0.0.0.0 --port=${LOCAL_APP_PORT} >> "${LOCAL_LOG_DIR}/backend.log" 2>&1

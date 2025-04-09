@@ -1,20 +1,11 @@
 #!/bin/bash
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-MAGENTA='\033[0;35m'
-CYAN='\033[0;36m'
-GRAY='\033[0;90m'
-BOLD='\033[1m'
-NC='\033[0m' # No Color
-
 # Version
 VERSION="1.0.0"
 
-
+# Source the logging utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/utils/logging.sh"
 
 # Total number of stages
 TOTAL_STAGES=6
@@ -28,61 +19,6 @@ trap cleanup INT
 cleanup() {
     echo -e "\n${YELLOW}Setup interrupted.${NC}"
     exit 1
-}
-
-# Log a message to the console
-log() {
-    local message="$1"
-    local level="${2:-INFO}"
-    local color="${NC}"
-    
-    case $level in
-        INFO) color="${BLUE}" ;;
-        SUCCESS) color="${GREEN}" ;;
-        WARNING) color="${YELLOW}" ;;
-        ERROR) color="${RED}" ;;
-        DEBUG) color="${GRAY}" ;;
-    esac
-    
-    echo -e "${color}[$(date '+%Y-%m-%d %H:%M:%S')] [${level}] ${message}${NC}"
-}
-
-# Get current timestamp
-get_timestamp() {
-    date "+%Y-%m-%d %H:%M:%S"
-}
-
-# Print formatted log messages
-log_info() {
-    log "$1" "INFO"
-}
-
-log_success() {
-    log "$1" "SUCCESS"
-}
-
-log_warning() {
-    log "$1" "WARNING"
-}
-
-log_error() {
-    log "$1" "ERROR"
-}
-
-log_step() {
-    echo -e "\n${GRAY}[$(get_timestamp)]${NC} ${BLUE}[STEP]${NC}    ${BOLD}$1${NC}"
-}
-
-log_debug() {
-    if [[ "${DEBUG}" == "true" ]]; then
-        log "$1" "DEBUG"
-    fi
-}
-
-log_section() {
-    echo -e "\n${CYAN}════════════════════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}  $1${NC}"
-    echo -e "${CYAN}════════════════════════════════════════════════════════════════════════════════${NC}\n"
 }
 
 # Display title and logo
@@ -349,6 +285,7 @@ build_frontend() {
     cd ..
     log_section "FRONTEND SETUP COMPLETE"
 }
+
 # Show help information
 show_help() {
     echo -e "${BOLD}Second-Me Setup Script v${VERSION}${NC}"
@@ -404,12 +341,6 @@ check_config_files() {
     # Check for .env file
     if [[ ! -f ".env" ]]; then
         log_error "Missing .env file"
-        return 1
-    fi
-    
-    # Check for environment.yml
-    if [[ ! -f "environment.yml" ]]; then
-        log_error "Missing environment.yml file"
         return 1
     fi
     
