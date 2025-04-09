@@ -566,11 +566,12 @@ check_sqlite() {
     if ! check_command "sqlite3"; then
         log_warning "SQLite3 is not installed or not in your PATH"
         
+        log_error "Please install SQLite before continuing, database operations require this dependency"
+
         # Get system identification and show installation recommendations
         local system_id=$(get_system_id)
         get_sqlite_recommendation "$system_id"
         
-        log_error "Please install SQLite before continuing, database operations require this dependency"
         return 1
     fi
     
