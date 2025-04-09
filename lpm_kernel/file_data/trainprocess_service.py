@@ -95,32 +95,59 @@ class Progress:
             try:
                 with open(self.progress_file, "r") as f:
                     saved_progress = json.load(f)
-                    # Restore saved progress state
-                    for stage_name, stage_data in saved_progress.get("stages", {}).items():
-                        if stage_name in self.progress.stages:
-                            stage = self.progress.stages[stage_name]
-                            # Restore stage progress
-                            if "progress" in stage_data:
-                                stage.progress = stage_data["progress"]
-                            # Restore stage status
-                            if "status" in stage_data:
-                                stage.status = Status[stage_data["status"].upper()]
-                            # Restore current step
-                            if "current_step" in stage_data:
-                                stage.current_step = stage_data["current_step"]
+                    stages_data = saved_progress.get("stages", [])
+                    
+                    if isinstance(stages_data, list):
+                        for stage_item in stages_data:
+                            stage_name = None
+                            # Try to find the stage alias/name from the item
+                            if "name" in stage_item:
+                                for key in self.progress.stages.keys():
+                                    if self.progress.stages[key].name == stage_item["name"]:
+                                        stage_name = key
+                                        break
                             
-                            # Restore step status
-                            for step_name, step_data in stage_data.get("steps", {}).items():
-                                if step_name in stage.steps:
-                                    step = stage.steps[step_name]
-                                    if "status" in step_data:
-                                        status = Status[step_data["status"].upper()]
-                                        self.progress.update_progress(
-                                            stage_name,
-                                            step_name,
-                                            status,
-                                            step_data.get("progress", None)
-                                        )
+                            if stage_name and stage_name in self.progress.stages:
+                                stage = self.progress.stages[stage_name]
+                                # Restore stage progress
+                                if "progress" in stage_item:
+                                    stage.progress = stage_item["progress"]
+                                # Restore stage status
+                                if "status" in stage_item:
+                                    try:
+                                        stage.status = Status[stage_item["status"].upper()]
+                                    except (KeyError, TypeError):
+                                        pass
+                                # Restore current step
+                                if "current_step" in stage_item:
+                                    stage.current_step = stage_item["current_step"]
+                                
+                                # Restore step status
+                                if "steps" in stage_item and isinstance(stage_item["steps"], list):
+                                    for step_item in stage_item["steps"]:
+                                        step_name = None
+                                        if "name" in step_item:
+                                            # Find the step key by name
+                                            for k, v in stage.steps.items():
+                                                if v.name == step_item["name"]:
+                                                    step_name = k
+                                                    break
+                                        
+                                        if step_name and step_name in stage.steps:
+                                            if "status" in step_item:
+                                                try:
+                                                    status_str = step_item["status"].upper()
+                                                    status = Status[status_str]
+                                                    self.progress.update_progress(
+                                                        stage_name,
+                                                        step_name,
+                                                        status,
+                                                        step_item.get("progress", None)
+                                                    )
+                                                except (KeyError, TypeError) as e:
+                                                    self.logger.error(f"Error restoring step status: {e}")
+                    else:
+                        self.logger.warning(f"Unexpected format for stages data: {type(stages_data).__name__}")
                     
                     # Restore overall progress
                     if "overall_progress" in saved_progress:
@@ -130,7 +157,10 @@ class Progress:
                         self.progress.current_stage = saved_progress["current_stage"]
                     # Restore overall status
                     if "status" in saved_progress:
-                        self.progress.status = Status[saved_progress["status"].upper()]
+                        try:
+                            self.progress.status = Status[saved_progress["status"].upper()]
+                        except (KeyError, TypeError):
+                            pass
             except json.JSONDecodeError as e:
                 self.logger.error(f"Failed to load progress file: {str(e)}")
             except Exception as e:
