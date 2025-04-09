@@ -181,8 +181,7 @@ start_services() {
     # Start backend service
     log_step "Starting backend service..."
     
-    nohup bash -c ./scripts/start_local.sh > logs/start.log 2>&1 &
-
+    nohup ./scripts/start_local.sh > logs/start.log 2>&1 &
     
     echo $! > run/.backend.pid
     log_info "Backend service started in background with PID: $(cat run/.backend.pid)"
