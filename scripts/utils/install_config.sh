@@ -1,6 +1,12 @@
 #!/bin/bash
 # Installation recommendations configuration
 
+# Import logging utilities if not already imported
+if ! command -v log_warning &>/dev/null; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    source "$SCRIPT_DIR/logging.sh"
+fi
+
 # Get installation recommendation for a package
 get_install_recommendation() {
     local package="$1"
@@ -17,7 +23,7 @@ get_install_recommendation() {
             get_node_recommendation "$system_id"
             ;;
         *)
-            echo "No specific recommendation available for $package"
+            log_warning "No specific recommendation available for $package"
             ;;
     esac
 }
@@ -28,36 +34,36 @@ get_python_recommendation() {
     
     case "$system_id" in
         "macos")
-            echo "Recommended installation for macOS: 'brew install python3'"
-            echo "Or download from: https://www.python.org/downloads/macos/"
+            log_warning "Recommended installation for macOS: 'brew install python3'"
+            log_warning "Or download from: https://www.python.org/downloads/macos/"
             ;;
         "linux-debian")
-            echo "Recommended installation for Debian/Ubuntu: 'sudo apt update && sudo apt install python3 python3-pip'"
+            log_warning "Recommended installation for Debian/Ubuntu: 'sudo apt update && sudo apt install python3 python3-pip'"
             ;;
         "linux-fedora")
-            echo "Recommended installation for Fedora: 'sudo dnf install python3 python3-pip'"
+            log_warning "Recommended installation for Fedora: 'sudo dnf install python3 python3-pip'"
             ;;
         "linux-redhat")
-            echo "Recommended installation for CentOS/RHEL: 'sudo yum install python3 python3-pip'"
+            log_warning "Recommended installation for CentOS/RHEL: 'sudo yum install python3 python3-pip'"
             ;;
         "linux-arch")
-            echo "Recommended installation for Arch Linux: 'sudo pacman -S python python-pip'"
+            log_warning "Recommended installation for Arch Linux: 'sudo pacman -S python python-pip'"
             ;;
         "linux-alpine")
-            echo "Recommended installation for Alpine Linux: 'apk add python3 py3-pip'"
+            log_warning "Recommended installation for Alpine Linux: 'apk add python3 py3-pip'"
             ;;
         "linux-other")
-            echo "Please install Python 3.12+ using your distribution's package manager"
-            echo "Or download from: https://www.python.org/downloads/linux/"
+            log_warning "Please install Python 3.12+ using your distribution's package manager"
+            log_warning "Or download from: https://www.python.org/downloads/linux/"
             ;;
         "windows")
-            echo "Recommended installation for Windows:"
-            echo "1. Download from: https://www.python.org/downloads/windows/"
-            echo "2. Or using winget: 'winget install Python.Python.3'"
-            echo "3. Or using Chocolatey: 'choco install python'"
+            log_warning "Recommended installation for Windows:"
+            log_warning "1. Download from: https://www.python.org/downloads/windows/"
+            log_warning "2. Or using winget: 'winget install Python.Python.3'"
+            log_warning "3. Or using Chocolatey: 'choco install python'"
             ;;
         *)
-            echo "Please download Python from: https://www.python.org/downloads/"
+            log_warning "Please download Python from: https://www.python.org/downloads/"
             ;;
     esac
 }
@@ -68,34 +74,34 @@ get_npm_recommendation() {
     
     case "$system_id" in
         "macos")
-            echo "Recommended installation for macOS: 'brew install npm'"
+            log_warning "Recommended installation for macOS: 'brew install npm'"
             ;;
         "linux-debian")
-            echo "Recommended installation for Debian/Ubuntu: 'sudo apt update && sudo apt install npm'"
+            log_warning "Recommended installation for Debian/Ubuntu: 'sudo apt update && sudo apt install npm'"
             ;;
         "linux-fedora")
-            echo "Recommended installation for Fedora: 'sudo dnf install npm'"
+            log_warning "Recommended installation for Fedora: 'sudo dnf install npm'"
             ;;
         "linux-redhat")
-            echo "Recommended installation for CentOS/RHEL: 'sudo yum install npm'"
+            log_warning "Recommended installation for CentOS/RHEL: 'sudo yum install npm'"
             ;;
         "linux-arch")
-            echo "Recommended installation for Arch Linux: 'sudo pacman -S npm'"
+            log_warning "Recommended installation for Arch Linux: 'sudo pacman -S npm'"
             ;;
         "linux-alpine")
-            echo "Recommended installation for Alpine Linux: 'apk add npm'"
+            log_warning "Recommended installation for Alpine Linux: 'apk add npm'"
             ;;
         "linux-other")
-            echo "Please install npm using your distribution's package manager"
+            log_warning "Please install npm using your distribution's package manager"
             ;;
         "windows")
-            echo "Recommended installation for Windows:"
-            echo "1. Install Node.js (includes npm): https://nodejs.org/en/download/"
-            echo "2. Or using winget: 'winget install OpenJS.NodeJS'"
-            echo "3. Or using Chocolatey: 'choco install nodejs'"
+            log_warning "Recommended installation for Windows:"
+            log_warning "1. Install Node.js (includes npm): https://nodejs.org/en/download/"
+            log_warning "2. Or using winget: 'winget install OpenJS.NodeJS'"
+            log_warning "3. Or using Chocolatey: 'choco install nodejs'"
             ;;
         *)
-            echo "Please install Node.js (includes npm): https://nodejs.org/en/download/"
+            log_warning "Please install Node.js (includes npm): https://nodejs.org/en/download/"
             ;;
     esac
 }
@@ -106,34 +112,34 @@ get_node_recommendation() {
     
     case "$system_id" in
         "macos")
-            echo "Recommended installation for macOS: 'brew install node'"
+            log_warning "Recommended installation for macOS: 'brew install node'"
             ;;
         "linux-debian")
-            echo "Recommended installation for Debian/Ubuntu: 'sudo apt update && sudo apt install nodejs'"
+            log_warning "Recommended installation for Debian/Ubuntu: 'sudo apt update && sudo apt install nodejs'"
             ;;
         "linux-fedora")
-            echo "Recommended installation for Fedora: 'sudo dnf install nodejs'"
+            log_warning "Recommended installation for Fedora: 'sudo dnf install nodejs'"
             ;;
         "linux-redhat")
-            echo "Recommended installation for CentOS/RHEL: 'sudo yum install nodejs'"
+            log_warning "Recommended installation for CentOS/RHEL: 'sudo yum install nodejs'"
             ;;
         "linux-arch")
-            echo "Recommended installation for Arch Linux: 'sudo pacman -S nodejs'"
+            log_warning "Recommended installation for Arch Linux: 'sudo pacman -S nodejs'"
             ;;
         "linux-alpine")
-            echo "Recommended installation for Alpine Linux: 'apk add nodejs'"
+            log_warning "Recommended installation for Alpine Linux: 'apk add nodejs'"
             ;;
         "linux-other")
-            echo "Please install Node.js using your distribution's package manager"
+            log_warning "Please install Node.js using your distribution's package manager"
             ;;
         "windows")
-            echo "Recommended installation for Windows:"
-            echo "1. Download from: https://nodejs.org/en/download/"
-            echo "2. Or using winget: 'winget install OpenJS.NodeJS'"
-            echo "3. Or using Chocolatey: 'choco install nodejs'"
+            log_warning "Recommended installation for Windows:"
+            log_warning "1. Download from: https://nodejs.org/en/download/"
+            log_warning "2. Or using winget: 'winget install OpenJS.NodeJS'"
+            log_warning "3. Or using Chocolatey: 'choco install nodejs'"
             ;;
         *)
-            echo "Please download Node.js from: https://nodejs.org/en/download/"
+            log_warning "Please download Node.js from: https://nodejs.org/en/download/"
             ;;
     esac
 }

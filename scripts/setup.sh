@@ -422,13 +422,9 @@ check_python() {
     if ! command -v python &>/dev/null; then
         log_error "python is not installed, please install python manually"
         
-        # Get system identification
+        # Get system identification and show installation recommendations
         local system_id=$(get_system_id)
-        
-        # Display installation recommendations
-        while IFS= read -r line; do
-            log_info "$line"
-        done < <(get_python_recommendation "$system_id")
+        get_python_recommendation "$system_id"
         
         return 1
     fi
