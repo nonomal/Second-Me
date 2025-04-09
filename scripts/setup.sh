@@ -1,11 +1,13 @@
 #!/bin/bash
 
+# Import utility scripts
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/utils/logging.sh"
+source "$SCRIPT_DIR/utils/os_detection.sh"
+source "$SCRIPT_DIR/utils/install_config.sh"
+
 # Version
 VERSION="1.0.0"
-
-# Source the logging utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/utils/logging.sh"
 
 # Total number of stages
 TOTAL_STAGES=6
@@ -418,7 +420,16 @@ check_python() {
     log_step "Checking for python installation"
     
     if ! command -v python &>/dev/null; then
-        log_error "python is not installed, please install python manually, try 'brew install python3' on macOS"
+        log_error "python is not installed, please install python manually"
+        
+        # Get system identification
+        local system_id=$(get_system_id)
+        
+        # Display installation recommendations
+        while IFS= read -r line; do
+            log_info "$line"
+        done < <(get_python_recommendation "$system_id")
+        
         return 1
     fi
     
@@ -432,7 +443,6 @@ check_python() {
     log_success "python check passed"
     return 0
 }
-
 
 check_poetry() {
     log_step "Checking for poetry installation"
