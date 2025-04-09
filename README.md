@@ -196,20 +196,6 @@ make help
 </details>
 
 
-### Important Notes
-1. Ensure you have sufficient disk space (at least 10GB recommended)
-2. If using local setup with an existing conda environment, ensure there are no conflicting package versions
-3. First startup may take a few minutes to download and install dependencies
-4. Some commands may require sudo privileges
-
-### Troubleshooting
-If you encounter issues, check:
-1. For local setup: Python and Node.js versions meet requirements
-2. For local setup: You're in the correct conda environment
-3. All dependencies are properly installed
-4. System firewall allows the application to use required ports
-5. For Docker setup: Docker daemon is running and you have sufficient permissions
-
 ## Tutorial and Use Cases
 🛠️ Feel free to follow [User tutorial](https://second-me.gitbook.io/a-new-ai-species-making-we-matter-again) to build your Second Me.
 
