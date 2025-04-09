@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/utils/logging.sh"
 source "$SCRIPT_DIR/utils/os_detection.sh"
 source "$SCRIPT_DIR/utils/install_config.sh"
+source "$SCRIPT_DIR/utils/python_tools.sh"
 
 # Version
 VERSION="1.0.0"
@@ -137,11 +138,18 @@ install_python_dependency() {
         return 1
     fi
     
+    # Get the appropriate Python command
+    local python_cmd=$(get_python_command)
+    if [ -z "$python_cmd" ]; then
+        log_error "No Python command found to verify packages"
+        return 1
+    fi
+    
     # Verify key packages are installed
-    log_info "Verifying key packages..."
+    log_info "Verifying key packages using $python_cmd..."
     local required_packages=("flask" "chromadb" "langchain")
     for pkg in "${required_packages[@]}"; do
-        if ! python -c "import $pkg" 2>/dev/null; then
+        if ! $python_cmd -c "import $pkg" 2>/dev/null; then
             log_error "Package '$pkg' is not installed correctly"
             return 1
         else
@@ -156,17 +164,24 @@ install_python_dependency() {
 install_graphrag() {
     log_step "Installing graphrag"
     
+    # Get the appropriate pip command
+    local pip_cmd=$(get_pip_command)
+    if [ -z "$pip_cmd" ]; then
+        log_error "pip command not found, cannot install graphrag"
+        return 1
+    fi
+    
     # Check and ensure correct version of graphrag is installed
     log_step "Checking graphrag version"
-    GRAPHRAG_VERSION=$(pip show graphrag 2>/dev/null | grep "Version:" | cut -d " " -f2)
+    GRAPHRAG_VERSION=$($pip_cmd show graphrag 2>/dev/null | grep "Version:" | cut -d " " -f2)
     GRAPHRAG_TARGET="1.2.1.dev27"
     GRAPHRAG_LOCAL_PATH="dependencies/graphrag-${GRAPHRAG_TARGET}.tar.gz"
 
     if [ "$GRAPHRAG_VERSION" != "$GRAPHRAG_TARGET" ]; then
         log_info "Installing correct version of graphrag..."
         if [ -f "$GRAPHRAG_LOCAL_PATH" ]; then
-            log_info "Installing graphrag from local file..."
-            if ! pip install --force-reinstall "$GRAPHRAG_LOCAL_PATH"; then
+            log_info "Installing graphrag from local file using $pip_cmd..."
+            if ! $pip_cmd install --force-reinstall "$GRAPHRAG_LOCAL_PATH"; then
                 log_error "Failed to install graphrag from local file"
                 return 1
             fi
@@ -458,15 +473,10 @@ check_potential_conflicts() {
 check_python() {
     log_step "Checking for python installation"
     
-    local python_cmd=""
+    # Get the appropriate Python command
+    local python_cmd=$(get_python_command)
     
-    # First check for python3 command
-    if command -v python3 &>/dev/null; then
-        python_cmd="python3"
-    # Then check for python command
-    elif command -v python &>/dev/null; then
-        python_cmd="python"
-    else
+    if [ -z "$python_cmd" ]; then
         log_error "python is not installed, please install python manually"
         
         # Get system identification and show installation recommendations
