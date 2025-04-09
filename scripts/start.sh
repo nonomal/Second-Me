@@ -3,9 +3,6 @@
 # Script version
 VERSION="1.0.0"
 
-# Source conda utilities
-SCRIPT_DIR="$( cd "$( dirname "${0:A}" )" && pwd )"
-source "$SCRIPT_DIR/conda_utils.sh"
 
 # Color definitions
 RED='\033[0;31m'
@@ -85,24 +82,11 @@ check_frontend_ready() {
     return 1
 }
 
-# These functions are now sourced from conda_utils.sh
 
 # Check if setup is complete
 check_setup_complete() {
     log_info "Checking if setup is complete..."
-    
-    # Check conda environment
-    if is_custom_conda_mode; then
-        log_info "Custom conda mode enabled, verifying environment..."
-        if ! verify_conda_env; then
-            return 1
-        fi
-    else
-        if ! conda env list | grep -q "${CONDA_DEFAULT_ENV:-second-me}"; then
-            log_error "Conda environment '${CONDA_DEFAULT_ENV:-second-me}' not found. Please run 'make setup' first."
-            return 1
-        fi
-    fi
+   
     
     # Check if frontend dependencies are installed
     if [ ! -d "lpm_frontend/node_modules" ] && [ "$BACKEND_ONLY" != "true" ]; then
@@ -135,13 +119,9 @@ start_services() {
     
     # Load environment variables
     if [[ -f .env ]]; then
-        export CONDA_DEFAULT_ENV="$(grep '^CONDA_DEFAULT_ENV=' .env | cut -d '=' -f2)"
         export LOCAL_APP_PORT="$(grep '^LOCAL_APP_PORT=' .env | cut -d '=' -f2)"
         export LOCAL_FRONTEND_PORT="$(grep '^LOCAL_FRONTEND_PORT=' .env | cut -d '=' -f2)"
         
-        if [[ -z "$CONDA_DEFAULT_ENV" ]]; then
-            export CONDA_DEFAULT_ENV="second-me"
-        fi
         if [[ -z "$LOCAL_APP_PORT" ]]; then
             export LOCAL_APP_PORT="8002"
         fi
@@ -165,34 +145,6 @@ start_services() {
     fi
     log_success "All ports are available"
     
-    # Initialize conda environment if not using custom configuration
-    if ! is_custom_conda_mode; then
-        log_info "Initializing conda environment..."
-        local conda_cmd
-        if ! conda_cmd=$(try_source_conda_sh_all); then
-            log_error "Failed to initialize conda environment"
-            return 1
-        fi
-        
-        # get conda.sh path
-        local conda_sh_path
-        if [[ -n "$conda_cmd" ]]; then
-            local conda_root="$(dirname "$(dirname "$conda_cmd")")"
-            if ! find_and_source_conda_sh "$conda_root" conda_sh_path; then
-                log_error "Could not find conda.sh activation script"
-                return 1
-            fi
-        else
-            log_error "conda command not found"
-            return 1
-        fi
-        log_info "Found conda.sh at: $conda_sh_path"
-        log_success "Conda initialized successfully: $conda_cmd"
-    else
-        log_info "Using custom conda environment, skipping conda initialization"
-        conda_sh_path="" # Set empty value since it won't be used
-    fi
-    
     # Create logs directory if it doesn't exist
     mkdir -p logs
     mkdir -p run
@@ -200,15 +152,8 @@ start_services() {
     # Start backend service
     log_info "Starting backend service..."
     
-    # Check if using custom conda mode
-    if is_custom_conda_mode; then
-        log_info "Using custom conda environment, skipping conda activation"
-        nohup zsh -c ./scripts/start_local.sh > logs/start.log 2>&1 &
-    else
-        log_info "Using conda environment: ${CONDA_DEFAULT_ENV}"
-        # Ensure conda is properly initialized in the subshell
-        nohup zsh -c "source ${conda_sh_path} && conda activate ${CONDA_DEFAULT_ENV} && exec ./scripts/start_local.sh" > logs/start.log 2>&1 &
-    fi
+    nohup bash -c ./scripts/start_local.sh > logs/start.log 2>&1 &
+
     
     echo $! > run/.backend.pid
     log_info "Backend service started in background with PID: $(cat run/.backend.pid)"
