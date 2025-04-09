@@ -491,7 +491,12 @@ check_poetry() {
     log_step "Checking for poetry installation"
     
     if ! command -v poetry &>/dev/null; then
-        log_warning "poetry is not installed, please install poetry manually, try 'pip install poetry'"
+        log_error "poetry is not installed, please install poetry manually"
+        
+        # Get system identification and show installation recommendations
+        local system_id=$(get_system_id)
+        get_poetry_recommendation "$system_id"
+        
         return 1
     fi
     

@@ -25,6 +25,9 @@ get_install_recommendation() {
         "cmake")
             get_cmake_recommendation "$system_id"
             ;;
+        "poetry")
+            get_poetry_recommendation "$system_id"
+            ;;
         *)
             log_warning "No specific recommendation available for $package"
             ;;
@@ -182,6 +185,59 @@ get_cmake_recommendation() {
             ;;
         *)
             log_warning "Please download CMake from: https://cmake.org/download/"
+            ;;
+    esac
+}
+
+# Poetry installation recommendations
+get_poetry_recommendation() {
+    local system_id="$1"
+    
+    case "$system_id" in
+        "macos")
+            log_warning "Recommended installation for macOS:"
+            log_warning "1. 'brew install poetry'"
+            log_warning "2. Or using the official installer: 'curl -sSL https://install.python-poetry.org | python3 -'"
+            ;;
+        "linux-debian")
+            log_warning "Recommended installation for Debian/Ubuntu:"
+            log_warning "1. Using pipx (recommended): 'sudo apt install pipx && pipx install poetry'"
+            log_warning "2. Or using the official installer in your home directory:"
+            log_warning "   'curl -sSL https://install.python-poetry.org | python3 -'"
+            log_warning "3. Or in a virtual environment:"
+            log_warning "   'python3 -m venv ~/.poetry-venv && ~/.poetry-venv/bin/pip install poetry'"
+            log_warning "   Then add ~/.poetry-venv/bin to your PATH"
+            ;;
+        "linux-fedora")
+            log_warning "Recommended installation for Fedora:"
+            log_warning "1. 'sudo dnf install poetry'"
+            log_warning "2. Or using the official installer: 'curl -sSL https://install.python-poetry.org | python3 -'"
+            ;;
+        "linux-redhat")
+            log_warning "Recommended installation for CentOS/RHEL:"
+            log_warning "1. Using the official installer: 'curl -sSL https://install.python-poetry.org | python3 -'"
+            ;;
+        "linux-arch")
+            log_warning "Recommended installation for Arch Linux:"
+            log_warning "1. 'sudo pacman -S python-poetry'"
+            ;;
+        "linux-alpine")
+            log_warning "Recommended installation for Alpine Linux:"
+            log_warning "1. 'apk add py3-poetry'"
+            log_warning "2. Or using the official installer: 'curl -sSL https://install.python-poetry.org | python3 -'"
+            ;;
+        "linux-other")
+            log_warning "Recommended installation for Linux:"
+            log_warning "1. Using the official installer: 'curl -sSL https://install.python-poetry.org | python3 -'"
+            ;;
+        "windows")
+            log_warning "Recommended installation for Windows:"
+            log_warning "1. Using PowerShell: '(Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -'"
+            log_warning "2. Or using Chocolatey: 'choco install poetry'"
+            ;;
+        *)
+            log_warning "Please install Poetry using the official installer:"
+            log_warning "curl -sSL https://install.python-poetry.org | python3 -"
             ;;
     esac
 }
