@@ -390,6 +390,11 @@ check_potential_conflicts() {
         log_error "Directory permissions check failed"
         exit 1
     fi
+
+    if ! check_python; then
+        log_error "python check failed, please install python first"
+        exit 1
+    fi
     
     if ! check_npm; then
         log_error "npm check failed"
@@ -405,9 +410,29 @@ check_potential_conflicts() {
         log_error "poetry check failed, please install poetry first"
         exit 1
     fi
-
+    
     return 0
 }
+
+check_python() {
+    log_step "Checking for python installation"
+    
+    if ! command -v python &>/dev/null; then
+        log_error "python is not installed, please install python manually, try 'brew install python3' on macOS"
+        return 1
+    fi
+    
+    # version > 3.12
+    local version=$(python --version 2>&1 | cut -d ' ' -f 2)
+    if [[ "$version" < "3.12" ]]; then
+        log_error "python version $version is not supported, please install python 3.12 or higher"
+        return 1
+    fi
+    
+    log_success "python check passed"
+    return 0
+}
+
 
 check_poetry() {
     log_step "Checking for poetry installation"
