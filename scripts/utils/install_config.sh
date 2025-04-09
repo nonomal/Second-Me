@@ -28,6 +28,9 @@ get_install_recommendation() {
         "poetry")
             get_poetry_recommendation "$system_id"
             ;;
+        "sqlite")
+            get_sqlite_recommendation "$system_id"
+            ;;
         *)
             log_warning "No specific recommendation available for $package"
             ;;
@@ -238,6 +241,51 @@ get_poetry_recommendation() {
         *)
             log_warning "Please install Poetry using the official installer:"
             log_warning "curl -sSL https://install.python-poetry.org | python3 -"
+            ;;
+    esac
+}
+
+# SQLite installation recommendations
+get_sqlite_recommendation() {
+    local system_id="$1"
+    
+    case "$system_id" in
+        "macos")
+            log_warning "Recommended installation for SQLite on macOS:"
+            log_warning "1. 'brew install sqlite'"
+            log_warning "SQLite is usually pre-installed on macOS, but this will ensure you have the latest version."
+            ;;
+        "linux-debian")
+            log_warning "Recommended installation for SQLite on Debian/Ubuntu:"
+            log_warning "1. 'sudo apt update && sudo apt install sqlite3'"
+            ;;
+        "linux-fedora")
+            log_warning "Recommended installation for SQLite on Fedora:"
+            log_warning "1. 'sudo dnf install sqlite'"
+            ;;
+        "linux-redhat")
+            log_warning "Recommended installation for SQLite on CentOS/RHEL:"
+            log_warning "1. 'sudo yum install sqlite'"
+            ;;
+        "linux-arch")
+            log_warning "Recommended installation for SQLite on Arch Linux:"
+            log_warning "1. 'sudo pacman -S sqlite'"
+            ;;
+        "linux-alpine")
+            log_warning "Recommended installation for SQLite on Alpine Linux:"
+            log_warning "1. 'apk add sqlite'"
+            ;;
+        "linux-other")
+            log_warning "Recommended installation for SQLite on Linux:"
+            log_warning "Please install SQLite using your distribution's package manager"
+            ;;
+        "windows")
+            log_warning "Recommended installation for SQLite on Windows:"
+            log_warning "1. Download from: https://www.sqlite.org/download.html"
+            log_warning "2. Or using Chocolatey: 'choco install sqlite'"
+            ;;
+        *)
+            log_warning "Please download SQLite from: https://www.sqlite.org/download.html"
             ;;
     esac
 }

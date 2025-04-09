@@ -559,6 +559,34 @@ check_cmake() {
     return 0
 }
 
+# Check if SQLite is installed and available
+check_sqlite() {
+    log_step "Checking SQLite"
+    
+    if ! check_command "sqlite3"; then
+        log_warning "SQLite3 is not installed or not in your PATH"
+        
+        # Get system-specific installation recommendation
+        get_sqlite_recommendation "$SYSTEM_ID"
+        
+        # Prompt user to continue without SQLite
+        read -p "Do you want to continue without SQLite? (y/n): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            log_error "Setup aborted due to missing SQLite"
+            exit 1
+        fi
+        
+        log_warning "Continuing without SQLite. Database operations will fail!"
+        return 1
+    fi
+    
+    # SQLite is installed
+    local version=$(sqlite3 --version | awk '{print $1}')
+    log_success "SQLite check passed, version $version"
+    return 0
+}
+
 # Parse command line arguments
 parse_args() {
     REQUIRE_CONFIRMATION=false
@@ -597,6 +625,12 @@ main() {
     # 1. Basic tools check (most fundamental)
     if ! check_potential_conflicts; then
         log_error "Basic tools check failed"
+        exit 1
+    fi
+    
+    # Check SQLite installation
+    if ! check_sqlite; then
+        log_error "SQLite check failed"
         exit 1
     fi
     
