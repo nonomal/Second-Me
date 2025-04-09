@@ -1230,10 +1230,11 @@ class TrainProcessService:
             # First check if we have the current process PID
             if not hasattr(self, 'current_pid') or not self.current_pid:
                 self.logger.info("No active process PID found")
-                if self.progress.progress.current_stage:
-                    current_step = self.progress.progress.stages[self.progress.progress.current_stage].current_step
-                    if current_step:
-                        step = ProcessStep(current_step)
+                if self.progress.progress.data["current_stage"]:
+                    current_stage_name = self.progress.progress.data["current_stage"]
+                    current_stage = next((s for s in self.progress.progress.data["stages"] if s["name"] == current_stage_name), None)
+                    if current_stage and current_stage["current_step"]:
+                        step = ProcessStep(current_stage["current_step"].lower().replace(" ", "_"))
                         self.progress.mark_step_failed(step)
                 return True
                 
