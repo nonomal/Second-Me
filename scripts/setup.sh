@@ -566,18 +566,11 @@ check_sqlite() {
     if ! check_command "sqlite3"; then
         log_warning "SQLite3 is not installed or not in your PATH"
         
-        # Get system-specific installation recommendation
-        get_sqlite_recommendation "$SYSTEM_ID"
+        # Get system identification and show installation recommendations
+        local system_id=$(get_system_id)
+        get_sqlite_recommendation "$system_id"
         
-        # Prompt user to continue without SQLite
-        read -p "Do you want to continue without SQLite? (y/n): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            log_error "Setup aborted due to missing SQLite"
-            exit 1
-        fi
-        
-        log_warning "Continuing without SQLite. Database operations will fail!"
+        log_error "Please install SQLite before continuing, database operations require this dependency"
         return 1
     fi
     
