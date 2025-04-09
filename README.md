@@ -98,6 +98,9 @@ http://localhost:3000
 make help
 ```
 
+5. For custom Ollama model configuration, please refer to:
+   [Custom Model Config(Ollama)](docs/Custom%20Model%20Config%28Ollama%29.md)
+
 
 ### 🖥️ Option 2: Manual Setup (Cross-Platform Guide)
 
