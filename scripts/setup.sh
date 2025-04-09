@@ -419,7 +419,15 @@ check_potential_conflicts() {
 check_python() {
     log_step "Checking for python installation"
     
-    if ! command -v python &>/dev/null; then
+    local python_cmd=""
+    
+    # First check for python3 command
+    if command -v python3 &>/dev/null; then
+        python_cmd="python3"
+    # Then check for python command
+    elif command -v python &>/dev/null; then
+        python_cmd="python"
+    else
         log_error "python is not installed, please install python manually"
         
         # Get system identification and show installation recommendations
@@ -430,13 +438,13 @@ check_python() {
     fi
     
     # version > 3.12
-    local version=$(python --version 2>&1 | cut -d ' ' -f 2)
+    local version=$($python_cmd --version 2>&1 | cut -d ' ' -f 2)
     if [[ "$version" < "3.12" ]]; then
         log_error "python version $version is not supported, please install python 3.12 or higher"
         return 1
     fi
     
-    log_success "python check passed"
+    log_success "python check passed, using $python_cmd version $version"
     return 0
 }
 
