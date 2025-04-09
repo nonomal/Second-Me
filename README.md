@@ -104,11 +104,6 @@ make help
 
 ### 🖥️ Option 2: Manual Setup (Cross-Platform Guide)
 
-<details>
-<summary><b>Click to expand/collapse single or multi-OS setup details</b></summary>
-
-In this section, we explore how to deploy both the frontend and backend on a single server, as well as how to enable cross-server communication between the frontend and backend using separate servers.
-
 #### ✅ Prerequisites
 - Miniforge/Miniconda
 
@@ -192,9 +187,6 @@ http://localhost:3000
 ```bash
 make help
 ```
-
-</details>
-
 
 ## Tutorial and Use Cases
 🛠️ Feel free to follow [User tutorial](https://second-me.gitbook.io/a-new-ai-species-making-we-matter-again) to build your Second Me.
