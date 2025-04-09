@@ -33,11 +33,11 @@ restart_services() {
     
     # Stop services
     log_info "Stopping services..."
-    zsh ./scripts/stop.sh
+    ./scripts/stop.sh
     
     # Start services
     log_info "Starting services..."
-    zsh ./scripts/start.sh
+    ./scripts/start.sh
 }
 
 # Execute restart services

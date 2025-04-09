@@ -18,8 +18,6 @@ PYTHON_PATH=$(which python)
 echo "Using Python: $PYTHON_PATH"
 PYTHON_VERSION=$(python --version)
 echo "Python version: $PYTHON_VERSION"
-CONDA_ENV=$(echo $CONDA_DEFAULT_ENV)
-echo "Conda environment: $CONDA_ENV"
 
 # Check necessary Python packages
 echo "Checking necessary Python packages..."

@@ -122,13 +122,13 @@ display_stage() {
 # Setup and configure package managers (npm)
 check_npm() {
     # Check if npm is already installed
-    log_info "Checking npm installation..."
+    log_step "Checking npm installation..."
     if ! command -v npm &>/dev/null; then
         log_error "npm not found - please install Node.js and npm manually"
         return 1
     fi
 
-    log_success "npm setup completed"
+    log_success "npm check passed"
     return 0
 }
 
@@ -141,7 +141,7 @@ check_command() {
 }
 
 # Helper function to install dependencies
-goto_dependency_installation() {
+install_python_dependency() {
     # Install Python packages using Poetry
     log_step "Installing Python packages using Poetry"
     
@@ -177,6 +177,13 @@ goto_dependency_installation() {
         fi
     done
 
+    log_success "Python environment setup completed"
+    return 0
+}
+
+install_graphrag() {
+    log_step "Installing graphrag"
+    
     # Check and ensure correct version of graphrag is installed
     log_step "Checking graphrag version"
     GRAPHRAG_VERSION=$(pip show graphrag 2>/dev/null | grep "Version:" | cut -d " " -f2)
@@ -200,8 +207,7 @@ goto_dependency_installation() {
     else
         log_success "Graphrag version is correct, skipping installation"
     fi
-
-    log_success "Python environment setup completed"
+    
     return 0
 }
 
@@ -369,7 +375,7 @@ show_help() {
 
 # Check system requirements
 check_system_requirements() {
-    log_section "CHECKING SYSTEM REQUIREMENTS"
+    log_step "Checking system requirements"
     
     # Detect system type
     local system_type=$(uname -s)
@@ -387,6 +393,7 @@ check_system_requirements() {
         fi
     fi
 
+    log_success "System requirements check passed"
     return 0
 }
 
@@ -433,7 +440,7 @@ check_directory_permissions() {
 
 # Check for potential conflicts
 check_potential_conflicts() {
-    log_step "Checking for potential conflicts"
+    log_info "Checking for potential conflicts"
 
     # System requirements check
     if ! check_system_requirements; then
@@ -463,7 +470,23 @@ check_potential_conflicts() {
         exit 1
     fi
 
+    if ! check_poetry; then
+        log_error "poetry check failed, please install poetry first"
+        exit 1
+    fi
 
+    return 0
+}
+
+check_poetry() {
+    log_step "Checking for poetry installation"
+    
+    if ! command -v poetry &>/dev/null; then
+        log_warning "poetry is not installed, please install poetry manually, try 'pip install poetry'"
+        return 1
+    fi
+    
+    log_success "poetry check passed"
     return 0
 }
 
@@ -472,10 +495,11 @@ check_cmake() {
     log_step "Checking for cmake installation"
     
     if ! command -v cmake &>/dev/null; then
-        log_warning "cmake is not installed, attempting to install it automatically..."
+        log_warning "cmake is not installed, please install cmake manually"
         return 1
     fi
     
+    log_success "cmake check passed"
     return 0
 }
 
@@ -523,6 +547,16 @@ main() {
     # Start installation process
     log_section "Starting installation"
     
+    if ! install_python_dependency; then
+        log_error "Failed to install python dependencies"
+        exit 1
+    fi
+
+    if ! install_graphrag; then
+        log_error "Failed to install graphrag"
+        exit 1
+    fi
+
     # 3. Build llama.cpp
     if ! build_llama; then
         exit 1
@@ -531,15 +565,6 @@ main() {
     # 4. Build frontend
     if ! build_frontend; then
         exit 1
-    fi
-    
-
-    # Source the shell configuration to ensure all changes take effect
-    local config_file="$HOME/.zshrc"
-    if [[ -f "$config_file" ]]; then
-        log_info "Applying final shell configuration..."
-        source "$config_file"
-        log_success "Shell configuration applied"
     fi
 
     log_success "Installation complete!"
