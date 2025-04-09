@@ -25,7 +25,7 @@ from lpm_kernel.configs.config import Config
 from lpm_kernel.file_data.chunker import DocumentChunker
 from lpm_kernel.kernel.l1.l1_manager import generate_l1_from_l0
 import threading
-from ..api.domains.trainprocess.progress import TrainProgress, Status, Step, Status
+from ..api.domains.trainprocess.progress import TrainProgress, Status
 import gc
 
 from lpm_kernel.configs.logging import get_train_process_logger, TRAIN_LOG_FILE
@@ -95,72 +95,24 @@ class Progress:
             try:
                 with open(self.progress_file, "r") as f:
                     saved_progress = json.load(f)
-                    stages_data = saved_progress.get("stages", [])
+                    # 直接将加载的进度数据设置为 TrainProgress 的 data 属性
+                    self.progress.data = saved_progress
                     
-                    if isinstance(stages_data, list):
-                        for stage_item in stages_data:
-                            stage_name = None
-                            # Try to find the stage alias/name from the item
-                            if "name" in stage_item:
-                                for key in self.progress.stages.keys():
-                                    if self.progress.stages[key].name == stage_item["name"]:
-                                        stage_name = key
-                                        break
+                    # 重新创建映射字典
+                    # 创建阶段名称到阶段数据的映射
+                    self.progress.stage_map = {}
+                    for stage in self.progress.data["stages"]:
+                        stage_name = stage["name"].lower().replace(" ", "_")
+                        self.progress.stage_map[stage_name] = stage
+                        
+                    # 创建步骤名称到步骤数据的映射
+                    self.progress.steps_map = {}
+                    for stage_name, stage in self.progress.stage_map.items():
+                        self.progress.steps_map[stage_name] = {}
+                        for step in stage["steps"]:
+                            step_name = step["name"].lower().replace(" ", "_")
+                            self.progress.steps_map[stage_name][step_name] = step
                             
-                            if stage_name and stage_name in self.progress.stages:
-                                stage = self.progress.stages[stage_name]
-                                # Restore stage progress
-                                if "progress" in stage_item:
-                                    stage.progress = stage_item["progress"]
-                                # Restore stage status
-                                if "status" in stage_item:
-                                    try:
-                                        stage.status = Status[stage_item["status"].upper()]
-                                    except (KeyError, TypeError):
-                                        pass
-                                # Restore current step
-                                if "current_step" in stage_item:
-                                    stage.current_step = stage_item["current_step"]
-                                
-                                # Restore step status
-                                if "steps" in stage_item and isinstance(stage_item["steps"], list):
-                                    for step_item in stage_item["steps"]:
-                                        step_name = None
-                                        if "name" in step_item:
-                                            # Find the step key by name
-                                            for k, v in stage.steps.items():
-                                                if v.name == step_item["name"]:
-                                                    step_name = k
-                                                    break
-                                        
-                                        if step_name and step_name in stage.steps:
-                                            if "status" in step_item:
-                                                try:
-                                                    status_str = step_item["status"].upper()
-                                                    status = Status[status_str]
-                                                    self.progress.update_progress(
-                                                        stage_name,
-                                                        step_name,
-                                                        status,
-                                                        step_item.get("progress", None)
-                                                    )
-                                                except (KeyError, TypeError) as e:
-                                                    self.logger.error(f"Error restoring step status: {e}")
-                    else:
-                        self.logger.warning(f"Unexpected format for stages data: {type(stages_data).__name__}")
-                    
-                    # Restore overall progress
-                    if "overall_progress" in saved_progress:
-                        self.progress.overall_progress = saved_progress["overall_progress"]
-                    # Restore current stage
-                    if "current_stage" in saved_progress:
-                        self.progress.current_stage = saved_progress["current_stage"]
-                    # Restore overall status
-                    if "status" in saved_progress:
-                        try:
-                            self.progress.status = Status[saved_progress["status"].upper()]
-                        except (KeyError, TypeError):
-                            pass
             except json.JSONDecodeError as e:
                 self.logger.error(f"Failed to load progress file: {str(e)}")
             except Exception as e:
@@ -203,11 +155,16 @@ class Progress:
     def is_step_completed(self, step: ProcessStep) -> bool:
         """Check if a step is completed"""
         stage_name, step_name = self._get_stage_and_step(step)
-        stage = self.progress.stages.get(stage_name)
-        if not stage:
+        
+        # 使用新的TrainProgress数据结构
+        if stage_name not in self.progress.stage_map:
             return False
-        step_info = stage.steps.get(step_name)
-        return step_info and step_info.completed
+            
+        if step_name not in self.progress.steps_map.get(stage_name, {}):
+            return False
+            
+        step_info = self.progress.steps_map[stage_name][step_name]
+        return step_info.get("completed", False)
 
     def mark_step_completed(self, step: ProcessStep):
         """Mark a step as completed"""
