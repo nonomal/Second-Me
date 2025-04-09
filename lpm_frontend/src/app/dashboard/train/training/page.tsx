@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import InfoModal from '@/components/InfoModal';
-import { startTrain, stopTrain, retrain, getModelName } from '@/service/train';
+import type { TrainingParams } from '@/service/train';
+import { startTrain, stopTrain, retrain, getModelName, getTrainingParams } from '@/service/train';
 import { useTrainingStore } from '@/store/useTrainingStore';
 import { getMemoryList } from '@/service/memory';
 import { message, Modal } from 'antd';
@@ -14,7 +15,6 @@ import TrainingLog from '@/components/train/TrainingLog';
 import TrainingProgress from '@/components/train/TrainingProgress';
 import TrainingConfiguration from '@/components/train/TrainingConfiguration';
 import { ROUTER_PATH } from '@/utils/router';
-
 interface TrainInfo {
   name: string;
   description: string;
@@ -59,6 +59,7 @@ export default function TrainingPage() {
 
   const [selectedInfo, setSelectedInfo] = useState<boolean>(false);
   const [isTraining, setIsTraining] = useState(false);
+  const [trainingParams, setTrainingParams] = useState<TrainingParams>({} as TrainingParams);
   const [stopTraining, setStopTraining] = useState(false);
   const [trainActionLoading, setTrainActionLoading] = useState(false);
 
@@ -146,6 +147,7 @@ export default function TrainingPage() {
 
   const status = useTrainingStore((state) => state.status);
   const trainingProgress = useTrainingStore((state) => state.trainingProgress);
+  const [isResume, setIsResume] = useState(trainingProgress.status === 'failed');
   const checkTrainStatus = useTrainingStore((state) => state.checkTrainStatus);
   const resetTrainingState = useTrainingStore((state) => state.resetTrainingState);
   const trainingError = useTrainingStore((state) => state.error);
@@ -176,6 +178,10 @@ export default function TrainingPage() {
       pollingInterval.current = null;
     }
   };
+
+  useEffect(() => {
+    setIsResume(trainingProgress.status === 'failed');
+  }, [trainingProgress]);
 
   useEffect(() => {
     if (status === 'trained' || trainingError) {
@@ -289,6 +295,21 @@ export default function TrainingPage() {
 
   const [trainingDetails, setTrainingDetails] = useState<TrainingDetail[]>([]);
 
+  //get training params
+  useEffect(() => {
+    getTrainingParams()
+      .then((res) => {
+        if (res.data.code === 0) {
+          setTrainingParams(res.data.data);
+        } else {
+          throw new Error(res.data.message);
+        }
+      })
+      .catch((error) => {
+        message.error(error.message);
+      });
+  }, []);
+
   useEffect(() => {
     const savedLogs = localStorage.getItem('trainingLogs');
 
@@ -308,6 +329,10 @@ export default function TrainingPage() {
   const scrollToBottom = () => {
     // This function is kept for backward compatibility
     // The actual scrolling is now handled by the TrainingLog component
+  };
+
+  const updateTrainingParams = (params: TrainingParams) => {
+    setTrainingParams((state) => ({ ...state, ...params }));
   };
 
   const getDetails = () => {
@@ -402,7 +427,7 @@ export default function TrainingPage() {
       getDetails();
 
       console.log('Using startTrain API to train new model:', config.baseModel);
-      const res = await startTrain({ model_name: config.baseModel });
+      const res = await startTrain({ model_name: config.baseModel, ...trainingParams });
 
       if (res.data.code === 0) {
         // Save training configuration and start polling
@@ -440,7 +465,7 @@ export default function TrainingPage() {
       getDetails();
 
       console.log('Using retrain API to retrain model:', config.baseModel);
-      const res = await retrain({ model_name: config.baseModel });
+      const res = await retrain({ model_name: config.baseModel, ...trainingParams });
 
       if (res.data.code === 0) {
         // Save training configuration and start polling
@@ -552,12 +577,15 @@ export default function TrainingPage() {
           changeBaseModel={changeBaseModel}
           config={config}
           handleTrainingAction={handleTrainingAction}
+          isResume={isResume}
           isTraining={isTraining}
           modelConfig={modelConfig}
           setConfig={setConfig}
           setSelectedInfo={setSelectedInfo}
           status={status}
           trainActionLoading={trainActionLoading}
+          trainingParams={trainingParams}
+          updateTrainingParams={updateTrainingParams}
         />
 
         {/* Only show training progress after training starts */}

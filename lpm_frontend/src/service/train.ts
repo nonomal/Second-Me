@@ -35,6 +35,15 @@ interface TrainStage {
   current_step: string | null;
 }
 
+export type SynthesisMode = 'low' | 'medium' | 'high';
+
+export interface TrainingParams {
+  number_of_epochs?: number;
+  learning_rate?: number;
+  concurrency_threads?: number;
+  data_synthesis_mode?: SynthesisMode;
+}
+
 export enum StageName {
   Stage1 = 'downloading_the_base_model',
   Stage2 = 'activating_the_memory_matrix',
@@ -64,7 +73,7 @@ interface TrainProgressResponse {
   status: StageStatus;
 }
 
-export interface TrainingConfig {
+export interface TrainingConfig extends TrainingParams {
   model_name: string;
 }
 
@@ -124,5 +133,12 @@ export const getModelName = () => {
   return Request<CommonResponse<TrainingConfig>>({
     method: 'get',
     url: `/api/trainprocess/model_name`
+  });
+};
+
+export const getTrainingParams = () => {
+  return Request<CommonResponse<TrainingParams>>({
+    method: 'get',
+    url: `/api/trainprocess/training_params`
   });
 };
