@@ -4,25 +4,31 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/utils/logging.sh"
 
-# Activate Poetry virtual environment if available
+# Activate Poetry virtual environment if available (but only if not already activated)
 log_info "Setting up Python environment..."
-POETRY_ENV_PATH=""
-if command -v poetry &>/dev/null; then
-    POETRY_ENV_PATH=$(poetry env info -p 2>/dev/null)
-    if [ -n "$POETRY_ENV_PATH" ] && [ -f "$POETRY_ENV_PATH/bin/activate" ]; then
-        log_info "Activating Poetry virtual environment: $POETRY_ENV_PATH"
-        source "$POETRY_ENV_PATH/bin/activate"
-    else
-        # Try using the local activation script if it exists
-        if [ -f ".poetry-venv/activate" ]; then
-            log_info "Activating Poetry environment via local script"
-            source ".poetry-venv/activate"
-        else
-            log_warning "Poetry environment not found. Some dependencies might be missing."
-        fi
-    fi
+
+# Check if Python environment is already activated by looking for specific environment markers
+if [[ "$VIRTUAL_ENV" != "" ]]; then
+    log_info "Python virtual environment already activated: $VIRTUAL_ENV"
 else
-    log_warning "Poetry is not installed. Some dependencies might be missing."
+    POETRY_ENV_PATH=""
+    if command -v poetry &>/dev/null; then
+        POETRY_ENV_PATH=$(poetry env info -p 2>/dev/null)
+        if [ -n "$POETRY_ENV_PATH" ] && [ -f "$POETRY_ENV_PATH/bin/activate" ]; then
+            log_info "Activating Poetry virtual environment: $POETRY_ENV_PATH"
+            source "$POETRY_ENV_PATH/bin/activate"
+        else
+            # Try using the local activation script if it exists
+            if [ -f ".poetry-venv/activate" ]; then
+                log_info "Activating Poetry environment via local script"
+                source ".poetry-venv/activate"
+            else
+                log_warning "Poetry environment not found. Some dependencies might be missing."
+            fi
+        fi
+    else
+        log_warning "Poetry is not installed. Some dependencies might be missing."
+    fi
 fi
 
 # Set environment variables
