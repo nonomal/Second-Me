@@ -3,6 +3,7 @@ import time
 from pathlib import Path
 from werkzeug.utils import secure_filename
 from flask import Blueprint, jsonify, Response, request
+from charset_normalizer import from_path
 
 from lpm_kernel.file_data.trainprocess_service import TrainProcessService
 from .progress import Status
@@ -88,7 +89,8 @@ def stream_logs():
         nonlocal last_position
         while True:
             try:
-                with open(log_file_path, 'r') as log_file:
+                encoding = from_path(log_file_path).best().encoding
+                with open(log_file_path, 'r', encoding=encoding) as log_file:
                     log_file.seek(last_position)
                     new_lines = log_file.readlines()  # Read new lines
 
