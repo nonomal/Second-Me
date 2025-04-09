@@ -22,6 +22,9 @@ get_install_recommendation() {
         "node")
             get_node_recommendation "$system_id"
             ;;
+        "cmake")
+            get_cmake_recommendation "$system_id"
+            ;;
         *)
             log_warning "No specific recommendation available for $package"
             ;;
@@ -140,6 +143,45 @@ get_node_recommendation() {
             ;;
         *)
             log_warning "Please download Node.js from: https://nodejs.org/en/download/"
+            ;;
+    esac
+}
+
+# CMake installation recommendations
+get_cmake_recommendation() {
+    local system_id="$1"
+    
+    case "$system_id" in
+        "macos")
+            log_warning "Recommended installation for macOS: 'brew install cmake'"
+            ;;
+        "linux-debian")
+            log_warning "Recommended installation for Debian/Ubuntu: 'sudo apt update && sudo apt install cmake'"
+            ;;
+        "linux-fedora")
+            log_warning "Recommended installation for Fedora: 'sudo dnf install cmake'"
+            ;;
+        "linux-redhat")
+            log_warning "Recommended installation for CentOS/RHEL: 'sudo yum install cmake'"
+            ;;
+        "linux-arch")
+            log_warning "Recommended installation for Arch Linux: 'sudo pacman -S cmake'"
+            ;;
+        "linux-alpine")
+            log_warning "Recommended installation for Alpine Linux: 'apk add cmake'"
+            ;;
+        "linux-other")
+            log_warning "Please install CMake using your distribution's package manager"
+            log_warning "Or download from: https://cmake.org/download/"
+            ;;
+        "windows")
+            log_warning "Recommended installation for Windows:"
+            log_warning "1. Download from: https://cmake.org/download/"
+            log_warning "2. Or using winget: 'winget install Kitware.CMake'"
+            log_warning "3. Or using Chocolatey: 'choco install cmake'"
+            ;;
+        *)
+            log_warning "Please download CMake from: https://cmake.org/download/"
             ;;
     esac
 }

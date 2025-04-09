@@ -505,6 +505,11 @@ check_cmake() {
     
     if ! command -v cmake &>/dev/null; then
         log_warning "cmake is not installed, please install cmake manually"
+        
+        # Get system identification and show installation recommendations
+        local system_id=$(get_system_id)
+        get_cmake_recommendation "$system_id"
+        
         return 1
     fi
     
