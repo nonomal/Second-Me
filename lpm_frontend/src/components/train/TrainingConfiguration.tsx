@@ -302,15 +302,15 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                   <div className="flex flex-col gap-2">
                     <div className="flex gap-3 items-center">
                       <div className="font-medium">Learning Rate</div>
-                      <Tooltip title="Lower values (0.01) provide stable but slower learning, while higher values accelerate learning but risk overshooting optimal parameters, potentially causing training instability.">
+                      <Tooltip title="Lower values (0.0001) provide stable but slower learning, while higher values accelerate learning but risk overshooting optimal parameters, potentially causing training instability.">
                         <QuestionCircleOutlined className="cursor-pointer" />
                       </Tooltip>
                     </div>
                     <InputNumber
                       className="!w-[300px]"
                       disabled={disabledChangeParams}
-                      max={0.1}
-                      min={0.001}
+                      max={0.005}
+                      min={0.00003}
                       onChange={(value) => {
                         if (value == null) {
                           return;
@@ -319,17 +319,18 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                         updateTrainingParams({ ...trainingParams, learning_rate: value });
                       }}
                       status={
-                        trainingParams.learning_rate == 0.1 || trainingParams.learning_rate == 0.001
+                        trainingParams.learning_rate == 0.005 ||
+                        trainingParams.learning_rate == 0.00003
                           ? 'warning'
                           : undefined
                       }
-                      step={0.001}
+                      step={0.00001}
                       value={trainingParams.learning_rate}
                     />
-                    {trainingParams.learning_rate == 0.1 ||
-                    trainingParams.learning_rate == 0.001 ? (
+                    {trainingParams.learning_rate == 0.00003 ||
+                    trainingParams.learning_rate == 0.005 ? (
                       <div className="text-xs text-red-500">
-                        Please enter a valid number between 0.001 and 0.1
+                        Please enter a valid number between 0.00003 and 0.005
                       </div>
                     ) : (
                       <div className="text-xs text-gray-500">
@@ -386,7 +387,7 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                     <InputNumber
                       className="!w-[300px]"
                       disabled={disabledChangeParams}
-                      max={5}
+                      max={10}
                       min={1}
                       onChange={(value) => {
                         if (value == null) {
@@ -396,7 +397,7 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                         updateTrainingParams({ ...trainingParams, concurrency_threads: value });
                       }}
                       status={
-                        trainingParams.concurrency_threads == 5 ||
+                        trainingParams.concurrency_threads == 10 ||
                         trainingParams.concurrency_threads == 1
                           ? 'warning'
                           : undefined
@@ -404,10 +405,10 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                       step={1}
                       value={trainingParams.concurrency_threads}
                     />
-                    {trainingParams.concurrency_threads == 5 ||
+                    {trainingParams.concurrency_threads == 10 ||
                     trainingParams.concurrency_threads == 1 ? (
                       <div className="text-xs text-red-500">
-                        Please enter a whole number between 1 and 5
+                        Please enter a whole number between 1 and 10
                       </div>
                     ) : (
                       <div className="text-xs text-gray-500">
