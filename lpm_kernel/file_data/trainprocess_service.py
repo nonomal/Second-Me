@@ -760,7 +760,7 @@ class TrainProcessService:
                     self.progress.mark_step_failed(ProcessStep.TRAIN)
                     return False
         
-            return monitor_result
+            return True
         
         except Exception as e:
             self.logger.error(f"Failed to start training: {str(e)}")
@@ -978,7 +978,7 @@ class TrainProcessService:
             )
             self.logger.info(f"Progress updated: {percentage}% - {message}")
         except Exception as e:
-            self.logger.error(f"Failed to update progress: {str(e)}")
+            self.logger.error(f"Progress callback error: {str(e)}")
 
     def _monitor_model_download(self) -> bool:
         """Monitor model download progress"""
