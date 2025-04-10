@@ -530,6 +530,8 @@ class L2DataProcessor:
 
         if embedding_model_name.startswith("openai"):
             settings["models"]["default_embedding_model"]["model"] = embedding_model_name.replace("openai/", "")
+        else:
+            settings["models"]["default_embedding_model"]["model"] = embedding_model_name
 
         settings["models"]["default_embedding_model"]["api_base"] = embedding_base_url
         settings["models"]["default_embedding_model"]["api_key"] = embedding_api_key

@@ -13,13 +13,13 @@
 
 ## Our Vision
 
-Companies like OpenAI built "Super AI" that threatens human independence. We crave individuality: AI that amplifies, not erases, you.
+Companies like OpenAI built "Super AI" that threatens human independence. We crave individuality: AI that amplifies, not erases, **YOU**.
 
 We’re challenging that with "**Second Me**": an open-source prototype where you craft your own **AI self**—a new AI species that preserves you, delivers your context, and defends your interests.
 
 It’s **locally trained and hosted**—your data, your control—yet **globally connected**, scaling your intelligence across an AI network. Beyond that, it’s your AI identity interface—a bold standard linking your AI to the world, sparks collaboration among AI selves, and builds tomorrow’s truly native AI apps.
 
-Join us. Tech enthusiasts, AI pros, domain experts—Second Me is your launchpad to extend your mind into the digital horizon.
+Tech enthusiasts, AI pros, domain experts, Join us! Second Me is your launchpad to extend your mind into the digital horizon.
 
 ## Key Features
 
@@ -62,102 +62,19 @@ Star and join us, and you will receive all release notifications from GitHub wit
 
 ## Quick Start
 
-
-
-
-### 🍎 Option 1: Local Setup (macOS with Apple Silicon)
-
-<!-- > **Special Note: This section is specifically for Mac (Apple Silicon) users** -->
-
-<details open>
-<summary><b>Click to expand/collapse Mac setup details</b></summary>
-
-##### Prerequisites
-- Python 3.12 or higher
-- Xcode Command Line Tools
-
-##### Installing Xcode Command Line Tools
-If you haven't installed Xcode Command Line Tools yet, you can install them by running:
-```bash
-xcode-select --install
-```
-
-After installation, you may need to accept the license agreement:
-```bash
-sudo xcodebuild -license accept
-```
-
-##### Setup Steps
-
-1. **Clone the repository**
-   ```bash
-   git clone git@github.com:Mindverse/Second-Me.git
-   cd Second-Me
-   ```
-
-2. **Set up the environment**
-
-   Choose one of the following options:
-
-   <details>
-   <summary><b>Option A: For users with existing conda environment</b></summary>
-   
-   If you already have conda installed:
-   
-   1. Create a new environment from our environment file:
-      ```bash
-      conda env create -f environment.yml   # This will create an environment named 'second-me'
-      conda activate second-me
-      ```
-   
-   2. Set the custom conda mode in `.env`:
-      ```bash
-      CUSTOM_CONDA_MODE=true
-      ```
-   
-   3. Run setup:
-      ```bash
-      make setup
-      ```
-   </details>
-
-   <details>
-   <summary><b>Option B: For new users</b></summary>
-   
-   If you're new or want a fresh environment:
-   ```bash
-   make setup
-   ```
-   
-   This command will automatically:
-   - Install all required system dependencies (including conda if not present)
-   - Create a new Python environment named 'second-me'
-   - Build llama.cpp
-   - Set up frontend environment
-   </details>
-
-3. **Start the service**
-   ```bash
-   make start
-   ```
-
-</details>
-
-### 🐳 Option 2: Docker Setup (For Linux & Windows users)
-
-
-<details>
-<summary><b>Click to expand/collapse Docker setup details</b></summary>
-
-Docker provides a consistent environment across different operating systems.
+### 🐳 Option 1: Docker Setup 
 
 ##### Prerequisites
 - Docker and Docker Compose installed on your system
 
-> **Important:** You must install both Docker and Docker Compose before proceeding. If you haven't installed them yet:
 > - For Docker installation: [Get Docker](https://docs.docker.com/get-docker/)
 > - For Docker Compose installation: [Install Docker Compose](https://docs.docker.com/compose/install/)
-
+>
+> **Note:** If your Docker installation doesn't have the `docker-compose` command, use `docker compose` instead and modify the Makefile accordingly.
+>
+> **For Windows Users:** You can use [MinGW](https://www.mingw-w64.org/) to run `make` commands. You may need to modify the Makefile by replacing Unix-specific commands with Windows-compatible alternatives.
+>
+> **For Mac Users with Apple Silicon:** If you're using Docker Desktop as your container runtime environment locally, please be mindful of resource usage limits. You can configure these settings at: Dashboard -> Settings -> Resources. **Important Note:** Make sure to allocate sufficient memory resources (at least 8GB recommended) to ensure the service runs properly. Insufficient memory may cause container crashes or severe performance degradation.
 ##### Setup Steps
 
 1. Clone the repository
@@ -166,42 +83,23 @@ git clone git@github.com:Mindverse/Second-Me.git
 cd Second-Me
 ```
 
-2. Build the Docker images
-```bash
-make docker-build
-```
-
-3. Start the containers
+2. Start the containers
 ```bash
 make docker-up
 ```
 
-4. To stop the containers when you're done
-```bash
-make docker-down
+3. After starting the service (either with local setup or Docker), open your browser and visit:
+```
+http://localhost:3000
 ```
 
-##### Other Useful Docker Commands
-
-- Restart all services
+4. View help and more commands
 ```bash
-make docker-restart-all
+make help
 ```
 
-- Rebuild and restart only the backend
-```bash
-make docker-restart-backend
-```
 
-- Rebuild and restart only the frontend
-```bash
-make docker-restart-frontend
-```
-
-</details>
-
-
-### 🖥️ Option 3: Manual Setup (Cross-Platform Guide)
+### 🖥️ Option 2: Manual Setup (Cross-Platform Guide)
 
 <details>
 <summary><b>Click to expand/collapse single or multi-OS setup details</b></summary>
@@ -279,7 +177,6 @@ npm run start
 
 > :information_source: **Note**: If the frontend and backend are deployed on separate servers, make sure to configure the `HOST_ADDRESS` in the `.env` file accordingly.
 
-</details>
 
 ### Accessing the Service
 
@@ -292,6 +189,9 @@ http://localhost:3000
 ```bash
 make help
 ```
+
+</details>
+
 
 ### Important Notes
 1. Ensure you have sufficient disk space (at least 10GB recommended)

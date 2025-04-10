@@ -29,7 +29,9 @@ from lpm_kernel.L1.status_bio_generator import StatusBioGenerator
 from lpm_kernel.L1.topics_generator import TopicsGenerator
 from lpm_kernel.api.services.user_llm_config_service import UserLLMConfigService
 from lpm_kernel.configs.config import Config
+from lpm_kernel.configs.logging import get_train_process_logger
 
+logger = get_train_process_logger()
 
 DATE_TIME_FORMAT = "%Y-%m-%d"
 
@@ -191,7 +193,71 @@ class L1Generator:
                 base_url=self.user_llm_config.chat_endpoint,
             )
             self.model_name = self.user_llm_config.chat_model_name
+        self._top_p_adjusted = False  # Flag to track if top_p has been adjusted
 
+    def _fix_top_p_param(self, error_message: str) -> bool:
+        """Fixes the top_p parameter if an API error indicates it's invalid.
+        
+        Some LLM providers don't accept top_p=0 and require values in specific ranges.
+        This function checks if the error is related to top_p and adjusts it to 0.001,
+        which is close enough to 0 to maintain deterministic behavior while satisfying
+        API requirements.
+        
+        Args:
+            error_message: Error message from the API response.
+            
+        Returns:
+            bool: True if top_p was adjusted, False otherwise.
+        """
+        if not self._top_p_adjusted and "top_p" in error_message.lower():
+            logger.warning("Fixing top_p parameter from 0 to 0.001 to comply with model API requirements")
+            self.bio_model_params["top_p"] = 0.001
+            self._top_p_adjusted = True
+            return True
+        return False
+
+    def _call_llm_with_retry(self, messages: List[Dict[str, str]], **kwargs) -> Any:
+        """Calls the LLM API with automatic retry for parameter adjustments.
+        
+        This function handles making API calls to the language model while
+        implementing automatic parameter fixes when errors occur. If the API
+        rejects the call due to invalid top_p parameter, it will adjust the
+        parameter value and retry the call once.
+        
+        Args:
+            messages: List of messages for the API call.
+            **kwargs: Additional parameters to pass to the API call.
+            
+        Returns:
+            API response object from the language model.
+            
+        Raises:
+            Exception: If the API call fails after all retries or for unrelated errors.
+        """
+        try:
+            return self.client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+                **self.bio_model_params,
+                **kwargs
+            )
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"API Error: {error_msg}")
+            
+            # Try to fix top_p parameter if needed
+            if hasattr(e, 'response') and hasattr(e.response, 'status_code') and e.response.status_code == 400:
+                if self._fix_top_p_param(error_msg):
+                    logger.info("Retrying LLM API call with adjusted top_p parameter")
+                    return self.client.chat.completions.create(
+                        model=self.model_name,
+                        messages=messages,
+                        **self.bio_model_params,
+                        **kwargs
+                    )
+            
+            # Re-raise the exception
+            raise
 
     def __build_message(
         self, system_prompt: str, user_prompt: str, language: str
@@ -238,12 +304,7 @@ class L1Generator:
             system_prompt, user_prompt, language=self.preferred_language
         )
 
-        response = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=global_bio_message,
-            **self.bio_model_params,
-        )
-
+        response = self._call_llm_with_retry(global_bio_message)
         third_perspective_result = response.choices[0].message.content
         global_bio.summary_third_view = third_perspective_result
         global_bio.content_third_view = global_bio.complete_content()
@@ -269,11 +330,7 @@ class L1Generator:
             system_prompt, user_prompt, language=self.preferred_language
         )
 
-        response = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=shift_perspective_message,
-            **self.bio_model_params,
-        )
+        response = self._call_llm_with_retry(shift_perspective_message)
         second_perspective_result = response.choices[0].message.content
 
         global_bio.summary_second_view = second_perspective_result

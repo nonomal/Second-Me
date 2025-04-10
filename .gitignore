@@ -13,6 +13,7 @@ llama.cpp
 *.ipynb
 data/db/*
 data/chroma_db/*
+data/
 lpm_kernel/L2/base_model/
 lpm_kernel/L2/data_pipeline/output/
 lpm_kernel/L2/data_pipeline/graphrag_indexing/cache/

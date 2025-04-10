@@ -5,6 +5,7 @@ LEARNING_RATE="2e-4"
 NUM_TRAIN_EPOCHS="3"
 CONCURRENCY_THREADS="2"
 DATA_SYNTHESIS_MODE="low"
+HALF=False
 
 # Process parameters
 while [[ "$#" -gt 0 ]]; do
@@ -33,6 +34,11 @@ if [ "$CONCURRENCY_THREADS" != "1" ]; then
   echo "Set thread environment variables to $CONCURRENCY_THREADS"
 fi
 
+# Add BF16 option based on the platform
+if [ "$PLATFORM" != "apple" ]; then
+  HALF=True
+fi
+
 # Execute training script with parameters from environment variables
 python lpm_kernel/L2/train.py \
   --seed 42 \
@@ -51,7 +57,7 @@ python lpm_kernel/L2/train.py \
   --save_strategy "steps" \
   --save_steps 5 \
   --push_to_hub False \
-  --bf16 True \
+  --bf16 $HALF \
   --packing False \
   --learning_rate $LEARNING_RATE \
   --lr_scheduler_type "cosine" \
@@ -69,5 +75,6 @@ python lpm_kernel/L2/train.py \
   --lora_target_modules "all-linear" \
   --use_4bit_quantization False \
   --use_nested_quant False \
-  --bnb_4bit_compute_dtype "bfloat16"
+  --bnb_4bit_compute_dtype "bfloat16" \
+  --is_cot False
 

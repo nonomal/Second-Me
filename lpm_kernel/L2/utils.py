@@ -161,13 +161,20 @@ def create_and_prepare_model(args, data_args, training_args):
             load_in_4bit=args.use_4bit_quantization,
         )
     else:
-        model = AutoModelForCausalLM.from_pretrained(
-            args.model_name_or_path,
-            quantization_config=bnb_config,
-            trust_remote_code=True,
-            attn_implementation="flash_attention_2" if args.use_flash_attn else "eager",
-            torch_dtype=torch.bfloat16,
-        )
+        if os.getenv("PLATFORM") != "apple":
+            model = AutoModelForCausalLM.from_pretrained(
+                args.model_name_or_path,
+                quantization_config=bnb_config,
+                trust_remote_code=True,
+                attn_implementation="flash_attention_2" if args.use_flash_attn else "eager",
+                torch_dtype=torch.bfloat16
+            )
+        else:
+            model = AutoModelForCausalLM.from_pretrained(
+                args.model_name_or_path,
+                quantization_config=bnb_config,
+                trust_remote_code=True
+            )
 
     peft_config = None
     chat_template = None
@@ -270,7 +277,7 @@ def create_chat_data(data_args, tokenizer):
         sample['assistant'] = sample['assistant'].strip('\n')
         
         messages = [
-            {"role": "system", "content": MEMORY_COT_PROMPT if is_cot else MEMORY_PROMPT.format(user_name=user_name)},
+            {"role": "system", "content": MEMORY_COT_PROMPT.format(user_name=user_name) if is_cot else MEMORY_PROMPT.format(user_name=user_name)},
             {"role": "user", "content": sample['user']},
             {"role": "assistant", "content": sample['assistant']},
         ]
