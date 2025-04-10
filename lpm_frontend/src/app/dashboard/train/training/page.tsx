@@ -60,6 +60,7 @@ export default function TrainingPage() {
   const [selectedInfo, setSelectedInfo] = useState<boolean>(false);
   const [isTraining, setIsTraining] = useState(false);
   const [trainingParams, setTrainingParams] = useState<TrainingParams>({} as TrainingParams);
+  const [nowTrainingParams, setNowTrainingParams] = useState<TrainingParams | null>(null);
   const [trainActionLoading, setTrainActionLoading] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -292,6 +293,7 @@ export default function TrainingPage() {
       .then((res) => {
         if (res.data.code === 0) {
           setTrainingParams(res.data.data);
+          setNowTrainingParams(res.data.data);
         } else {
           throw new Error(res.data.message);
         }
@@ -415,9 +417,13 @@ export default function TrainingPage() {
 
     try {
       getDetails();
+      setNowTrainingParams(trainingParams);
 
       console.log('Using startTrain API to train new model:', config.baseModel);
-      const res = await startTrain({ model_name: config.baseModel, ...trainingParams });
+      const res = await startTrain({
+        model_name: config.baseModel,
+        ...(isResume ? {} : trainingParams)
+      });
 
       if (res.data.code === 0) {
         // Save training configuration and start polling
@@ -433,6 +439,7 @@ export default function TrainingPage() {
     } catch (error: unknown) {
       console.error('Error starting training:', error);
       setIsTraining(false);
+      setNowTrainingParams(null);
 
       if (error instanceof Error) {
         message.error(error.message || 'Failed to start training');
@@ -570,6 +577,7 @@ export default function TrainingPage() {
           isResume={isResume}
           isTraining={isTraining}
           modelConfig={modelConfig}
+          nowTrainingParams={nowTrainingParams}
           setConfig={setConfig}
           setSelectedInfo={setSelectedInfo}
           status={status}

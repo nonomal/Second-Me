@@ -38,6 +38,7 @@ interface TrainingConfigurationProps {
   updateTrainingParams: (params: TrainingParams) => void;
   status: string;
   isResume: boolean;
+  nowTrainingParams: TrainingParams | null;
   changeBaseModel: boolean;
   handleTrainingAction: () => Promise<void>;
   trainActionLoading: boolean;
@@ -59,6 +60,7 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
   isTraining,
   updateTrainingParams,
   trainingParams,
+  nowTrainingParams,
   status,
   isResume,
   changeBaseModel,
@@ -194,7 +196,11 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                     }
                     optionType="button"
                     options={synthesisModeOptions}
-                    value={trainingParams.data_synthesis_mode}
+                    value={
+                      disabledChangeParams && nowTrainingParams && !changeBaseModel
+                        ? nowTrainingParams.data_synthesis_mode
+                        : trainingParams.data_synthesis_mode
+                    }
                   />
 
                   <span className="text-xs text-gray-500">
@@ -325,7 +331,11 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                           : undefined
                       }
                       step={0.00001}
-                      value={trainingParams.learning_rate}
+                      value={
+                        disabledChangeParams && nowTrainingParams && !changeBaseModel
+                          ? nowTrainingParams.learning_rate
+                          : trainingParams.learning_rate
+                      }
                     />
                     {trainingParams.learning_rate == 0.00003 ||
                     trainingParams.learning_rate == 0.005 ? (
@@ -364,7 +374,11 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                           : undefined
                       }
                       step={1}
-                      value={trainingParams.number_of_epochs}
+                      value={
+                        disabledChangeParams && nowTrainingParams && !changeBaseModel
+                          ? nowTrainingParams.number_of_epochs
+                          : trainingParams.number_of_epochs
+                      }
                     />
                     {trainingParams.number_of_epochs == 10 ||
                     trainingParams.number_of_epochs == 1 ? (
@@ -403,7 +417,11 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                           : undefined
                       }
                       step={1}
-                      value={trainingParams.concurrency_threads}
+                      value={
+                        disabledChangeParams && nowTrainingParams && !changeBaseModel
+                          ? nowTrainingParams.concurrency_threads
+                          : trainingParams.concurrency_threads
+                      }
                     />
                     {trainingParams.concurrency_threads == 10 ||
                     trainingParams.concurrency_threads == 1 ? (
