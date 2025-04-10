@@ -735,8 +735,18 @@ class TrainProcessService:
             
             self.logger.info("Training started, monitoring progress")
             # start monitoring training progress
-            return self._monitor_training_progress(log_path)
+            monitor_result = self._monitor_training_progress(log_path)
             
+            # Check if the training was successful by checking the returncode
+            if hasattr(self, 'training_result') and self.training_result:
+                if self.training_result.get('returncode', 1) != 0:
+                    error_msg = f"Training failed: {self.training_result.get('error', 'Unknown error')}"
+                    self.logger.error(error_msg)
+                    self.progress.mark_step_failed(ProcessStep.TRAIN)
+                    return False
+        
+            return monitor_result
+        
         except Exception as e:
             self.logger.error(f"Failed to start training: {str(e)}")
             self.progress.mark_step_failed(ProcessStep.TRAIN)
@@ -810,28 +820,39 @@ class TrainProcessService:
             self.logger.info(f"  Concurrency threads: {concurrency_threads}")
             self.logger.info(f"  Data synthesis mode: {data_synthesis_mode}")
             
-            # Build command to directly call bash script
-            bash_command = f"bash {script_path} --lr {learning_rate} --epochs {num_train_epochs} --threads {concurrency_threads} --mode {data_synthesis_mode}"
-            self.logger.info(f"Executing command: {bash_command}")
-        
+            # Prepare arguments for the script
+            args = [
+                f"--lr", str(learning_rate),
+                f"--epochs", str(num_train_epochs),
+                f"--threads", str(concurrency_threads),
+                f"--mode", str(data_synthesis_mode)
+            ]
+            
             # Ensure log directory exists
             os.makedirs(os.path.dirname(log_path), exist_ok=True)
             
-            # Open log file for writing
-            with open(log_path, 'w') as log_file:
-                # Use Popen to execute command and redirect output to log file
-                process = subprocess.Popen(
-                    shlex.split(bash_command),
-                    stdout=log_file,
-                    stderr=subprocess.STDOUT,
-                    cwd=os.getcwd(),
-                    env=os.environ.copy()
-                )
-                
-                # Save process object for later status checking
-                self.training_process = process
+            # Use script executor to execute training script
+            script_executor = ScriptExecutor()
+            result = script_executor.execute(
+                script_path=script_path,
+                script_type="train",
+                args=args,
+                log_file=log_path
+            )
             
-            self.logger.info(f"Training process started with PID: {process.pid}")
+            # Store the result for later checking in the train method
+            self.training_result = result
+            
+            # Check if script execution was started successfully
+            if 'error' in result and result['error'] is not None:
+                self.logger.error(f"Failed to start training: {result['error']}")
+                return False
+                
+            # Get the process ID if available
+            if hasattr(script_executor, 'process') and script_executor.process:
+                self.current_pid = script_executor.process.pid
+                self.logger.info(f"Training process started with PID: {self.current_pid}")
+        
             return True
             
         except Exception as e:
