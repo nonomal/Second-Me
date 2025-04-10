@@ -23,7 +23,8 @@
   "overrides": {
     "braces": "3.0.3",
     "@babel/runtime": "^7.26.10",
-    "yargs-parser": "^20.2.9"
+    "yargs-parser": "^20.2.9",
+    "postcss": "^8.4.31"
   },
   "dependencies": {
     "@headlessui/react": "^1.7.17",
@@ -43,7 +44,7 @@
     "framer-motion": "^12.3.1",
     "github-markdown-css": "^5.8.1",
     "lucide-react": "^0.475.0",
-    "next": "14.2.5",
+    "next": "14.2.25",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-markdown": "^9.0.3",
