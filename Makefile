@@ -85,7 +85,7 @@ status:
 # Set Docker environment variable for all Docker commands
 docker-%: export IN_DOCKER_ENV=1
 
-DOCKER_COMPOSE_CMD := $(shell if command -v docker compose >/dev/null 2>&1; then echo "docker compose"; else echo "docker-compose"; fi)
+DOCKER_COMPOSE_CMD := $(shell if command -v docker-compose >/dev/null 2>&1; then echo "docker-compose"; else echo "docker compose"; fi)
 
 docker-build:
 	$(DOCKER_COMPOSE_CMD) build
