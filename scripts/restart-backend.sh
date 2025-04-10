@@ -1,62 +1,18 @@
 #!/bin/bash
 
-# Color definitions
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-MAGENTA='\033[0;35m'
-CYAN='\033[0;36m'
-GRAY='\033[0;90m'
-BOLD='\033[1m'
-NC='\033[0m' # No Color
-
-# Get current timestamp
-get_timestamp() {
-    date "+%Y-%m-%d %H:%M:%S"
-}
-
-# Print formatted log messages
-log_info() {
-    echo -e "${GRAY}[$(get_timestamp)]${NC} ${GREEN}[INFO]${NC}    $1"
-}
-
-log_success() {
-    echo -e "${GRAY}[$(get_timestamp)]${NC} ${GREEN}[SUCCESS]${NC} $1"
-}
-
-log_warning() {
-    echo -e "${GRAY}[$(get_timestamp)]${NC} ${YELLOW}[WARNING]${NC} $1"
-}
-
-log_error() {
-    echo -e "${GRAY}[$(get_timestamp)]${NC} ${RED}[ERROR]${NC}   $1"
-}
-
-log_step() {
-    echo -e "\n${GRAY}[$(get_timestamp)]${NC} ${BLUE}[STEP]${NC}    ${BOLD}$1${NC}"
-}
-
-log_debug() {
-    if [[ "${DEBUG}" == "true" ]]; then
-        echo -e "${GRAY}[$(get_timestamp)]${NC} ${MAGENTA}[DEBUG]${NC}   $1"
-    fi
-}
-
-log_section() {
-    echo -e "\n${CYAN}════════════════════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}  $1${NC}"
-    echo -e "${CYAN}════════════════════════════════════════════════════════════════════════════════${NC}\n"
-}
+# Source the logging utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/utils/logging.sh"
 
 # Load configuration from .env file
 load_env() {
     if [ -f .env ]; then
-        # Load necessary environment variables
-        export LOCAL_BASE_DIR=$(grep '^LOCAL_BASE_DIR=' .env | cut -d '=' -f2)
+        # Only load necessary environment variables
+        export LOCAL_APP_PORT=$(grep '^LOCAL_APP_PORT=' .env | cut -d '=' -f2)
     else
-        log_error ".env file not found!"
-        return 1
+        # Use default port if .env not found
+        export LOCAL_APP_PORT=8002
+        log_info "Using default port: ${LOCAL_APP_PORT}"
     fi
 }
 

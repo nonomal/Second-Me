@@ -1,15 +1,4 @@
-# Available Commands:
-# Commands that don't require conda environment:
-#   make help         - Show this help message
-#   make setup        - Run complete installation script
-#   make start        - Start all services
-#   make stop         - Stop chat services
-#   make restart      - Restart chat services
-#   make restart-backend - Restart only backend service
-#   make restart-force - Force restart and reset data
-#   make status       - Show status of all services
-
-.PHONY: install test format lint all setup start stop restart restart-backend restart-force help check-conda check-env docker-build docker-up docker-down docker-build-backend docker-build-frontend docker-restart-backend docker-restart-frontend docker-restart-all
+.PHONY: install test format lint all setup start stop restart restart-backend restart-force help docker-build docker-up docker-down docker-build-backend docker-build-frontend docker-restart-backend docker-restart-frontend docker-restart-all
 
 # Detect Apple Silicon without printing
 ifeq ($(shell uname -s),Darwin)
@@ -38,7 +27,7 @@ help:
 	@echo "\033[1mSecond-Me Makefile Commands\033[0m"
 	@echo "\033[0;90m$$(date)\033[0m\n"
 	@echo ""
-	@echo "\033[1;32m▶ MAIN COMMANDS:\033[0m"
+	@echo "\033[1;32m▶ LOCAL COMMANDS:\033[0m"
 	@echo "  make setup                 - Complete installation"
 	@echo "  make start                 - Start all services"
 	@echo "  make stop                  - Stop all services"
@@ -59,9 +48,6 @@ help:
 	@echo ""
 	@echo "\033[1mAll Available Commands:\033[0m"
 	@echo "  make help                  - Show this help message"
-	@echo "  make check-env             - Check environment without installing"
-	@echo ""
-	@echo "\033[1mCommands that require conda environment:\033[0m"
 	@echo "  make install               - Install project dependencies"
 	@echo "  make test                  - Run tests"
 	@echo "  make format                - Format code"
@@ -73,45 +59,33 @@ help:
 		echo "  Apple Silicon detected - Docker commands will use PLATFORM=apple"; \
 	fi
 
-# Check if in conda environment
-check-conda:
-	@if [ -z "$$CONDA_DEFAULT_ENV" ]; then \
-		echo "Error: Please activate conda environment first!"; \
-		exit 1; \
-	fi
 
-# Check environment without installing
-check-env:
-	zsh ./scripts/setup.sh --check-only
-
-# Commands that don't require conda environment
 setup:
-	zsh ./scripts/setup.sh
+	./scripts/setup.sh
 
 start:
-	zsh ./scripts/start.sh
+	./scripts/start.sh
 
 stop:
-	zsh ./scripts/stop.sh
+	./scripts/stop.sh
 
 restart:
-	zsh ./scripts/restart.sh
+	./scripts/restart.sh
 
 restart-backend:
-	zsh ./scripts/restart-backend.sh
+	./scripts/restart-backend.sh
 
 restart-force:
-	zsh ./scripts/restart-force.sh
+	./scripts/restart-force.sh
 
 status:
-	zsh ./scripts/status.sh
+	./scripts/status.sh
 
 # Docker commands
 # Set Docker environment variable for all Docker commands
 docker-%: export IN_DOCKER_ENV=1
 
-# 检测是否安装了 docker compose 插件
-DOCKER_COMPOSE_CMD := $(shell if command -v docker compose >/dev/null 2>&1; then echo "docker compose"; else echo "docker-compose"; fi)
+DOCKER_COMPOSE_CMD := $(shell if command -v docker-compose >/dev/null 2>&1; then echo "docker-compose"; else echo "docker compose"; fi)
 
 docker-build:
 	$(DOCKER_COMPOSE_CMD) build
@@ -146,17 +120,16 @@ docker-restart-all:
 	$(DOCKER_COMPOSE_CMD) build || { echo "\033[1;31m❌ Build failed! Aborting operation...\033[0m"; exit 1; }
 	$(DOCKER_COMPOSE_CMD) up -d
 
-# Commands that require conda environment
-install: check-conda
+install:
 	poetry install
 
-test: check-conda
+test:
 	poetry run pytest tests
 
-format: check-conda
+format:
 	poetry run ruff format lpm_kernel/
 
-lint: check-conda
+lint:
 	poetry run ruff check lpm_kernel/
 
-all: check-conda format lint test
+all: format lint test

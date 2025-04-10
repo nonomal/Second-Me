@@ -105,25 +105,16 @@ make help
 ### 🖥️ Option 2: Manual Setup (Cross-Platform Guide)
 
 #### ✅ Prerequisites
-- Miniforge/Miniconda
 
 ##### 📦 Install Dependencies 
-The following scripts are sourced from [`scripts/setup.sh`](https://github.com/mindverse/Second-Me/blob/master/scripts/setup.sh) and [`scripts\start_local.sh`](https://github.com/mindverse/Second-Me/blob/master/scripts/start_local.sh).
 
-🐍 Python Environment Setup with Conda and Poetry
-We recommend managing the Python environment using Miniconda, and handling dependencies with Poetry. While Conda and Poetry are independent tools, they can be used together effectively:
+🐍 Python Environment Setup with Poetry
 
-- Conda provides flexible and isolated environment management.
 - Poetry offers strict and declarative dependency management.
 
 Below is a step-by-step example of combining them:
 ```bash
 # Set up Python Environment
-conda create -n secondme python=3.12
-conda activate secondme
-
-# (Recommand) Install Poetry inside the Conda environment
-# This avoids using system-wide Poetry and keeps dependencies isolated
 pip install poetry
 
 # (Optional) Set a custom Python package index (e.g., TUNA mirror for better speed in China)
