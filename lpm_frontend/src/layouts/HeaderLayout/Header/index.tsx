@@ -10,6 +10,7 @@ import { useEffect } from 'react';
 import { useUploadStore } from '@/store/useUploadStore';
 import { ROUTER_PATH } from '@/utils/router';
 import { EVENT } from '@/utils/event';
+import GitHubStars from '@/components/GithubStars';
 
 export function Header() {
   const pathname = usePathname();
@@ -98,8 +99,7 @@ export function Header() {
             target="_blank"
           >
             <div className="flex items-center space-x-1">
-              <GithubOutlined className="text-lg" />
-              <span>Star on GitHub</span>
+              <GitHubStars />
             </div>
           </Link>
         </div>
