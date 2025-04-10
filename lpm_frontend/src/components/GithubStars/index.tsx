@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { GithubOutlined } from '@ant-design/icons';
-import { formatNumber } from '@/utils/formatNumber';
 
 export default function GitHubStars() {
   const [stars, setStars] = useState<number | null>(null);
@@ -20,6 +19,10 @@ export default function GitHubStars() {
       });
   }, []);
 
+  const formatNumber = (_stars: number): string => {
+    return _stars >= 1000 ? (_stars / 1000).toFixed(1) + 'k' : _stars.toString();
+  };
+
   return (
     <a
       className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded transition text-gray-800"
@@ -28,7 +31,7 @@ export default function GitHubStars() {
       target="_blank"
     >
       <GithubOutlined className="text-lg" />
-      {stars !== null && `${formatNumber(stars)}`}
+      {stars !== null ? formatNumber(stars) : 'Star On GitHub'}
     </a>
   );
 }
