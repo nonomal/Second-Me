@@ -60,7 +60,6 @@ export default function TrainingPage() {
   const [selectedInfo, setSelectedInfo] = useState<boolean>(false);
   const [isTraining, setIsTraining] = useState(false);
   const [trainingParams, setTrainingParams] = useState<TrainingParams>({} as TrainingParams);
-  const [stopTraining, setStopTraining] = useState(false);
   const [trainActionLoading, setTrainActionLoading] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -278,14 +277,6 @@ export default function TrainingPage() {
     };
   }, [trainingProgress]);
 
-  // Handle stop training request
-  useEffect(() => {
-    if (stopTraining && trainingProgress.status === 'in_progress') {
-      message.info('The step in progress cannot be stopped');
-      setStopTraining(false);
-    }
-  }, [stopTraining]);
-
   // Cleanup when component unmounts
   useEffect(() => {
     return () => {
@@ -395,7 +386,6 @@ export default function TrainingPage() {
 
       if (res.data.code === 0) {
         setIsTraining(false);
-        setStopTraining(true);
       } else {
         message.error(res.data.message || 'Failed to stop training');
       }
