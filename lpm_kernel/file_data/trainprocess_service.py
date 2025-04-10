@@ -204,7 +204,19 @@ class Progress:
                 "step": step_name,
                 "status": Status.FAILED.value
             })
-            
+
+    def mark_step_suspended(self, step: ProcessStep):
+        """Mark a step as suspended"""
+        stage_name, step_name = self._get_stage_and_step(step)
+        self.progress.update_progress(stage_name, step_name, Status.SUSPENDED)
+        self._save_progress()
+        if self.progress_callback:
+            self.progress_callback({
+                "stage": stage_name,
+                "step": step_name,
+                "status": Status.SUSPENDED.value
+            })
+
     def mark_step_in_progress(self, step: ProcessStep):
         """Mark a step as in progress"""
         stage_name, step_name = self._get_stage_and_step(step)
@@ -1256,7 +1268,7 @@ class TrainProcessService:
                 self.current_step = step
                 if self.is_stopped:
                     self.logger.info("Training process aborted during step")
-                    self.progress.mark_step_failed(step)
+                    self.progress.mark_step_suspended(step)
                     break  # If stop is requested, exit the loop
             
                 self.logger.info(f"Starting step: {step.value}")
@@ -1337,7 +1349,7 @@ class TrainProcessService:
             self.logger.info("Training process has been requested to stop")
             # mark train stop
             if self.current_step == ProcessStep.TRAIN:
-                self.progress.mark_step_failed(ProcessStep.TRAIN)
+                self.progress.mark_step_suspended(ProcessStep.TRAIN)
             
             # First check if we have the current process PID
             if not hasattr(self, 'current_pid') or not self.current_pid:
@@ -1346,7 +1358,7 @@ class TrainProcessService:
                     current_step = self.progress.progress.stages[self.progress.progress.current_stage].current_step
                     if current_step:
                         step = ProcessStep(current_step)
-                        self.progress.mark_step_failed(step)
+                        self.progress.mark_step_suspended(step)
                 return True
 
             try:
