@@ -109,38 +109,42 @@ status:
 # Docker commands
 # Set Docker environment variable for all Docker commands
 docker-%: export IN_DOCKER_ENV=1
+
+# 检测是否安装了 docker compose 插件
+DOCKER_COMPOSE_CMD := $(shell if command -v docker compose >/dev/null 2>&1; then echo "docker compose"; else echo "docker-compose"; fi)
+
 docker-build:
-	docker-compose build
+	$(DOCKER_COMPOSE_CMD) build
 
 docker-up:
-	docker-compose up -d
+	$(DOCKER_COMPOSE_CMD) up -d
 
 docker-down:
-	docker-compose down
+	$(DOCKER_COMPOSE_CMD) down
 
 docker-build-backend:
-	docker-compose build backend
+	$(DOCKER_COMPOSE_CMD) build backend
 
 docker-build-frontend:
-	docker-compose build frontend
+	$(DOCKER_COMPOSE_CMD) build frontend
 
 docker-restart-backend:
-	docker-compose stop backend
-	docker-compose rm -f backend
-	docker-compose build backend || { echo "\033[1;31m❌ Backend build failed! Aborting operation...\033[0m"; exit 1; }
-	docker-compose up -d backend
+	$(DOCKER_COMPOSE_CMD) stop backend
+	$(DOCKER_COMPOSE_CMD) rm -f backend
+	$(DOCKER_COMPOSE_CMD) build backend || { echo "\033[1;31m❌ Backend build failed! Aborting operation...\033[0m"; exit 1; }
+	$(DOCKER_COMPOSE_CMD) up -d backend
 
 docker-restart-frontend:
-	docker-compose stop frontend
-	docker-compose rm -f frontend
-	docker-compose build frontend || { echo "\033[1;31m❌ Frontend build failed! Aborting operation...\033[0m"; exit 1; }
-	docker-compose up -d frontend
+	$(DOCKER_COMPOSE_CMD) stop frontend
+	$(DOCKER_COMPOSE_CMD) rm -f frontend
+	$(DOCKER_COMPOSE_CMD) build frontend || { echo "\033[1;31m❌ Frontend build failed! Aborting operation...\033[0m"; exit 1; }
+	$(DOCKER_COMPOSE_CMD) up -d frontend
 
 docker-restart-all:
-	docker-compose stop
-	docker-compose rm -f
-	docker-compose build || { echo "\033[1;31m❌ Build failed! Aborting operation...\033[0m"; exit 1; }
-	docker-compose up -d
+	$(DOCKER_COMPOSE_CMD) stop
+	$(DOCKER_COMPOSE_CMD) rm -f
+	$(DOCKER_COMPOSE_CMD) build || { echo "\033[1;31m❌ Build failed! Aborting operation...\033[0m"; exit 1; }
+	$(DOCKER_COMPOSE_CMD) up -d
 
 # Commands that require conda environment
 install: check-conda

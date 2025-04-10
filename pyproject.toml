@@ -31,6 +31,7 @@ sentencepiece = "^0.2.0"
 httpx = {extras = ["socks"], version = "^0.28.1"}
 python-socks = "^2.4.0"
 jsonlines = "^4.0.0"
+charset-normalizer = "^3.4.1"
 
 # Development environment dependencies
 # Use 'poetry install --with dev' to install development dependencies
