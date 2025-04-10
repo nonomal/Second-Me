@@ -24,14 +24,9 @@ export default function GitHubStars() {
   };
 
   return (
-    <a
-      className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded transition text-gray-800"
-      href="https://github.com/mindverse/Second-Me"
-      rel="noreferrer"
-      target="_blank"
-    >
+    <div className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded transition text-gray-800">
       <GithubOutlined className="text-lg" />
       {stars !== null ? formatNumber(stars) : 'Star On GitHub'}
-    </a>
+    </div>
   );
 }
