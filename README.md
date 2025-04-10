@@ -186,10 +186,10 @@ make help
 The following features have been completed internally and are being gradually integrated into the open-source project. For detailed experimental results and technical specifications, please refer to our [Technical Report](https://arxiv.org/abs/2503.08102).
 
 ### Model Enhancement Features
-- [ ] **Long Chain-of-Thought Training Pipeline**: Enhanced reasoning capabilities through extended thought process training
+- [✓] **Long Chain-of-Thought Training Pipeline**: Enhanced reasoning capabilities through extended thought process training
 - [ ] **Direct Preference Optimization for L2 Model**: Improved alignment with user preferences and intent
 - [ ] **Data Filtering for Training**: Advanced techniques for higher quality training data selection
-- [ ] **Apple Silicon Support**: Native support for Apple Silicon processors with MLX Training and Serving capabilities
+- [✓] **Apple Silicon Support**: Native support for Apple Silicon processors with MLX Training and Serving capabilities
 
 ### Product Features
 - [ ] **Natural Language Memory Summarization**: Intuitive memory organization in natural language format
