@@ -156,18 +156,6 @@ http://localhost:3000
 > 💡 **Advantages**: This method offers better performance than Docker on Mac & Linux systems while still providing a simple setup process. It installs directly on your host system without containerization overhead. (Windows not tested)
 
 
-### Accessing the Service
-
-After starting the service (either with local setup or Docker), open your browser and visit:
-```
-http://localhost:3000
-```
-
-### View help and more commands
-```bash
-make help
-```
-
 ## Tutorial and Use Cases
 🛠️ Feel free to follow [User tutorial](https://second-me.gitbook.io/a-new-ai-species-making-we-matter-again) to build your Second Me.
 
