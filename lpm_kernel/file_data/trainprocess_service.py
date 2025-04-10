@@ -245,7 +245,7 @@ class TrainProcessService:
     # Static variable to store the latest training parameters
     _latest_training_params = {
         "model_name": "Qwen2.5-0.5B-Instruct",
-        "learning_rate": 2e-4,
+        "learning_rate": 1e-4,
         "number_of_epochs": 3,
         "concurrency_threads": 2,
         "data_synthesis_mode": "low"
@@ -725,17 +725,30 @@ class TrainProcessService:
             
             script_path = os.path.join(os.getcwd(), "lpm_kernel/L2/train_for_user.sh")
             
-            # Start training in a separate thread
-            training_thread = threading.Thread(
-                target=self._start_training,
-                args=(script_path, log_path),
+            # First start monitoring progress in a separate thread
+            self.logger.info("Starting monitoring thread first...")
+            monitor_thread = threading.Thread(
+                target=self._monitor_training_progress,
+                args=(log_path,),
                 daemon=True
             )
-            training_thread.start()
+            monitor_thread.start()
             
-            self.logger.info("Training started, monitoring progress")
-            # start monitoring training progress
-            monitor_result = self._monitor_training_progress(log_path)
+            # Allow a moment for the monitoring thread to initialize
+            time.sleep(1)
+            
+            # Then directly execute training process (blocking)
+            self.logger.info("Now starting training process (blocking)...")
+            training_result = self._start_training(script_path, log_path)
+            
+            if not training_result:
+                self.logger.error("Training process failed to start")
+                self.progress.mark_step_failed(ProcessStep.TRAIN)
+                return False
+                
+            # Wait for the monitoring thread to finish
+            self.logger.info("Training process completed, waiting for monitoring to finish...")
+            monitor_thread.join(timeout=10)  # Wait up to 10 seconds for monitor to finish
             
             # Check if the training was successful by checking the returncode
             if hasattr(self, 'training_result') and self.training_result:
@@ -821,38 +834,62 @@ class TrainProcessService:
             self.logger.info(f"  Data synthesis mode: {data_synthesis_mode}")
             
             # Prepare arguments for the script
-            args = [
-                f"--lr", str(learning_rate),
-                f"--epochs", str(num_train_epochs),
-                f"--threads", str(concurrency_threads),
-                f"--mode", str(data_synthesis_mode)
+            # Build command line arguments, need to include script path as the first parameter
+            cmd = [
+                script_path,
+                "--lr", str(learning_rate),
+                "--epochs", str(num_train_epochs),
+                "--threads", str(concurrency_threads),
+                "--mode", str(data_synthesis_mode)
             ]
             
             # Ensure log directory exists
             os.makedirs(os.path.dirname(log_path), exist_ok=True)
             
-            # Use script executor to execute training script
-            script_executor = ScriptExecutor()
-            result = script_executor.execute(
-                script_path=script_path,
-                script_type="train",
-                args=args,
-                log_file=log_path
+            # Set environment variables to improve tqdm output
+            env = os.environ.copy()
+            env["PYTHONUNBUFFERED"] = "1"  # Force Python to be unbuffered
+            env["FORCE_COLOR"] = "1"       # Force colored output
+            env["TQDM_FORCE_TTY"] = "1"    # Force tqdm to use TTY features
+            
+            # Ensure log directory exists
+            log_dir = os.path.dirname(log_path)
+            os.makedirs(log_dir, exist_ok=True)
+            
+            # Open log file
+            log_file = open(log_path, "ab")
+            
+            # Use subprocess.Popen to directly execute the training script, redirecting output to file
+            process = subprocess.Popen(
+                cmd,
+                env=env,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                bufsize=0,  # Unbuffered
             )
+            self.process = process
+            self.current_pid = process.pid
+            self.logger.info(f"Training process started with PID: {self.current_pid}")
             
-            # Store the result for later checking in the train method
-            self.training_result = result
+            # Wait for process to finish directly (blocking)
+            self.logger.info("Waiting for training process to complete...")
+            return_code = process.wait()
             
-            # Check if script execution was started successfully
-            if 'error' in result and result['error'] is not None:
-                self.logger.error(f"Failed to start training: {result['error']}")
+            # Close log file
+            log_file.close()
+            
+            # Save results for train method to check
+            self.training_result = {
+                "returncode": return_code,
+                "error": f"Execution failed, return code: {return_code}" if return_code != 0 else None
+            }
+            
+            if return_code != 0:
+                self.logger.error(f"Command execution failed, return code: {return_code}")
                 return False
-                
-            # Get the process ID if available
-            if hasattr(script_executor, 'process') and script_executor.process:
-                self.current_pid = script_executor.process.pid
-                self.logger.info(f"Training process started with PID: {self.current_pid}")
-        
+            else:
+                self.logger.info(f"Command execution successful, return code: {return_code}")
+            
             return True
             
         except Exception as e:
