@@ -62,11 +62,6 @@ export const tabs = [
         icon: <RoleplayIcon className="w-4 h-4" />
       },
       {
-        name: 'Intergrations',
-        path: ROUTER_PATH.APPLICATIONS_INTERGRATIONS,
-        icon: <RoleplayIcon className="w-4 h-4" />
-      },
-      {
         name: 'Roleplay Apps',
         path: ROUTER_PATH.APPLICATIONS_ROLEPLAY,
         icon: <RoleplayIcon className="w-4 h-4" />
@@ -80,6 +75,11 @@ export const tabs = [
         name: 'Second X Apps',
         path: ROUTER_PATH.APPLICATIONS_SECOND_X,
         icon: <GlobeIcon className="w-4 h-4" />
+      },
+      {
+        name: 'Intergrations',
+        path: ROUTER_PATH.APPLICATIONS_INTERGRATIONS,
+        icon: <RoleplayIcon className="w-4 h-4" />
       }
     ]
   }
