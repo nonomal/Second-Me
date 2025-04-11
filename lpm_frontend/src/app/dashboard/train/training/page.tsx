@@ -427,12 +427,13 @@ export default function TrainingPage() {
       console.log('Using startTrain API to train new model:', config.baseModel);
       const res = await startTrain({
         model_name: config.baseModel,
-        ...(isResume ? {} : trainingParams)
+        ...(isResume && !changeBaseModel ? {} : trainingParams)
       });
 
       if (res.data.code === 0) {
         // Save training configuration and start polling
         localStorage.setItem('trainingConfig', JSON.stringify(config));
+        setChangeBaseModel(false);
         console.log('API call successful, starting to poll for status updates');
         setStatus('training');
         scrollPageToBottom();
