@@ -63,19 +63,17 @@ Star and join us, and you will receive all release notifications from GitHub wit
 
 ## Quick Start
 
-### 📊 Installation Method Selection Guide
+### 📊 Model Deployment Memory and Supported Model Size Reference Guide
 
-Choose the suitable installation method based on your system memory and model size:
+*Note: "B" in the table represents "billion parameters model". Data shown are examples only; actual supported model sizes may vary depending on system optimization, deployment environment, and other hardware/software conditions.*
 
+| Memory (GB) | Docker Deployment (Windows/Linux) | Docker Deployment (Mac) | Integrated Setup (Windows/Linux) | Integrated Setup (Mac) |
+|--------------|-----------------------------|-------------------|--------------------------|----------------|
+| 8            | ~0.8B (example)                | ~0.4B (example)       | ~1.0B (example)              | ~0.6B (example)    |
+| 16           | 1.5B (example)                 | 0.5B (example)        | ~2.0B (example)              | ~0.8B (example)    |
+| 32           | ~2.8B (example)                | ~1.2B (example)       | ~3.5B (example)              | ~1.5B (example)    |
 
-#### Selection by Model Size
-
-| Model Size | Minimum Memory | Recommended Installation |
-|---------|------------|------------|
-| 0.5B | 8GB | Option 2 only | 
-| 1.5B | 16GB | Option 1 or 2 |
-| 3B | 32GB | Option 1 or 2 |
-| 7B | 64GB+ | Option 1 or 2 |
+> **Note**: Models below 0.5B may not provide satisfactory performance for complex tasks. And we're continuously improving cross-platform support - please [submit an issue](https://github.com/mindverse/Second-Me/issues/new) for feedback or compatibility problems on different operating systems.
 
 > **MLX Acceleration**: Mac M-series users can use [MLX](https://github.com/mindverse/Second-Me/tree/master/lpm_kernel/L2/mlx_training) to run larger models (CLI-only).
 
