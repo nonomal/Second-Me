@@ -147,7 +147,7 @@ export default function TrainingPage() {
 
   const status = useTrainingStore((state) => state.status);
   const trainingProgress = useTrainingStore((state) => state.trainingProgress);
-  const [isResume, setIsResume] = useState(trainingProgress.status === 'failed');
+  const [isResume, setIsResume] = useState(trainingProgress.status === 'suspended');
   const checkTrainStatus = useTrainingStore((state) => state.checkTrainStatus);
   const resetTrainingState = useTrainingStore((state) => state.resetTrainingState);
   const trainingError = useTrainingStore((state) => state.error);
@@ -180,7 +180,7 @@ export default function TrainingPage() {
   };
 
   useEffect(() => {
-    setIsResume(trainingProgress.status === 'failed');
+    setIsResume(trainingProgress.status === 'suspended');
   }, [trainingProgress]);
 
   useEffect(() => {
@@ -262,7 +262,11 @@ export default function TrainingPage() {
       }
     }
     // If training is completed or failed, stop polling
-    else if (trainingProgress.status === 'completed' || trainingProgress.status === 'failed') {
+    else if (
+      trainingProgress.status === 'completed' ||
+      trainingProgress.status === 'failed' ||
+      trainingProgress.status === 'suspended'
+    ) {
       stopPolling();
       setIsTraining(false);
 
@@ -388,6 +392,7 @@ export default function TrainingPage() {
 
       if (res.data.code === 0) {
         setIsTraining(false);
+        setIsResume(true);
       } else {
         message.error(res.data.message || 'Failed to stop training');
       }

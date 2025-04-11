@@ -18,8 +18,8 @@ interface StartTrainResponse {
   progress_id: string;
 }
 
-export type StepStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
-export type StageStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
+export type StepStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'suspended';
+export type StageStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'suspended';
 
 interface TrainStep {
   completed: boolean;
