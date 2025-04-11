@@ -1,4 +1,5 @@
 import json
+import os
 import time
 from pathlib import Path
 from werkzeug.utils import secure_filename
@@ -22,6 +23,10 @@ def start_process():
     
     Request parameters:
         model_name: Model name
+        learning_rate: Learning rate for model training (optional)
+        number_of_epochs: Number of training epochs (optional)
+        concurrency_threads: Number of threads for concurrent processing (optional)
+        data_synthesis_mode: Mode for data synthesis (optional)
     
     Includes the following steps:
     1. Health check
@@ -55,22 +60,51 @@ def start_process():
             return jsonify(APIResponse.error(message="Missing required parameters"))
 
         model_name = data["model_name"]
+        
+        # Get optional parameters with default values
+        learning_rate = data.get("learning_rate", None)
+        number_of_epochs = data.get("number_of_epochs", None)
+        concurrency_threads = data.get("concurrency_threads", None)
+        data_synthesis_mode = data.get("data_synthesis_mode", None)
+        
+        # Log the received parameters
+        logger.info(f"Training parameters: model_name={model_name}, learning_rate={learning_rate}, number_of_epochs={number_of_epochs}, concurrency_threads={concurrency_threads}, data_synthesis_mode={data_synthesis_mode}")
 
-        # Create service instance with model name
+        # Create service instance with model name and additional parameters
         train_service = TrainProcessService(
             model_name=model_name
         )
         if not train_service.check_training_condition():
             train_service.reset_progress()
 
+        # Save training parameters
+        training_params = {
+            "model_name": model_name,
+            "learning_rate": learning_rate,
+            "number_of_epochs": number_of_epochs,
+            "concurrency_threads": concurrency_threads,
+            "data_synthesis_mode": data_synthesis_mode
+        }
+        
+        # Update the latest training parameters
+        TrainProcessService.update_training_params(training_params)
+        
+        # Log training parameters
+        logger.info(f"Saved training parameters: {training_params}")
+
         thread = Thread(target=train_service.start_process)
         thread.daemon = True
         thread.start()
 
+        # Return success response with all parameters
         return jsonify(
             APIResponse.success(
                 data={
-                    "model_name": model_name
+                    "model_name": model_name,
+                    "learning_rate": learning_rate,
+                    "number_of_epochs": number_of_epochs,
+                    "concurrency_threads": concurrency_threads,
+                    "data_synthesis_mode": data_synthesis_mode
                 }
             )
         )
@@ -178,10 +212,10 @@ def stop_training():
             progress = train_service.progress.progress
             
             # Check if status is FAILED
-            if progress.status == Status.FAILED:
+            if progress.status == Status.SUSPENDED:
                 return jsonify(APIResponse.success(
-                    message="Training process has been stopped and status is confirmed as failed",
-                    data={"status": "failed"}
+                    message="Training process has been stopped and status is confirmed as suspended",
+                    data={"status": "suspended"}
                 ))
             
             # Wait before checking again
@@ -216,6 +250,35 @@ def get_model_name():
     except Exception as e:
         logger.error(f"Failed to get model name: {str(e)}")
         return jsonify(APIResponse.error(message=f"Failed to get model name: {str(e)}"))
+
+
+@trainprocess_bp.route("/training_params", methods=["GET"])
+def get_training_params():
+    """
+    Get the latest training parameters
+    
+    Returns:
+        Response: JSON response
+        {
+            "code": 0 for success, non-zero for failure,
+            "message": "Error message",
+            "data": {
+                "model_name": "Model name",
+                "learning_rate": "Learning rate",
+                "number_of_epochs": "Number of epochs",
+                "concurrency_threads": "Concurrency threads",
+                "data_synthesis_mode": "Data synthesis mode"
+            }
+        }
+    """
+    try:
+        # Get the latest training parameters
+        training_params = TrainProcessService.get_latest_training_params()
+        
+        return jsonify(APIResponse.success(data=training_params))
+    except Exception as e:
+        logger.error(f"Error getting training parameters: {str(e)}")
+        return jsonify(APIResponse.error(message=f"Error getting training parameters: {str(e)}"))
 
 
 @trainprocess_bp.route("/retrain", methods=["POST"])

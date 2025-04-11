@@ -1,10 +1,11 @@
 import concurrent.futures
 import traceback
-from dotenv import load_dotenv
 import os
+import random
+from dotenv import load_dotenv
 import openai
 from tqdm import tqdm
-
+from enum import Enum
 from lpm_kernel.L2.data_pipeline.data_prep.selfqa.selfqa_prompt import (
     system_prompt_cn, system_cot_prompt_cn,
     system_prompt_en, system_cot_prompt_en
@@ -37,6 +38,12 @@ def is_english(text: str) -> bool:
         True if the text contains only ASCII alphabetic characters, False otherwise.
     """
     return text.isascii() and text.isalpha()
+
+
+class DataSynthesisMode(Enum):
+    LOW = {"user_question_nums":3, "user_bind_question_nums":3}
+    MEDIUM = {"user_question_nums":2, "user_bind_question_nums":2}
+    HIGH = {"user_question_nums":1, "user_bind_question_nums":1}
 
 
 class SelfQA:
@@ -73,6 +80,8 @@ class SelfQA:
                 api_key=user_llm_config.chat_api_key,
                 base_url=user_llm_config.chat_endpoint,
             )
+        self.max_workers = os.environ.get("concurrency_threads", 2)
+        self.data_synthesis_mode = os.environ.get("DATA_SYNTHESIS_MODE", "low")
         if self.is_cot:
             logger.info("generate selfQA data in longcot pattern!!!")
             self.env_path = os.path.join(os.getcwd(), "lpm_kernel/L2/.env")
@@ -155,11 +164,12 @@ class SelfQA:
             f"你认得{self.user_name}这个名字吗？",
             f"{self.user_name}这个名字对你来说有印象吗？",
         ]
-
         if self.preferred_language != "Chinese":
-            return question_list_en + user_bind_question_en
+            return random.sample(question_list_en, len(question_list_en) // DataSynthesisMode[self.data_synthesis_mode.upper()].value["user_question_nums"]) + \
+                   random.sample(user_bind_question_en, len(user_bind_question_en) // DataSynthesisMode[self.data_synthesis_mode.upper()].value["user_bind_question_nums"])
         else:
-            return question_list_cn + user_bind_question_cn
+            return random.sample(question_list_cn, len(question_list_cn) // DataSynthesisMode[self.data_synthesis_mode.upper()].value["user_question_nums"]) + \
+                   random.sample(user_bind_question_cn, len(user_bind_question_cn) // DataSynthesisMode[self.data_synthesis_mode.upper()].value["user_bind_question_nums"])
 
 
     def generate_qa(self) -> list:
@@ -169,6 +179,7 @@ class SelfQA:
             A list of dictionaries containing question and answer pairs.
         """
         q_list = self._get_question_list()
+        logger.info(f"q_list : {q_list}")
 
         q_a_list = []
 
@@ -211,8 +222,8 @@ class SelfQA:
             
             return {"user": q, "assistant": a}
 
-        # Use ThreadPoolExecutor with max_workers=2
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        # Use ThreadPoolExecutor with max_workers=self.max_workers
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             # Submit all questions to the executor
             future_to_question = {executor.submit(process_question, q): q for q in q_list}
             
