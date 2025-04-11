@@ -10,7 +10,7 @@ restart_services_force() {
     
     # Stop services
     log_info "Stopping services..."
-    ./scripts/stop.sh
+    "${SCRIPT_DIR}/scripts/stop.sh"
     
     # Remove data directory
     log_warning "Removing data directory..."
@@ -18,7 +18,7 @@ restart_services_force() {
 
     # Start services
     log_info "Starting services..."
-    ./scripts/start.sh
+    "${SCRIPT_DIR}/scripts/start.sh"
 }
 
 # Execute force restart services
