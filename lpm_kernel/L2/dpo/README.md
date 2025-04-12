@@ -15,15 +15,24 @@ This document provides a comprehensive guide to executing the DPO workflow, both
 
 ## Getting Started
 
+### Setup
+
+Before executing the subsequent steps, please ensure that your API key and base URL are configured in `lpm_kernel/L2/dpo/utils.py`. Additionally, you need to manually fill in the global bio, including your interests, occupation, etc.
+
 ### Automatically
 
 To execute the DPO workflow automatically, follow these steps:
 
 1. Navigate to the project root directory in your terminal.
-2. Run the following command:
-   ```bash
+2. Deploy your sft model by using llama.cpp.Before deploy the model, you should convert it into gguf format. Ensure the model is accessible via an API endpoint on port 8080.
+```bash
+    # Example command to run the SFT model with llama.cpp
+    ./llama.cpp/build/llama_server --model /path/to/sft_model --port 8080
+```
+2. Run the following command in another terminal(also in the project root directory):
+```bash
    bash lpm_kernel/L2/dpo/dpo_pipeline.sh
-   ```
+```
 3. Before execution, ensure the following prerequisites are met:
    - Verify that the personal model path is correctly configured in the script.
    - Confirm that the SFT training dataset is saved in the designated location.
@@ -65,7 +74,7 @@ python lpm_kernel/L2/dpo/dpo_train.py \
     --learning_rate 5e-6 \
     --lora_r 32 \
     --lora_alpha 64 \
-    --batch_size 8
+    --batch_size 4
 ```
 
 This command initiates the training process with specified hyperparameters. Adjust these parameters as needed for optimal results.

@@ -8,14 +8,7 @@ import openai
 from tqdm import tqdm
 from prompt import JUDGE_COT_PROMPT, JUDGE_PROMPT, MEMORY_COT_PROMPT, MEMORY_PROMPT, CONTEXT_COT_PROMPT, CONTEXT_PROMPT, CONTEXT_ENHANCE_EVAL_SYS, JUDGE_EVAL_SYS, MEMORY_EVAL_SYS, USR
 
-# Add the root directory to the Python path
-# root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
-# sys.path.insert(0, root_dir)
-
-from lpm_kernel.kernel.l1.l1_manager import (
-    get_latest_global_bio,
-)
-from lpm_kernel.api.services.user_llm_config_service import UserLLMConfigService
+from utils import OPENAI_API_KEY,OPENAI_BASE_URL,Global_Bio
 
 from openai import OpenAI
 from pydantic import BaseModel
@@ -49,19 +42,17 @@ class DPOData:
         self.input_path = input_path
         self.output_dir = output_dir
         
-        # load the api key
-        user_llm_config_service = UserLLMConfigService()
-        user_llm_config = user_llm_config_service.get_available_llm()
-        if user_llm_config is None:
-            self.client = None
-            self.model_name = None
-        else:
-            self.model_name = user_llm_config.chat_model_name
-    
+        # Use the API key and base URL from utils.py
+        self.model_name = "gpt-4o"  # Set your model name here
+        if OPENAI_BASE_URL:
             self.client = openai.OpenAI(
-                api_key=user_llm_config.chat_api_key,
-                base_url=user_llm_config.chat_endpoint,
+                api_key=OPENAI_API_KEY,
+                base_url=OPENAI_BASE_URL,
             )
+        else:
+            self.client = OpenAI(
+                api_key=OPENAI_API_KEY,
+            ) 
         self.preference_language = preference_language
 
     def load_and_sample_data(self, sample_fraction=0.1):
@@ -81,7 +72,7 @@ class DPOData:
         return chat_messages
     
     # build messages in chat format
-    def create_chat_data(data):
+    def create_chat_data(self,data):
         def preprocess(sample, is_cot=False):
             if sample.get('assistant') is None and sample.get('enhanced_request') is not None:
                 user_message = f"{USER_NAME}的诉求是：" + sample['user_request']
@@ -100,9 +91,7 @@ class DPOData:
                     {"role": "user", "content": user_message},
                     # {"role": "assistant", "content": sample['user_feedback'].strip('\n')},
                 ]
-                global_bio = get_latest_global_bio()
-                global_bio = global_bio if global_bio else ""
-                # global_bio = "这是{USER_NAME}的个人画像"
+                global_bio = Global_Bio
                 return [{"messages": messages,"user":user_message,"label":sample['user_feedback'].strip('\n'),"eval_prompt":JUDGE_EVAL_SYS.format(global_bio=global_bio),"infer_prompt":infer_prompt}]
             sample['assistant'] = sample['assistant'].strip('\n')
             if sample.get('timestamp') is not None and sample.get('is_timeqa', None) is None:
@@ -142,7 +131,7 @@ class DPOData:
                 messages = [
                     {"role": "system", "content": infer_prompt},
                     {"role": "user", "content": sample['user']},
-                    {"role": "assistant", "content": sample['assistant']},
+                    # {"role": "assistant", "content": sample['assistant']},
                 ]
                 if 'None' in sample['assistant']:
                     return []
@@ -171,7 +160,7 @@ class DPOData:
                 
                 message = instance.get("messages",[])
                 # 调用 generate_responses 生成轨迹
-                traces = self.generate_traces(message)
+                traces = self.generate_traces(message,3)
                 
                 # 将轨迹附加到实例中
                 instance_with_traces = {
@@ -185,7 +174,7 @@ class DPOData:
                 all_traces.append(instance_with_traces)
                 
         return all_traces
-    def generate_traces(messages, nums_traces=3):
+    def generate_traces(self,messages, nums_traces=3):
         """
         Generate traces using the OpenAI API.
         llama.cpp can serve as http server
@@ -303,7 +292,7 @@ class DPOData:
         
         return instances
     
-    def compare_traces(traces, eval_results):
+    def compare_traces(self,traces, eval_results):
         """
         Compare three traces to determine the best and worst trace.
         :param traces: A list of three traces [trace1, trace2, trace3].
@@ -357,7 +346,7 @@ class DPOData:
     
     def process_request_structered(self,messages, format_class):
         try:
-            model = "gpt-4o"
+            model = self.model_name
             completion = self.client.beta.chat.completions.parse(
                 model=model,
                 messages=messages,
@@ -373,7 +362,7 @@ class DPOData:
         except Exception as e:
             return f"Error occurred: {str(e)}"
     
-    def multi_process_request(all_messages, max_workers, func, structure=None):
+    def multi_process_request(self,all_messages, max_workers, func, structure=None):
         with concurrent.futures.ThreadPoolExecutor(max_workers=min(max_workers, len(all_messages))) as executor:
             # 使用 (index, future) 结构来跟踪每个任务的索引
             futures = [(i, executor.submit(func, messages, structure)) if structure is not None else (i, executor.submit(func, messages)) for i, messages in enumerate(all_messages)]
@@ -388,7 +377,7 @@ class DPOData:
 
         return results
 
-    def prepare_dpo_datasets(sampled_data):
+    def prepare_dpo_datasets(self,sampled_data):
         """
         Prepare full and direct training versions of the DPO dataset.
 
@@ -408,7 +397,7 @@ class DPOData:
 
         return full_version, direct_training_version
 
-    def save_datasets(output_dir, full_version, direct_training_version):
+    def save_datasets(self,output_dir, full_version, direct_training_version):
         """
         Save the full and direct training versions of the DPO dataset to JSON files.
 
@@ -441,7 +430,7 @@ class DPOData:
         full_version, direct_training_version = self.prepare_dpo_datasets(compare_res)
 
         # Save datasets
-        self.save_datasets(full_version, direct_training_version)
+        self.save_datasets(self.output_dir,full_version, direct_training_version)
 
         print(f"Sampled data saved to {self.output_dir}")
 

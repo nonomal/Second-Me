@@ -73,7 +73,7 @@ def train(args):
         num_train_epochs=args.num_train_epochs,
         learning_rate=args.learning_rate,
         per_device_train_batch_size=args.batch_size,
-        gradient_checkpointing=True,
+        gradient_checkpointing=False,
         gradient_checkpointing_kwargs={"use_reentrant":True},
         max_grad_norm=args.max_grad_norm,
         lr_scheduler_type="cosine",
