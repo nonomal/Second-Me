@@ -45,7 +45,16 @@ def cal_upperbound(
     :param raw: system prompt and raw content
     :return:
     """
-    enc = tiktoken.encoding_for_model(model_name)
+    if model_name is not None:
+        if model_name in tiktoken.model.MODEL_TO_ENCODING:
+            enc = tiktoken.encoding_for_model(model_name)
+            logging.info(f"Successfully initialized tokenizer for model: {model_name}")
+        else:
+            enc = tiktoken.get_encoding("cl100k_base")
+            logging.warning(f"Model '{model_name}' doesn't have a corresponding tokenizer, falling back to default: cl100k_base")
+    else:
+        enc = tiktoken.get_encoding("cl100k_base")
+        logging.info(f"No model specified, using default tokenizer: cl100k_base")
     raw_token = len(enc.encode(raw))
     upper_bound = model_limit - raw_token - tolerance - generage_limit
     if upper_bound < 0:
@@ -117,9 +126,15 @@ class TokenTextSplitter(TextSplitter):
             )
         # create a GPT-3 encoder instance
         if model_name is not None:
-            enc = tiktoken.encoding_for_model(model_name)
+            if model_name in tiktoken.model.MODEL_TO_ENCODING:
+                enc = tiktoken.encoding_for_model(model_name)
+                logging.info(f"Successfully initialized tokenizer for model: {model_name}")
+            else:
+                enc = tiktoken.get_encoding(encoding_name)
+                logging.warning(f"Model '{model_name}' doesn't have a corresponding tokenizer, falling back to default: {encoding_name}")
         else:
             enc = tiktoken.get_encoding(encoding_name)
+            logging.info(f"No model specified, using default tokenizer: {encoding_name}")
         self._tokenizer = enc
         self._allowed_special = allowed_special
         self._disallowed_special = disallowed_special
@@ -205,7 +220,16 @@ def chunk_filter(
 
 
 def get_safe_content_turncate(content, model_name="gpt-3.5-turbo", max_tokens=3300):
-    enc = tiktoken.encoding_for_model(model_name)
+    if model_name is not None:
+        if model_name in tiktoken.model.MODEL_TO_ENCODING:
+            enc = tiktoken.encoding_for_model(model_name)
+            logging.info(f"Successfully initialized tokenizer for model: {model_name}")
+        else:
+            enc = tiktoken.get_encoding("cl100k_base")
+            logging.warning(f"Model '{model_name}' doesn't have a corresponding tokenizer, falling back to default: cl100k_base")
+    else:
+        enc = tiktoken.get_encoding("cl100k_base")
+        logging.info(f"No model specified, using default tokenizer: cl100k_base")
     logging.warning(
         "get_safe_content_turncate(): current model maximum input length is %s, current input length is %s",
         max_tokens,

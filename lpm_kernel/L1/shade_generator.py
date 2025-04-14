@@ -53,7 +53,71 @@ class ShadeGenerator:
                 base_url=self.user_llm_config.chat_endpoint,
             )
             self.model_name = self.user_llm_config.chat_model_name
+        self._top_p_adjusted = False  # Flag to track if top_p has been adjusted
 
+    def _fix_top_p_param(self, error_message: str) -> bool:
+        """Fixes the top_p parameter if an API error indicates it's invalid.
+        
+        Some LLM providers don't accept top_p=0 and require values in specific ranges.
+        This function checks if the error is related to top_p and adjusts it to 0.001,
+        which is close enough to 0 to maintain deterministic behavior while satisfying
+        API requirements.
+        
+        Args:
+            error_message: Error message from the API response.
+            
+        Returns:
+            bool: True if top_p was adjusted, False otherwise.
+        """
+        if not self._top_p_adjusted and "top_p" in error_message.lower():
+            logger.warning("Fixing top_p parameter from 0 to 0.001 to comply with model API requirements")
+            self.model_params["top_p"] = 0.001
+            self._top_p_adjusted = True
+            return True
+        return False
+
+    def _call_llm_with_retry(self, messages: List[Dict[str, str]], **kwargs) -> Any:
+        """Calls the LLM API with automatic retry for parameter adjustments.
+        
+        This function handles making API calls to the language model while
+        implementing automatic parameter fixes when errors occur. If the API
+        rejects the call due to invalid top_p parameter, it will adjust the
+        parameter value and retry the call once.
+        
+        Args:
+            messages: List of messages for the API call.
+            **kwargs: Additional parameters to pass to the API call.
+            
+        Returns:
+            API response object from the language model.
+            
+        Raises:
+            Exception: If the API call fails after all retries or for unrelated errors.
+        """
+        try:
+            return self.client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+                **self.model_params,
+                **kwargs
+            )
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"API Error: {error_msg}")
+            
+            # Try to fix top_p parameter if needed
+            if hasattr(e, 'response') and hasattr(e.response, 'status_code') and e.response.status_code == 400:
+                if self._fix_top_p_param(error_msg):
+                    logger.info("Retrying LLM API call with adjusted top_p parameter")
+                    return self.client.chat.completions.create(
+                        model=self.model_name,
+                        messages=messages,
+                        **self.model_params,
+                        **kwargs
+                    )
+            
+            # Re-raise the exception
+            raise
 
     def _build_message(self, system_prompt: str, user_prompt: str) -> List[Dict[str, str]]:
         """Builds the message structure for the LLM API.
@@ -101,11 +165,7 @@ Domain Timelines:
         shift_perspective_message = self._build_message(
             PERSON_PERSPECTIVE_SHIFT_V2_PROMPT, user_prompt
         )
-        response = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=shift_perspective_message,
-            **self.model_params,
-        )
+        response = self._call_llm_with_retry(shift_perspective_message)
         content = response.choices[0].message.content
         shift_pattern = r"\{.*\}"
         shift_perspective_result = self.__parse_json_response(content, shift_pattern)
@@ -184,9 +244,7 @@ Domain Timelines:
 
         shade_generate_message = self._build_message(SHADE_INITIAL_PROMPT, user_prompt)
 
-        response = self.client.chat.completions.create(
-            model=self.model_name, messages=shade_generate_message, **self.model_params
-        )
+        response = self._call_llm_with_retry(shade_generate_message)
         content = response.choices[0].message.content
 
         logger.info(f"Shade Generate Result: {content}")
@@ -213,9 +271,7 @@ Domain Timelines:
         )
 
         merge_shades_message = self._build_message(SHADE_MERGE_PROMPT, user_prompt)
-        response = self.client.chat.completions.create(
-            model=self.model_name, messages=merge_shades_message, **self.model_params
-        )
+        response = self._call_llm_with_retry(merge_shades_message)
         content = response.choices[0].message.content
         logger.info(f"Shade Generate Result: {content}")
         return self.__shade_merge_postprocess(content)
@@ -302,9 +358,7 @@ Recent Memories:
 {recent_memories_str}
 """
         shade_improve_message = self._build_message(SHADE_IMPROVE_PROMPT, user_prompt)
-        response = self.client.chat.completions.create(
-            model=self.model_name, messages=shade_improve_message, **self.model_params
-        )
+        response = self._call_llm_with_retry(shade_improve_message)
         content = response.choices[0].message.content
         logger.info(f"Shade Generate Result: {content}")
         return self.__shade_improve_postprocess(old_shade_info, content)
@@ -391,7 +445,72 @@ class ShadeMerger:
             "timeout": 45,
         }
         self.preferred_language = "en"
+        self._top_p_adjusted = False  # Flag to track if top_p has been adjusted
 
+
+    def _fix_top_p_param(self, error_message: str) -> bool:
+        """Fixes the top_p parameter if an API error indicates it's invalid.
+        
+        Some LLM providers don't accept top_p=0 and require values in specific ranges.
+        This function checks if the error is related to top_p and adjusts it to 0.001,
+        which is close enough to 0 to maintain deterministic behavior while satisfying
+        API requirements.
+        
+        Args:
+            error_message: Error message from the API response.
+            
+        Returns:
+            bool: True if top_p was adjusted, False otherwise.
+        """
+        if not self._top_p_adjusted and "top_p" in error_message.lower():
+            logger.warning("Fixing top_p parameter from 0 to 0.001 to comply with model API requirements")
+            self.model_params["top_p"] = 0.001
+            self._top_p_adjusted = True
+            return True
+        return False
+
+    def _call_llm_with_retry(self, messages: List[Dict[str, str]], **kwargs) -> Any:
+        """Calls the LLM API with automatic retry for parameter adjustments.
+        
+        This function handles making API calls to the language model while
+        implementing automatic parameter fixes when errors occur. If the API
+        rejects the call due to invalid top_p parameter, it will adjust the
+        parameter value and retry the call once.
+        
+        Args:
+            messages: List of messages for the API call.
+            **kwargs: Additional parameters to pass to the API call.
+            
+        Returns:
+            API response object from the language model.
+            
+        Raises:
+            Exception: If the API call fails after all retries or for unrelated errors.
+        """
+        try:
+            return self.client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+                **self.model_params,
+                **kwargs
+            )
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"API Error: {error_msg}")
+            
+            # Try to fix top_p parameter if needed
+            if hasattr(e, 'response') and hasattr(e.response, 'status_code') and e.response.status_code == 400:
+                if self._fix_top_p_param(error_msg):
+                    logger.info("Retrying LLM API call with adjusted top_p parameter")
+                    return self.client.chat.completions.create(
+                        model=self.model_name,
+                        messages=messages,
+                        **self.model_params,
+                        **kwargs
+                    )
+            
+            # Re-raise the exception
+            raise
 
     def _build_user_prompt(self, shade_info_list: List[ShadeMergeInfo]) -> str:
         """Builds a user prompt from shade information list.
@@ -525,11 +644,7 @@ class ShadeMerger:
             )
             logger.info(f"Built merge_decision_message: {merge_decision_message}")
 
-            response = self.client.chat.completions.create(
-                model=self.model_name,
-                messages=merge_decision_message,
-                **self.model_params,
-            )
+            response = self._call_llm_with_retry(merge_decision_message)
             content = response.choices[0].message.content
             logger.info(f"Shade Merge Decision Result: {content}")
 

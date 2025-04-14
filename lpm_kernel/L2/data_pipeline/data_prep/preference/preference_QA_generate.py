@@ -1,27 +1,52 @@
 from itertools import islice
 import concurrent.futures
 import json
-import logging
 import os
 import random
 import re
-
+from dotenv import load_dotenv
 from tqdm import tqdm
 import openai
-
+from enum import Enum
 from lpm_kernel.api.services.user_llm_config_service import UserLLMConfigService
 from lpm_kernel.configs.config import Config
 from lpm_kernel.L2.data_pipeline.data_prep.preference.prompts import (
-    CH_USR_TEMPLATES,
-    EN_USR_TEMPLATES,
-    CH_SYS_TEMPLATES,
-    EN_SYS_TEMPLATES,
+    CH_USR_TEMPLATES, CH_USR_COT_TEMPLATES,
+    EN_USR_TEMPLATES, EN_USR_COT_TEMPLATES,
+    CH_SYS_TEMPLATES, CH_SYS_COT_TEMPLATES,
+    EN_SYS_TEMPLATES, EN_SYS_COT_TEMPLATES
 )
 import traceback
+from lpm_kernel.configs.logging import get_train_process_logger
+logger = get_train_process_logger()
+
+class TqdmLoggingHandler:
+    def __init__(self):
+        pass
+    
+    def write(self, msg):
+        logger.info(msg.strip())
+    
+    def flush(self):
+        pass
+    
+tqdm_handler = TqdmLoggingHandler()
+
+
+class LowMode(Enum):
+    cluster_nums = 3
+
+
+class MediumMode(Enum):
+    cluster_nums = 2
+
+
+class HighMode(Enum):
+    cluster_nums = 1
 
 
 class PreferenceQAGenerator:
-    def __init__(self, filename: str, bio: str, preference_language: str):
+    def __init__(self, filename: str, bio: str, preference_language: str, is_cot: bool = True):
         """Initialize the PreferenceQAGenerator class.
         
         Args:
@@ -30,6 +55,7 @@ class PreferenceQAGenerator:
             preference_language: Language for prompts ("Chinese/中文" or otherwise English).
         """
         self.filename = filename
+        self.is_cot = is_cot
         
         with open(self.filename, "r", encoding="utf-8") as f:
             self.pre_msg = json.load(f)
@@ -46,16 +72,37 @@ class PreferenceQAGenerator:
                 api_key=user_llm_config.chat_api_key,
                 base_url=user_llm_config.chat_endpoint,
             )
+        if self.is_cot:
+            logger.info("generate pereference data in longcot pattern!!!")
+            self.env_path = os.path.join(os.getcwd(), "lpm_kernel/L2/.env")
+            if os.path.exists(self.env_path):
+                load_dotenv(self.env_path)
+            else:
+                raise FileNotFoundError(f"Config file not found: {self.env_path}")
+            self.model_name = os.getenv("DEEPSEEK_MODEL_NAME", "")
+            self.api_key = os.getenv("DEEPSEEK_API_KEY", "")
+            self.base_url = os.getenv("DEEPSEEK_BASE_URL", "")
+            if self.model_name.startswith("deepseek"):
+                    self.client = openai.OpenAI(
+                    api_key=self.api_key,
+                    base_url=self.base_url,
+                )
+            else:
+                logger.error(f"Error model_name, longcot data generating model_name: deepseek series")
+                raise
+            
         
         self.bio = bio
         self.question_list = []
         self.preference_language = preference_language
         self.prompt_templates = self._get_prompt_templates(preference_language)
         self.sys_templates = self._get_sys_templates(preference_language)
+        self.max_workers = 1
+        self.data_synthesis_mode = os.environ.get("DATA_SYNTHESIS_MODE", "low")
 
 
     def generate_response(self, sys: str, prompt: str) -> str:
-        """Generate a response using the OpenAI API.
+        """Generate a response using the OpenAI / DeepSeek API.
         
         Args:
             sys: The system prompt to use.
@@ -64,8 +111,36 @@ class PreferenceQAGenerator:
         Returns:
             The generated response text or None if an error occurred.
         """
+        def get_remote_response(sys: str, prompt: str) -> str:
+            """Get response from OpenAI / DeepSeek API.
+            
+            Args:
+                sys: The system prompt to use.
+                prompt: The user prompt to send to the API.
+                
+            Returns:
+                The response content from OpenAI / DeepSeek, or None if an error occurs.
+            """
+            try:
+                res = self.client.chat.completions.create(
+                    messages=[
+                            {"role": "system", "content": sys},
+                            {"role": "user", "content": prompt},
+                        ],
+                    model=self.model_name,
+                )
+                response_message = res.choices[0].message
+                if self.is_cot:
+                    return "<think>" + response_message.reasoning_content + "</think>" + response_message.content
+                else:
+                    return response_message.content
+            except Exception as e:
+                logger.error(traceback.format_exc())
+            return None
+        
+        
         try:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 future = executor.submit(
                     self.client.chat.completions.create,
                     model=self.model_name,
@@ -77,7 +152,7 @@ class PreferenceQAGenerator:
                 response = future.result()
                 return response.choices[0].message.content
         except Exception as e:
-            logging.error(f"Error generating response: {e}")
+            logger.error(f"Error generating response: {e}")
             return None
 
 
@@ -96,7 +171,7 @@ class PreferenceQAGenerator:
 
 
     def _get_prompt_templates(self, preference_language: str) -> dict:
-        """Return a dictionary of prompt templates based on language preference.
+        """Return a dictionary of prompt templates based on language preference (w or w/o cot).
         
         Args:
             preference_language: The language preference ("Chinese/中文" or otherwise English).
@@ -105,13 +180,19 @@ class PreferenceQAGenerator:
             A dictionary of prompt templates.
         """
         if preference_language == "Chinese":
-            return CH_USR_TEMPLATES
+            if self.is_cot:
+                return CH_USR_COT_TEMPLATES
+            else:
+                return CH_USR_TEMPLATES
         else:
-            return EN_USR_TEMPLATES
+            if self.is_cot:
+                return EN_USR_COT_TEMPLATES
+            else:
+                return EN_USR_TEMPLATES
 
 
     def _get_sys_templates(self, preference_language: str) -> dict:
-        """Return a dictionary of system templates based on language preference.
+        """Return a dictionary of system templates based on language preference (w or w/o cot).
         
         Args:
             preference_language: The language preference ("Chinese/中文" or otherwise English).
@@ -120,9 +201,15 @@ class PreferenceQAGenerator:
             A dictionary of system templates.
         """
         if preference_language == "Chinese":
-            return CH_SYS_TEMPLATES
+            if self.is_cot:
+                return CH_SYS_COT_TEMPLATES
+            else:
+                return CH_SYS_TEMPLATES
         else:
-            return EN_SYS_TEMPLATES
+            if self.is_cot:
+                return EN_SYS_COT_TEMPLATES
+            else:
+                return EN_SYS_TEMPLATES
 
 
     def process_clusters(self, output_filename: str) -> None:
@@ -133,8 +220,17 @@ class PreferenceQAGenerator:
         """
         cluster_items = list(self.pre_msg.items())
         count = 0
-
-        for _, cluster in tqdm(cluster_items):
+        
+        if self.data_synthesis_mode == "low":
+            sample_num = max(1, len(cluster_items) // LowMode.cluster_nums.value) if 0 < len(cluster_items) < 3 else len(cluster_items) // LowMode.cluster_nums.value
+            new_cluster_items = random.sample(cluster_items, sample_num)
+        elif self.data_synthesis_mode == "medium":
+            sample_num = max(1, len(cluster_items) // MediumMode.cluster_nums.value) if 0 < len(cluster_items) < 2 else len(cluster_items) // MediumMode.cluster_nums.value
+            new_cluster_items = random.sample(cluster_items, sample_num)
+        else: # high or other case
+            new_cluster_items = cluster_items
+            
+        for _, cluster in tqdm(new_cluster_items, desc="preference_generate", file=tqdm_handler):
             chunk_concat = self._get_chunk_concat(cluster["contents"])
 
             tags = " ".join(cluster["tags"])
@@ -145,7 +241,7 @@ class PreferenceQAGenerator:
             
             n_cluster = len(cluster["contents"])
             if n_cluster > 1:
-                logging.info(f"Cluster has {str(n_cluster)} chunks")
+                logger.info(f"Cluster has {str(n_cluster)} chunks")
 
             prompt_question_template = self.prompt_templates["query"]
             prompt_answer_template = self.prompt_templates["answer"]
@@ -159,8 +255,11 @@ class PreferenceQAGenerator:
                         bio=self.bio, chunks_concat=chunk_concat
                     ),
                 )
+                if self.is_cot:
+                    question_match = re.search(r"<question>(.*?)</question>", gen_question, re.DOTALL)
+                    gen_question = question_match.group(1).strip() if question_match else gen_question
             except Exception as e:
-                logging.error(traceback.format_exc())
+                logger.error(traceback.format_exc())
                 continue
             try:
                 gen_answer = self.generate_response(
@@ -170,14 +269,14 @@ class PreferenceQAGenerator:
                     ),
                 )
             except Exception as e:
-                logging.error(traceback.format_exc())
+                logger.error(traceback.format_exc())
                 continue
             
             self.question_list.append({"user": gen_question, "assistant": gen_answer})
             if n_cluster >= 20:
                 self._generate_multiple_questions(cluster["contents"], chunk_concat)
             if count % 5 == 0:
-                logging.info(f"Processed {count} clusters")
+                logger.info(f"Processed {count} clusters")
 
         with open(output_filename, "w") as json_file:
             json.dump(self.question_list, json_file, indent=4, ensure_ascii=False)
@@ -215,11 +314,11 @@ class PreferenceQAGenerator:
             if len(self.clean_chunk(content)) >= 80
         ]
 
-        logging.info(f"Big cluster: n_repeat = {n_repeat}")
+        logger.info(f"Big cluster: n_repeat = {n_repeat}")
 
         for i in range(n_repeat):
             if i % 5 == 0 and i > 0:
-                logging.info(f"Repeat {i} times")
+                logger.info(f"Repeat {i} times")
             selected_chunks = random.sample(
                 chunk_content_list, min(len(chunk_content_list), num_chunk_referred)
             )
@@ -236,6 +335,9 @@ class PreferenceQAGenerator:
                         bio=self.bio, chunks_concat=chunk_concat
                     ),
                 )
+                if self.is_cot:
+                    question_match = re.search(r"<question>(.*?)</question>", gen_question, re.DOTALL)
+                    gen_question = question_match.group(1).strip() if question_match else gen_question
                 gen_answer = self.generate_response(
                     sys_answer,
                     prompt_answer_template.format(
@@ -243,7 +345,7 @@ class PreferenceQAGenerator:
                     ),
                 )
             except Exception as e:
-                logging.error(traceback.format_exc())
+                logger.error(traceback.format_exc())
                 continue
             self.question_list.append({"user": gen_question, "assistant": gen_answer})
         return

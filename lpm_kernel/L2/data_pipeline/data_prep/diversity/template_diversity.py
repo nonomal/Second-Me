@@ -71,6 +71,49 @@ ENG_Q_GENERATE_TEMPLATE = """You are the user interacting with your personal AI 
 
 ENG_A_GENERATE_TEMPLATE = """You are the dedicated AI assistant specifically designed to assist the user by responding to their questions and statements, which are often rooted in the personal notes they have taken. Every query or statement from the user (Q) represents their own perspective, capturing their individual thoughts, questions, emotions, or reflections. As their AI assistant, your responses (A) should always be aligned with your role in supporting the user. This means providing responses that are not only helpful and supportive but also relevant to the context in which the query was made. Furthermore, your answers should be grounded in the user's prior knowledge, as represented by their notes, ensuring consistency in tone, content, and insight. It is crucial that your responses remain tailored to the specific type of query the user poses, ensuring that the interaction feels natural and contextually appropriate. Your goal is to act as a trusted companion, offering both informative and empathetic responses based on the user's personal needs."""
 
+A_GENERATE_COT_TEMPLATE = """# Goal #
+You will be provided with multiple historical interactions between people and AI robots, and you need to respond to questions according to the following answer format:
+
+__answer_rule__
+
+# Guidelines #
+1. Reason through and answer the questions, ideally mentioning specific previous content from the user (for example, 'You mentioned xxx before', 'You talked about xxx previously', 'We discussed xxx earlier', etc.). 
+2. Answer the questions as comprehensively as possible, ensuring that your responses are both accurate and in-depth, covering all aspects of the query. 
+
+# Response Format #
+<think>(thought and reasoning part)</think><answer>(answer part)</answer>
+"""
+
+COT_SHOT_1 = """<think>Based on the information you've previously mentioned, several key reasons and influencing factors can be summarized for the anticipated slowdown of China's economy in 2024:
+
+1. **High Debt Levels and Burden**: You discussed that China's GDP growth was 5.2% in 2023, but this growth is...
+
+2. **Declining Investment Returns**: You mentioned that historically, technological advancements have caused fluctuations in investment returns...
+
+3. **Global Economic Environment and Export Conditions**: According to assessments by the International Monetary Fund (IMF) and other institutions...
+
+4. **Policy Uncertainty and Governance Challenges**: We also talked about certain policy issues, such as...
+
+5. **Changes in Population Structure**: The decline in birth rates and the aging population are likely to affect the labor market, becoming a major factor in the future economic slowdown.
+
+6. **Industry Restructuring and Insufficient Innovation**: Additionally, we previously discussed the impact of industry restructuring and the pandemic...
+</think><answer>
+Taking these factors into account, it can be anticipated that the reasons for the slowdown of China's economy in 2024 have a multi-faceted background, including domestic policy and economic structural issues, as well as influences from the global economic environment and long-term demographic trends.
+<answer>"""
+
+COT_SHOT_2 = """<think>There exists a deep connection between the invariance in physics and the embedding space of large language models, which can profoundly influence our understanding of language and real entities.
+
+First, you mentioned that the essence of the physical world is invariance...
+
+Next, in your notes, we observed the influence of Wittgenstein's philosophical theories on language models...
+
+Additionally, in physics, there are invariances such as conservation laws...
+
+Finally, the invariance in physics and the embedding space of large language models...
+</think><answer>
+Therefore, through the comparison of the principles of invariance in physics and the embedding space of large language models, we can see a common idea: seeking stable patterns and structures in complex systems to deepen our understanding of the relationship between language and reality. This connection is not merely a surface similarity, but a substantial methodological guidance.</answer>"""
+
+
 
 class templater:
     """Class for generating templates for question and answer generation.
@@ -79,7 +122,7 @@ class templater:
     and answers based on predefined rules and configurations.
     """
 
-    def __init__(self, q_dict: dict, a_dict: dict, user_name: str = "", global_bio: str = ""):
+    def __init__(self, q_dict: dict, a_dict: dict, user_name: str = "", global_bio: str = "", is_cot: bool = True):
         """Initialize the templater with question and answer dictionaries.
         
         Args:
@@ -92,9 +135,10 @@ class templater:
         self.q_dict = q_dict
         self.user_name = user_name
         self.global_bio = global_bio
-        self.shot1 = SHOT_1
-        self.shot2 = SHOT_2
-        self.a_temp = A_GENERATE_TEMPLATE
+        self.is_cot = is_cot
+        self.shot1, self.cot_shot1 = SHOT_1, COT_SHOT_1
+        self.shot2, self.cot_shot2 = SHOT_2, COT_SHOT_2
+        self.a_temp, self.a_cot_temp = A_GENERATE_TEMPLATE, A_GENERATE_COT_TEMPLATE
 
 
     def get_A_template(self, question_type: str) -> tuple:
@@ -106,7 +150,7 @@ class templater:
         Returns:
             A tuple containing the answer template and a list of chosen optional types.
         """
-        templ = self.a_temp
+        templ = self.a_cot_temp if self.is_cot else self.a_temp
         answer_rule = ""
         required_type = self.q_dict[question_type]["requiredAnswerTypes"]
         optional_type = self.q_dict[question_type]["optionalAnswerTypes"]
@@ -150,7 +194,10 @@ class templater:
 
         # Add example for global questions
         if question_type == "global":
-            tmp = random.choice([self.shot1, self.shot2, self.shot2])
+            if self.is_cot:
+                tmp = random.choice([self.cot_shot1, self.cot_shot2, self.cot_shot2])
+            else:
+                tmp = random.choice([self.shot1, self.shot2, self.shot2])
             templ += f"# Example Output #\n{tmp}"
 
         return templ, chosen_optional_type

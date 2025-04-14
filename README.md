@@ -3,7 +3,8 @@
 <div align="center">
   
 [![Homepage](https://img.shields.io/badge/Second_Me-Homepage-blue?style=flat-square&logo=homebridge)](https://www.secondme.io/)
-[![Report](https://img.shields.io/badge/Paper-arXiv-red?style=flat-square&logo=arxiv)](https://arxiv.org/abs/2503.08102)
+[![AI-native Memory](https://img.shields.io/badge/AI--native_Memory-arXiv-orange?style=flat-square&logo=academia)](https://arxiv.org/abs/2406.18312)
+[![AI-native Memory 2.0](https://img.shields.io/badge/AI--native_Memory_2.0-arXiv-red?style=flat-square&logo=arxiv)](https://arxiv.org/abs/2503.08102)
 [![Discord](https://img.shields.io/badge/Chat-Discord-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/GpWHQNUwrg)
 [![Twitter](https://img.shields.io/badge/Follow-@SecondMe_AI-1DA1F2?style=flat-square&logo=x&logoColor=white)](https://x.com/SecondMe_AI1)
 [![Reddit](https://img.shields.io/badge/Join-Reddit-FF4500?style=flat-square&logo=reddit&logoColor=white)](https://www.reddit.com/r/SecondMeAI/)
@@ -13,13 +14,13 @@
 
 ## Our Vision
 
-Companies like OpenAI built "Super AI" that threatens human independence. We crave individuality: AI that amplifies, not erases, you.
+Companies like OpenAI built "Super AI" that threatens human independence. We crave individuality: AI that amplifies, not erases, **YOU**.
 
 We’re challenging that with "**Second Me**": an open-source prototype where you craft your own **AI self**—a new AI species that preserves you, delivers your context, and defends your interests.
 
 It’s **locally trained and hosted**—your data, your control—yet **globally connected**, scaling your intelligence across an AI network. Beyond that, it’s your AI identity interface—a bold standard linking your AI to the world, sparks collaboration among AI selves, and builds tomorrow’s truly native AI apps.
 
-Join us. Tech enthusiasts, AI pros, domain experts—Second Me is your launchpad to extend your mind into the digital horizon.
+Tech enthusiasts, AI pros, domain experts, Join us! Second Me is your launchpad to extend your mind into the digital horizon.
 
 ## Key Features
 
@@ -62,103 +63,36 @@ Star and join us, and you will receive all release notifications from GitHub wit
 
 ## Quick Start
 
+### 📊 Model Deployment Memory and Supported Model Size Reference Guide
 
+*Note: "B" in the table represents "billion parameters model". Data shown are examples only; actual supported model sizes may vary depending on system optimization, deployment environment, and other hardware/software conditions.*
 
+| Memory (GB) | Docker Deployment (Windows/Linux) | Docker Deployment (Mac) | Integrated Setup (Windows/Linux) | Integrated Setup (Mac) |
+|--------------|-----------------------------|-------------------|--------------------------|----------------|
+| 8            | ~0.8B (example)                | ~0.4B (example)       | ~1.0B (example)              | ~0.6B (example)    |
+| 16           | 1.5B (example)                 | 0.5B (example)        | ~2.0B (example)              | ~0.8B (example)    |
+| 32           | ~2.8B (example)                | ~1.2B (example)       | ~3.5B (example)              | ~1.5B (example)    |
 
-### 🍎 Option 1: Local Setup (macOS with Apple Silicon)
+> **Note**: Models below 0.5B may not provide satisfactory performance for complex tasks. And we're continuously improving cross-platform support - please [submit an issue](https://github.com/mindverse/Second-Me/issues/new) for feedback or compatibility problems on different operating systems.
 
-<!-- > **Special Note: This section is specifically for Mac (Apple Silicon) users** -->
+> **MLX Acceleration**: Mac M-series users can use [MLX](https://github.com/mindverse/Second-Me/tree/master/lpm_kernel/L2/mlx_training) to run larger models (CLI-only).
 
-<details open>
-<summary><b>Click to expand/collapse Mac setup details</b></summary>
+### 🐳 Option 1: Docker Setup 
 
-##### Prerequisites
-- Python 3.12 or higher
-- Xcode Command Line Tools
+> **Note**: Docker setup on Mac M-Series chips has 25-30% performance overhead compared to integrated setup, but offers easier installation process.
 
-##### Installing Xcode Command Line Tools
-If you haven't installed Xcode Command Line Tools yet, you can install them by running:
-```bash
-xcode-select --install
-```
-
-After installation, you may need to accept the license agreement:
-```bash
-sudo xcodebuild -license accept
-```
-
-##### Setup Steps
-
-1. **Clone the repository**
-   ```bash
-   git clone git@github.com:Mindverse/Second-Me.git
-   cd Second-Me
-   ```
-
-2. **Set up the environment**
-
-   Choose one of the following options:
-
-   <details>
-   <summary><b>Option A: For users with existing conda environment</b></summary>
-   
-   If you already have conda installed:
-   
-   1. Create a new environment from our environment file:
-      ```bash
-      conda env create -f environment.yml   # This will create an environment named 'second-me'
-      conda activate second-me
-      ```
-   
-   2. Set the custom conda mode in `.env`:
-      ```bash
-      CUSTOM_CONDA_MODE=true
-      ```
-   
-   3. Run setup:
-      ```bash
-      make setup
-      ```
-   </details>
-
-   <details>
-   <summary><b>Option B: For new users</b></summary>
-   
-   If you're new or want a fresh environment:
-   ```bash
-   make setup
-   ```
-   
-   This command will automatically:
-   - Install all required system dependencies (including conda if not present)
-   - Create a new Python environment named 'second-me'
-   - Build llama.cpp
-   - Set up frontend environment
-   </details>
-
-3. **Start the service**
-   ```bash
-   make start
-   ```
-
-</details>
-
-### 🐳 Option 2: Docker Setup (For Linux & Windows users)
-
-
-<details>
-<summary><b>Click to expand/collapse Docker setup details</b></summary>
-
-Docker provides a consistent environment across different operating systems.
-
-##### Prerequisites
+#### Prerequisites
 - Docker and Docker Compose installed on your system
+  - For Docker installation: [Get Docker](https://docs.docker.com/get-docker/)
+  - For Docker Compose installation: [Install Docker Compose](https://docs.docker.com/compose/install/)
 
-> **Important:** You must install both Docker and Docker Compose before proceeding. If you haven't installed them yet:
-> - For Docker installation: [Get Docker](https://docs.docker.com/get-docker/)
-> - For Docker Compose installation: [Install Docker Compose](https://docs.docker.com/compose/install/)
+- For Windows Users: You can use [MinGW](https://www.mingw-w64.org/) to run `make` commands. You may need to modify the Makefile by replacing Unix-specific commands with Windows-compatible alternatives.
 
-##### Setup Steps
+- Memory Usage Settings (important):
+  - Configure these settings in Docker Desktop (macOS) or Docker Desktop (Windows) at: Dashboard -> Settings -> Resources
+  - Make sure to allocate sufficient memory resources (at least 8GB recommended)
+
+#### Setup Steps
 
 1. Clone the repository
 ```bash
@@ -166,152 +100,59 @@ git clone git@github.com:Mindverse/Second-Me.git
 cd Second-Me
 ```
 
-2. Build the Docker images
-```bash
-make docker-build
-```
-
-3. Start the containers
+2. Start the containers
 ```bash
 make docker-up
 ```
 
-4. To stop the containers when you're done
+3. After starting the service (either with local setup or Docker), open your browser and visit:
 ```bash
-make docker-down
-```
-
-##### Other Useful Docker Commands
-
-- Restart all services
-```bash
-make docker-restart-all
-```
-
-- Rebuild and restart only the backend
-```bash
-make docker-restart-backend
-```
-
-- Rebuild and restart only the frontend
-```bash
-make docker-restart-frontend
-```
-
-- Please notice that if you are using Apple Silicon and you want to run docker commands directly, you need to set the `PLATFORM` environment variable to `apple`. For example:
-```bash
-PLATFORM=apple docker-compose up -d --build
-```
-
-
-</details>
-
-
-### 🖥️ Option 3: Manual Setup (Cross-Platform Guide)
-
-<details>
-<summary><b>Click to expand/collapse single or multi-OS setup details</b></summary>
-
-In this section, we explore how to deploy both the frontend and backend on a single server, as well as how to enable cross-server communication between the frontend and backend using separate servers.
-
-##### ✅ Prerequisites
-- Miniforge/Miniconda
-
-##### 📦 Install Dependencies 
-The following scripts are sourced from [`scripts/setup.sh`](https://github.com/mindverse/Second-Me/blob/master/scripts/setup.sh) and [`scripts\start_local.sh`](https://github.com/mindverse/Second-Me/blob/master/scripts/start_local.sh).
-
-🐍 Python Environment Setup with Conda and Poetry
-We recommend managing the Python environment using Miniconda, and handling dependencies with Poetry. While Conda and Poetry are independent tools, they can be used together effectively:
-
-- Conda provides flexible and isolated environment management.
-- Poetry offers strict and declarative dependency management.
-
-Below is a step-by-step example of combining them:
-```bash
-# Set up Python Environment
-conda create -n secondme python=3.12
-conda activate secondme
-
-# (Recommand) Install Poetry inside the Conda environment
-# This avoids using system-wide Poetry and keeps dependencies isolated
-pip install poetry
-
-# (Optional) Set a custom Python package index (e.g., TUNA mirror for better speed in China)
-poetry source add tuna https://pypi.tuna.tsinghua.edu.cn/simple
-poetry source set-default tuna
-
-poetry install --no-root --no-interaction
-
-# Install specific version of GraphRAG from local archive
-# ⚠️ Adjust the path separator based on your OS (e.g., \ on Windows, / on Unix)
-pip install --force-reinstall dependencies\graphrag-1.2.1.dev27.tar.gz 
-```
-
-```bash
-# Install Frontend Dependencies 
-cd lpm_frontend
-npm install
-cd ..
-
-# Build llama.cpp Dependencies 
-unzip -q dependencies/llama.cpp.zip
-cd llama.cpp
-mkdir -p build && cd build
-cmake ..
-cmake --build . --config Release
-cd ../..
-```
-
-##### Run Servers
-
-```bash
-# Initialize SQL Database
-mkdir -p "./data/sqlite"
-cat docker/sqlite/init.sql | sqlite3 ./data/sqlite/lpm.db
-
-# Initialize ChromaDB Database
-mkdir -p logs
-python docker/app/init_chroma.py
-
-# Start the Backend Server (develop mode)
-python -m flask run --host=0.0.0.0 --port=8002 >> "logs/backend.log" 2>&1
-# If deploying in a production environment, please use `nohup` and `disown` commands to keep it running persistently in the background.
-
-# Start the Frontend Server (Open Another Terminal Shell)
-cd lpm_frontend
-npm run build
-npm run start
-```
-
-> :information_source: **Note**: If the frontend and backend are deployed on separate servers, make sure to configure the `HOST_ADDRESS` in the `.env` file accordingly.
-
-</details>
-
-### Accessing the Service
-
-After starting the service (either with local setup or Docker), open your browser and visit:
-```
 http://localhost:3000
 ```
 
-### View help and more commands
+4. View help and more commands
 ```bash
 make help
 ```
 
-### Important Notes
-1. Ensure you have sufficient disk space (at least 10GB recommended)
-2. If using local setup with an existing conda environment, ensure there are no conflicting package versions
-3. First startup may take a few minutes to download and install dependencies
-4. Some commands may require sudo privileges
+5. For custom Ollama model configuration, please refer to:
+   [Custom Model Config(Ollama)](docs/Custom%20Model%20Config%28Ollama%29.md)
 
-### Troubleshooting
-If you encounter issues, check:
-1. For local setup: Python and Node.js versions meet requirements
-2. For local setup: You're in the correct conda environment
-3. All dependencies are properly installed
-4. System firewall allows the application to use required ports
-5. For Docker setup: Docker daemon is running and you have sufficient permissions
+
+### 🚀 Option 2: Integrated Setup (Non-Docker)
+
+> **Note**: Integrated Setup provides best performance, especially for larger models, as it runs directly on your host system without containerization overhead.
+
+#### Prerequisites
+- Python 3.10+ installed on your system
+- Node.js 18+ and npm installed
+- Basic build tools (cmake, make, etc.)
+
+#### Setup Steps
+
+1. Clone the repository
+```bash
+git clone git@github.com:Mindverse/Second-Me.git
+cd Second-Me
+```
+
+2. Run the integrated setup (installs all dependencies and prepares the environment)
+```bash
+make setup
+```
+
+3. Start all services
+```bash
+make restart
+```
+
+4. After services are started, open your browser and visit:
+```bash
+http://localhost:3000
+```
+
+> 💡 **Advantages**: This method offers better performance than Docker on Mac & Linux systems while still providing a simple setup process. It installs directly on your host system without containerization overhead. (Windows not tested)
+
 
 ## Tutorial and Use Cases
 🛠️ Feel free to follow [User tutorial](https://second-me.gitbook.io/a-new-ai-species-making-we-matter-again) to build your Second Me.
@@ -331,10 +172,10 @@ If you encounter issues, check:
 The following features have been completed internally and are being gradually integrated into the open-source project. For detailed experimental results and technical specifications, please refer to our [Technical Report](https://arxiv.org/abs/2503.08102).
 
 ### Model Enhancement Features
-- [ ] **Long Chain-of-Thought Training Pipeline**: Enhanced reasoning capabilities through extended thought process training
+- [✓] **Long Chain-of-Thought Training Pipeline**: Enhanced reasoning capabilities through extended thought process training
 - [ ] **Direct Preference Optimization for L2 Model**: Improved alignment with user preferences and intent
 - [ ] **Data Filtering for Training**: Advanced techniques for higher quality training data selection
-- [ ] **Apple Silicon Support**: Native support for Apple Silicon processors with MLX Training and Serving capabilities
+- [✓] **Apple Silicon Support**: Native support for Apple Silicon processors with MLX Training and Serving capabilities
 
 ### Product Features
 - [ ] **Natural Language Memory Summarization**: Intuitive memory organization in natural language format

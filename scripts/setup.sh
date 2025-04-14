@@ -1,22 +1,14 @@
 #!/bin/bash
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-MAGENTA='\033[0;35m'
-CYAN='\033[0;36m'
-GRAY='\033[0;90m'
-BOLD='\033[1m'
-NC='\033[0m' # No Color
+# Import utility scripts
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/utils/logging.sh"
+source "$SCRIPT_DIR/utils/os_detection.sh"
+source "$SCRIPT_DIR/utils/install_config.sh"
+source "$SCRIPT_DIR/utils/python_tools.sh"
 
 # Version
 VERSION="1.0.0"
-
-# Source conda utilities
-SCRIPT_DIR="$( cd "$( dirname "${0:A}" )" && pwd )"
-source "$SCRIPT_DIR/conda_utils.sh"
 
 # Total number of stages
 TOTAL_STAGES=6
@@ -30,61 +22,6 @@ trap cleanup INT
 cleanup() {
     echo -e "\n${YELLOW}Setup interrupted.${NC}"
     exit 1
-}
-
-# Log a message to the console
-log() {
-    local message="$1"
-    local level="${2:-INFO}"
-    local color="${NC}"
-    
-    case $level in
-        INFO) color="${BLUE}" ;;
-        SUCCESS) color="${GREEN}" ;;
-        WARNING) color="${YELLOW}" ;;
-        ERROR) color="${RED}" ;;
-        DEBUG) color="${GRAY}" ;;
-    esac
-    
-    echo -e "${color}[$(date '+%Y-%m-%d %H:%M:%S')] [${level}] ${message}${NC}"
-}
-
-# Get current timestamp
-get_timestamp() {
-    date "+%Y-%m-%d %H:%M:%S"
-}
-
-# Print formatted log messages
-log_info() {
-    log "$1" "INFO"
-}
-
-log_success() {
-    log "$1" "SUCCESS"
-}
-
-log_warning() {
-    log "$1" "WARNING"
-}
-
-log_error() {
-    log "$1" "ERROR"
-}
-
-log_step() {
-    echo -e "\n${GRAY}[$(get_timestamp)]${NC} ${BLUE}[STEP]${NC}    ${BOLD}$1${NC}"
-}
-
-log_debug() {
-    if [[ "${DEBUG}" == "true" ]]; then
-        log "$1" "DEBUG"
-    fi
-}
-
-log_section() {
-    echo -e "\n${CYAN}════════════════════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}  $1${NC}"
-    echo -e "${CYAN}════════════════════════════════════════════════════════════════════════════════${NC}\n"
 }
 
 # Display title and logo
@@ -121,62 +58,50 @@ display_stage() {
     echo ""
 }
 
-# Get conda environment name from .env file
-get_conda_env_name() {
-    if [[ -f ".env" ]]; then
-        local env_name=$(grep '^CONDA_DEFAULT_ENV=' .env | cut -d '=' -f2)
-        if [[ -n "$env_name" ]]; then
-            echo "$env_name"
-            return 0
-        fi
+# Setup and configure package managers (npm)
+check_npm() {
+    log_step "Checking npm installation..."
+    
+    # Check if npm is already installed
+    if ! command -v npm &>/dev/null; then
+        log_error "npm not found - please install npm manually"
+        
+        # Get system identification and show installation recommendations
+        local system_id=$(get_system_id)
+        get_npm_recommendation "$system_id"
+        
+        return 1
     fi
-    echo "second-me"  
+
+    log_success "npm check passed"
     return 0
 }
 
-# Setup and configure package managers (npm)
-setup_npm() {
-    log_step "Setting up npm package manager"
+# Check Node.js installation
+check_node() {
+    log_step "Checking Node.js installation..."
     
-    # Check if npm is already installed
-    log_info "Checking npm installation..."
-    if ! command -v npm &>/dev/null; then
-        log_warning "npm not found - installing Node.js and npm"
-        if ! brew install node; then
-            log_error "Failed to install Node.js and npm"
-            return 1
-        fi
+    local node_cmd=""
+    
+    # Check for node command
+    if command -v node &>/dev/null; then
+        node_cmd="node"
+    # Also check for nodejs command as it's used on some Linux distributions
+    elif command -v nodejs &>/dev/null; then
+        node_cmd="nodejs"
+    else
+        log_error "Node.js is not installed, please install Node.js manually"
         
-        # Verify npm was installed successfully
-        if ! command -v npm &>/dev/null; then
-            log_error "npm installation failed - command not found after installation"
-            return 1
-        fi
-        log_success "Successfully installed Node.js and npm"
-    else
-        log_success "npm is already installed"
-    fi
-    
-    # Configure npm settings
-    log_info "Configuring npm settings..."
-    
-    # Set npm registry
-    log_info "Setting npm registry to https://registry.npmjs.org/"
-    npm config set registry https://registry.npmjs.org/
-    
-    # Set npm cache directory
-    log_info "Setting npm cache directory to $HOME/.npm"
-    npm config set cache "$HOME/.npm"
-    
-    # Verify npm configuration
-    if npm config list &>/dev/null; then
-        log_success "npm is properly configured"
-    else
-        log_error "npm configuration failed"
+        # Get system identification and show installation recommendations
+        local system_id=$(get_system_id)
+        get_node_recommendation "$system_id"
+        
         return 1
     fi
     
-    log_success "npm setup completed"
+    # Check version (if needed)
+    local version=$($node_cmd --version 2>&1 | sed 's/v//')
+    log_success "Node.js check passed, using $node_cmd version $version"
     return 0
 }
 
@@ -188,181 +113,8 @@ check_command() {
     return 0
 }
 
-# Install Homebrew packages
-install_brew_packages() {
-    log_step "Checking additional Homebrew packages"
-    
-    if ! check_command brew; then
-        log_error "Homebrew is not installed."
-        log_error "Please run the setup script from the beginning."
-        return 1
-    fi
-    
-    # Required brew packages
-    local required_packages=(
-        "sqlite"    # Database
-        "make"      # Build tool
-    )
-    
-    # Check and install each package
-    for package in "${required_packages[@]}"; do
-        if ! brew list $package &>/dev/null; then
-            log_warning "Installing $package..."
-            if ! brew install $package; then
-                log_error "Failed to install $package"
-                return 1
-            fi
-            
-            # Verify installation
-            if ! brew list $package &>/dev/null; then
-                log_error "Failed to verify $package installation"
-                return 1
-            fi
-        fi
-    done
-    
-    log_success "All Homebrew packages are installed"
-    return 0
-}
-
-# Install conda using Homebrew
-install_conda() {
-    log_info "Installing Miniconda using Homebrew..."
-    
-    brew install --cask miniconda
-    local brew_result=$?
-    
-    if [ $brew_result -ne 0 ]; then
-        log_error "Failed to install Miniconda (exit code: $brew_result)"
-        return 1
-    fi
-    
-    # Get Miniconda installation path from Homebrew cask info
-    local conda_info
-    conda_info=$(brew info --cask miniconda)
-    if [ $? -ne 0 ]; then
-        log_error "Failed to get Miniconda installation info"
-        return 1
-    fi
-    
-    # Extract conda binary path from brew info output
-    local conda_binary
-    conda_binary=$(echo "$conda_info" | grep "condabin/conda" | cut -d' ' -f1)
-    if [ -z "$conda_binary" ]; then
-        log_error "Could not find conda binary path in brew info output"
-        return 1
-    fi
-    
-    # Get the base directory (two levels up from condabin)
-    local conda_root
-    conda_root=$(dirname "$(dirname "$conda_binary")")
-    if [ ! -d "$conda_root" ]; then
-        log_error "Conda base directory not found at $conda_root"
-        return 1
-    fi
-    
-    log_info "Using Homebrew Miniconda installation path: $conda_root"
-    
-    # Initialize conda for bash and zsh
-    log_info "Initializing conda for shell integration..."
-    
-    # First source conda.sh to make conda command available
-    if ! find_and_source_conda_sh "$conda_root"; then
-        log_error "Could not find conda.sh after installation at $conda_root"
-        return 1
-    fi
-    
-    # Now run conda init for both shells
-    local shells=("zsh")
-    for shell in "${shells[@]}"; do
-        log_info "Running conda init for $shell..."
-        if ! conda init "$shell"; then
-            log_warning "Failed to initialize conda for $shell shell"
-        else
-            log_success "Initialized conda for $shell shell"
-        fi
-    done
-    
-    # Verify shell configurations
-    for shell in "${shells[@]}"; do
-        local rc_file="$HOME/.${shell}rc"
-        if [ -f "$rc_file" ] && grep -q "conda initialize" "$rc_file"; then
-            log_success "Verified conda initialization in $rc_file"
-        else
-            log_warning "Could not verify conda initialization in $rc_file"
-        fi
-    done
-    
-    # Add helpful message about shell restart
-    log_info "Conda has been initialized for zsh shell"
-    log_info "To use conda in a new shell, either:"
-    log_info "1. Start a new shell session, or"
-    log_info "2. Run: source ~/.zshrc"
-    
-    log_success "Conda installed and initialized successfully"
-    return 0
-}
-
-# Activate Python environment
-activate_python_env() {
-    log_section "PYTHON ENVIRONMENT ACTIVATION"
-    
-    # If custom conda mode is enabled, skip to dependency installation
-    if is_custom_conda_mode; then
-        log_info "Using custom conda environment"
-        goto_dependency_installation
-        return $?
-    fi
-    
-    # 1. Check conda installation
-    log_step "Checking conda installation"
-    if ! try_source_conda_sh_all; then
-        log_error "Conda not found. It should have been installed during pre-installation checks."
-        return 1
-    fi
-    
-    # 2. Get environment name
-    local env_name
-    if ! env_name=$(get_conda_env_name); then
-        log_error "Could not get conda environment name"
-        return 1
-    fi
-    
-    # 3. Create or update environment
-    log_step "Activating conda environment: $env_name"
-    
-    if conda env list | grep -q "^${env_name} "; then
-        log_info "Environment exists, updating..."
-        if ! conda env update -f environment.yml -n "$env_name"; then
-            log_error "Failed to update conda environment $env_name"
-            return 1
-        fi
-    else
-        log_info "Creating new environment... $env_name"
-        if ! conda env create -f environment.yml -n "$env_name"; then
-            log_error "Failed to create conda environment $env_name"
-            return 1
-        fi
-    fi
-    
-    # attempt to activate conda environment
-    log_info "Attempting to activate conda environment: $env_name"
-    if ! conda activate "$env_name" 2>/dev/null; then
-        log_info "conda activate failed, trying alternative method..."
-        # if conda activate fails, try using source activate
-        if command -v activate &>/dev/null && ! source activate "$env_name"; then
-            log_error "Failed to activate conda environment using both methods"
-            return 1
-        fi
-    fi
-    
-    log_success "Successfully activated conda environment: $env_name"
-    goto_dependency_installation
-    return $?
-}
-
 # Helper function to install dependencies
-goto_dependency_installation() {
+install_python_dependency() {
     # Install Python packages using Poetry
     log_step "Installing Python packages using Poetry"
     
@@ -386,29 +138,77 @@ goto_dependency_installation() {
         return 1
     fi
     
-    # Verify key packages are installed
-    log_info "Verifying key packages..."
+    # Verify key packages are installed using Poetry's own environment
+    log_info "Verifying key packages using Poetry environment..."
     local required_packages=("flask" "chromadb" "langchain")
     for pkg in "${required_packages[@]}"; do
-        if ! python -c "import $pkg" 2>/dev/null; then
-            log_error "Package '$pkg' is not installed correctly"
+        if ! poetry run python -c "import $pkg" 2>/dev/null; then
+            log_error "Package '$pkg' is not installed correctly in Poetry environment"
             return 1
         else
-            log_info "Package '$pkg' is installed correctly"
+            log_info "Package '$pkg' is installed correctly in Poetry environment"
         fi
     done
+    
+    # Get and save the Poetry environment path
+    local poetry_env_path=$(poetry env info -p 2>/dev/null)
+    if [ -n "$poetry_env_path" ]; then
+        log_info "Poetry virtual environment is located at: $poetry_env_path"
+        # Create an activation script for convenience
+        create_poetry_activate_script "$poetry_env_path"
+    fi
 
-    # Check and ensure correct version of graphrag is installed
-    log_step "Checking graphrag version"
-    GRAPHRAG_VERSION=$(pip show graphrag 2>/dev/null | grep "Version:" | cut -d " " -f2)
+    log_success "Python environment setup completed"
+    log_info "------------------------------------------------------------------------------"
+    log_info "To use this Python environment, you can:"
+    log_info "1. Run 'poetry shell' to open a new shell with the virtual environment activated"
+    log_info "2. Run 'source .poetry-venv/activate' to activate the environment in your current shell"
+    log_info "3. Use 'poetry run python script.py' to run a single command without activating the environment"
+    log_info "------------------------------------------------------------------------------"
+    return 0
+}
+
+# Create a convenient activation script for the Poetry environment
+create_poetry_activate_script() {
+    local env_path="$1"
+    local activate_dir=".poetry-venv"
+    local activate_script="$activate_dir/activate"
+    
+    # Create directory if it doesn't exist
+    mkdir -p "$activate_dir"
+    
+    # Create activation script
+    cat > "$activate_script" << EOF
+#!/bin/bash
+# Activation script for Poetry virtual environment
+
+# Source the actual virtual environment activate script
+source "$env_path/bin/activate"
+
+# Print confirmation message
+echo "Poetry virtual environment activated: $env_path"
+echo "Use 'deactivate' command to exit this environment"
+EOF
+    
+    # Make script executable
+    chmod +x "$activate_script"
+    log_info "Created Poetry environment activation script at: $activate_script"
+}
+
+install_graphrag() {
+    log_step "Installing graphrag"
+    
+    # Check the current graphrag version in Poetry environment
+    log_step "Checking graphrag version in Poetry environment"
+    GRAPHRAG_VERSION=$(poetry run pip show graphrag 2>/dev/null | grep "Version:" | cut -d " " -f2)
     GRAPHRAG_TARGET="1.2.1.dev27"
     GRAPHRAG_LOCAL_PATH="dependencies/graphrag-${GRAPHRAG_TARGET}.tar.gz"
 
     if [ "$GRAPHRAG_VERSION" != "$GRAPHRAG_TARGET" ]; then
-        log_info "Installing correct version of graphrag..."
+        log_info "Installing correct version of graphrag in Poetry environment..."
         if [ -f "$GRAPHRAG_LOCAL_PATH" ]; then
-            log_info "Installing graphrag from local file..."
-            if ! pip install --force-reinstall "$GRAPHRAG_LOCAL_PATH"; then
+            log_info "Installing graphrag from local file using Poetry..."
+            if ! poetry run pip install --force-reinstall "$GRAPHRAG_LOCAL_PATH"; then
                 log_error "Failed to install graphrag from local file"
                 return 1
             fi
@@ -421,8 +221,7 @@ goto_dependency_installation() {
     else
         log_success "Graphrag version is correct, skipping installation"
     fi
-
-    log_success "Python environment setup completed"
+    
     return 0
 }
 
@@ -565,64 +364,6 @@ build_frontend() {
     log_section "FRONTEND SETUP COMPLETE"
 }
 
-# Initialize Conda environment if necessary
-init_conda_env_if_necessary() {
-    log_section "SETTING UP SHELL INTEGRATION"
-    
-    local config_file="$HOME/.zshrc"
-    log_info "Will update shell configuration in: $config_file"
-    
-    # Add Conda
-    if command -v conda &>/dev/null; then
-        log_info "Checking Conda initialization status"
-        # Check if already initialized
-        if ! grep -q "conda initialize" "$config_file" 2>/dev/null; then
-            log_info "Conda not initialized, running conda init"
-            conda init zsh
-            log_success "Added Conda initialization to shell configuration"
-            
-            # Source the updated config
-            log_info "Applying new shell configuration..."
-            source "$config_file"
-            log_success "Shell configuration applied"
-        else
-            log_info "Conda already initialized"
-        fi
-    fi
-    
-    log_success "Conda environment initialized"
-    return 0
-}
-
-# Ensure shell config file exists and is properly backed up
-ensure_shell_config() {
-    local config_file="$1"
-    
-    if [[ ! -f "$config_file" ]]; then
-        log_info "Shell configuration file does not exist, creating it: $config_file"
-        touch "$config_file"
-        echo "# Shell configuration file created by Second-Me setup script on $(date)" > "$config_file"
-        
-        # Add basic configuration
-        echo "# Set basic environment variables" >> "$config_file"
-        echo 'export PATH="$HOME/bin:$HOME/.local/bin:$PATH"' >> "$config_file"
-        
-        log_success "Created new shell configuration file: $config_file"
-    else
-        # Backup config file
-        cp "$config_file" "${config_file}.bak.$(date +%Y%m%d%H%M%S)"
-        log_info "Created backup of $config_file"
-    fi
-    
-    # Verify file is writable
-    if [[ ! -w "$config_file" ]]; then
-        log_error "Shell configuration file is not writable: $config_file"
-        return 1
-    fi
-    
-    return 0
-}
-
 # Show help information
 show_help() {
     echo -e "${BOLD}Second-Me Setup Script v${VERSION}${NC}"
@@ -649,89 +390,25 @@ show_help() {
 
 # Check system requirements
 check_system_requirements() {
-    log_section "CHECKING SYSTEM REQUIREMENTS"
+    log_step "Checking system requirements"
     
-    # Detect current shell
-    local current_shell=$(basename "$SHELL")
-    log_info "Detected shell: $current_shell"
+    # Detect system type
+    local system_type=$(uname -s)
+    log_info "Detected system type: $system_type"
     
-    # Only support zsh
-    if [[ "$current_shell" != "zsh" ]]; then
-        log_error "Only zsh shell is supported"
-        return 1
-    fi
-
-    # Check if running on macOS
-    if [[ "$(uname)" != "Darwin" ]]; then
-        log_error "This script only supports macOS"
-        return 1
-    fi
-    
-    local macos_version=$(sw_vers -productVersion)
-    log_info "Detected macOS version: $macos_version"
-    
-    local major_version=$(echo "$macos_version" | cut -d. -f1)
-    if [[ "$major_version" -lt 14 ]]; then
-        log_error "This script requires macOS 14 (Sonoma) or later. Your version: $macos_version"
-        return 1
-    fi
-
-    # Check shell config file
-    local config_file="$HOME/.zshrc"
-    if ! ensure_shell_config "$config_file"; then
-        log_error "Failed to setup shell configuration file"
-        return 1
-    fi
-    
-    # Rest of the system checks...
-    
-    # Detect system architecture
-    local system_arch=$(uname -m)
-    log_info "Detected system architecture: $system_arch"
-    
-    # Check installed Homebrew architecture
-    if command -v brew &>/dev/null; then
-        local brew_path=$(command -v brew)
-        local brew_dir=$(dirname "$(dirname "$brew_path")")
+    # Only check macOS version if on Mac
+    if [[ "$system_type" == "Darwin" ]]; then
+        local macos_version=$(sw_vers -productVersion)
+        log_info "Detected macOS version: $macos_version"
         
-        if [[ "$system_arch" == "arm64" && "$brew_dir" != "/opt/homebrew" ]]; then
-            log_warning "Detected M1/M2 chip (arm64), but Homebrew installed in $brew_dir instead of /opt/homebrew"
-            log_warning "This may indicate Homebrew was installed for Intel chips, which may cause performance issues"
-            log_warning "It is recommended to uninstall current Homebrew and reinstall the arm64 version"
-            # Do not force exit, just warn
-        elif [[ "$system_arch" != "arm64" && "$brew_dir" == "/opt/homebrew" ]]; then
-            log_warning "Detected Intel chip, but Homebrew installed in /opt/homebrew instead of /usr/local"
-            log_warning "This may indicate Homebrew was installed for M1/M2 chips, which may cause compatibility issues"
-            # Do not force exit, just warn
-        else
-            log_success "Homebrew architecture matches system architecture"
+        local major_version=$(echo "$macos_version" | cut -d. -f1)
+        if [[ "$major_version" -lt 14 ]]; then
+            log_error "This script requires macOS 14 (Sonoma) or later. Your version: $macos_version"
+            return 1
         fi
     fi
-    
-    # Check installed Conda architecture
-    if command -v conda &>/dev/null; then
-        local conda_info=$(conda info --json 2>/dev/null)
-        if [[ $? -eq 0 ]]; then
-            local conda_platform=$(echo "$conda_info" | grep -o '"platform": "[^"]*"' | cut -d'"' -f4)
-            
-            if [[ "$system_arch" == "arm64" && "$conda_platform" != *"arm64"* && "$conda_platform" != *"aarch64"* ]]; then
-                log_error "Detected M1/M2 chip (arm64), but Conda seems to be installed for Intel chips (platform: $conda_platform)"
-                log_error "This will cause performance issues or compatibility problems"
-                log_error "Please uninstall current Conda and install Miniforge (a Conda distribution optimized for Apple Silicon)"
-                return 1
-            elif [[ "$system_arch" != "arm64" && ("$conda_platform" == *"arm64"* || "$conda_platform" == *"aarch64"*) ]]; then
-                log_error "Detected Intel chip, but Conda seems to be installed for M1/M2 chips (platform: $conda_platform)"
-                log_error "This will cause compatibility issues"
-                log_error "Please uninstall current Conda and install the correct version for your architecture"
-                return 1
-            else
-                log_success "Conda architecture matches system architecture"
-            fi
-        else
-            log_warning "Failed to retrieve Conda information, skipping Conda architecture check"
-        fi
-    fi
-    
+
+    log_success "System requirements check passed"
     return 0
 }
 
@@ -742,12 +419,6 @@ check_config_files() {
     # Check for .env file
     if [[ ! -f ".env" ]]; then
         log_error "Missing .env file"
-        return 1
-    fi
-    
-    # Check for environment.yml
-    if [[ ! -f "environment.yml" ]]; then
-        log_error "Missing environment.yml file"
         return 1
     fi
     
@@ -778,22 +449,12 @@ check_directory_permissions() {
 
 # Check for potential conflicts
 check_potential_conflicts() {
-    log_step "Checking for potential conflicts"
+    log_info "Checking for potential conflicts"
 
     # System requirements check
     if ! check_system_requirements; then
         log_error "System requirements check failed"
         exit 1
-    fi
-    
-    # Check custom conda configuration if enabled
-    if is_custom_conda_mode; then
-        log_info "Custom conda mode is enabled, verifying environment..."
-        if ! verify_conda_env; then
-            log_error "Custom conda environment verification failed"
-            exit 1
-        fi
-        log_success "Custom conda environment verification passed"
     fi
     
     # Configuration files check
@@ -807,83 +468,116 @@ check_potential_conflicts() {
         log_error "Directory permissions check failed"
         exit 1
     fi
-    
-    # Check Homebrew installation
-    if command -v brew &>/dev/null; then
-        log_info "Homebrew is installed"
-    else
-        log_warning "Homebrew is not installed, attempting to install it automatically..."
-        
-        # Only use local copy of the Homebrew install script
-        local homebrew_script="${SCRIPT_DIR}/../dependencies/homebrew_install.sh"
-        local brew_installed=false
-        
-        if [[ -f "$homebrew_script" ]]; then
-            log_info "Using local Homebrew install script"
-            if /bin/bash "$homebrew_script"; then
-                
-                # Add Homebrew to PATH for the current session
-                if ! add_homebrew_to_path; then
-                    log_error "Homebrew installed but couldn't be added to PATH"
-                    return 1
-                fi
-                
-                # Verify Homebrew is actually installed and working
-                if command -v brew &>/dev/null; then
-                    log_success "Homebrew installed successfully"
-                else
-                    log_error "Homebrew installation failed: brew command not found in PATH"
-                    return 1
-                fi
-            fi
-        else
-            log_error "Local Homebrew install script not found at: $homebrew_script"
-            log_error "Please ensure the Homebrew install script exists in the dependencies folder."
-            return 1
-        fi
+
+    if ! check_python; then
+        log_error "python check failed, please install python first"
+        exit 1
     fi
     
-    # Check Conda installation
-    if command -v conda &>/dev/null; then
-        log_info "Conda is installed"
-    else
-        log_warning "Conda is not installed, attempting to install it automatically..."
-        # Check if Homebrew is available now
-        if command -v brew &>/dev/null; then
-            if ! install_conda; then
-                log_error "Failed to install Conda automatically"
-                return 1
-            fi
-        else
-            log_error "Cannot install Conda: Homebrew is required but not available"
-            return 1
-        fi
+    if ! check_node; then
+        log_error "Node.js check failed"
+        exit 1
+    fi
+    
+    if ! check_npm; then
+        log_error "npm check failed"
+        exit 1
+    fi
+    
+    if ! check_cmake; then
+        log_error "cmake check and installation failed"
+        exit 1
+    fi
+
+    if ! check_poetry; then
+        log_error "poetry check failed, please install poetry first"
+        exit 1
     fi
     
     return 0
 }
 
+check_python() {
+    log_step "Checking for python installation"
+    
+    # Get the appropriate Python command
+    local python_cmd=$(get_python_command)
+    
+    if [ -z "$python_cmd" ]; then
+        log_error "python is not installed, please install python manually"
+        
+        # Get system identification and show installation recommendations
+        local system_id=$(get_system_id)
+        get_python_recommendation "$system_id"
+        
+        return 1
+    fi
+    
+    # version > 3.12
+    local version=$($python_cmd --version 2>&1 | cut -d ' ' -f 2)
+    if [[ "$version" < "3.12" ]]; then
+        log_error "python version $version is not supported, please install python 3.12 or higher"
+        return 1
+    fi
+    
+    log_success "python check passed, using $python_cmd version $version"
+    return 0
+}
+
+check_poetry() {
+    log_step "Checking for poetry installation"
+    
+    if ! command -v poetry &>/dev/null; then
+        log_error "poetry is not installed, please install poetry manually"
+        
+        # Get system identification and show installation recommendations
+        local system_id=$(get_system_id)
+        get_poetry_recommendation "$system_id"
+        
+        return 1
+    fi
+    
+    log_success "poetry check passed"
+    return 0
+}
+
 # Check and install cmake if not present
-check_and_install_cmake() {
+check_cmake() {
     log_step "Checking for cmake installation"
     
     if ! command -v cmake &>/dev/null; then
-        log_warning "cmake is not installed, attempting to install it automatically..."
-        if command -v brew &>/dev/null; then
-            log_info "Installing cmake using Homebrew..."
-            if ! brew install cmake; then
-                log_error "Failed to install cmake using Homebrew"
-                return 1
-            fi
-            log_success "cmake installed successfully"
-        else
-            log_error "Cannot install cmake: Homebrew is required but not available"
-            return 1
-        fi
-    else
-        log_info "cmake is installed"
+        log_warning "cmake is not installed, please install cmake manually"
+        
+        # Get system identification and show installation recommendations
+        local system_id=$(get_system_id)
+        get_cmake_recommendation "$system_id"
+        
+        return 1
     fi
     
+    log_success "cmake check passed"
+    return 0
+}
+
+# Check if SQLite is installed and available
+check_sqlite() {
+    log_step "Checking SQLite"
+    
+    if ! check_command "sqlite3"; then
+        log_warning "SQLite3 is not installed or not in your PATH"
+        
+        log_error "Please install SQLite before continuing, database operations require this dependency"
+
+        # Get system identification and show installation recommendations
+        local system_id=$(get_system_id)
+        get_sqlite_recommendation "$system_id"
+        
+        return 1
+    fi
+    
+    # SQLite is installed
+    local version=$(sqlite3 --version | awk '{print $1}')
+    log_success "SQLite check passed, version $version"
     return 0
 }
 
@@ -910,41 +604,6 @@ parse_args() {
     done
 }
 
-# Add Homebrew to PATH for the current session
-add_homebrew_to_path() {
-    log_info "Adding Homebrew to PATH..."
-    
-    local brew_path="/opt/homebrew/bin"
-    local config_file="$HOME/.zshrc"
-    
-    if [[ -f "$brew_path/brew" ]]; then
-        log_info "Found Homebrew installation at: $brew_path"
-        
-        # Set up Homebrew environment for current session
-        eval "$(/opt/homebrew/bin/brew shellenv)"
-        
-        # Add Homebrew initialization to .zshrc if not already present
-        if ! grep -q "HOMEBREW_PREFIX" "$config_file" 2>/dev/null; then
-            log_info "Adding Homebrew initialization to $config_file"
-            echo "" >> "$config_file"
-            echo "# Set up Homebrew environment" >> "$config_file"
-            echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> "$config_file"
-            
-            # Source the updated config
-            log_info "Applying new shell configuration..."
-            source "$config_file"
-            log_success "Shell configuration applied"
-        else
-            log_info "Homebrew initialization already present in shell configuration"
-        fi
-        
-        log_success "Homebrew added to PATH successfully"
-        return 0
-    fi
-    
-    log_error "Could not find Homebrew installation at $brew_path"
-    return 1
-}
 
 # Main function
 main() {
@@ -958,32 +617,30 @@ main() {
     log_section "Running pre-installation checks"
     
     # 1. Basic tools check (most fundamental)
-    # install homebrew, conda if necessary
     if ! check_potential_conflicts; then
         log_error "Basic tools check failed"
+        exit 1
+    fi
+    
+    # Check SQLite installation
+    if ! check_sqlite; then
+        log_error "SQLite check failed"
         exit 1
     fi
     
     # Start installation process
     log_section "Starting installation"
     
-    # 1. Setup Conda environment
-    if ! activate_python_env; then
+    if ! install_python_dependency; then
+        log_error "Failed to install python dependencies"
         exit 1
     fi
-    
-    # 2. Setup npm
-    if ! setup_npm; then
-        log_error "npm setup failed"
+
+    if ! install_graphrag; then
+        log_error "Failed to install graphrag"
         exit 1
     fi
-    
-    # 2. Check and install cmake
-    if ! check_and_install_cmake; then
-        log_error "cmake check and installation failed"
-        exit 1
-    fi
-    
+
     # 3. Build llama.cpp
     if ! build_llama; then
         exit 1
@@ -992,19 +649,6 @@ main() {
     # 4. Build frontend
     if ! build_frontend; then
         exit 1
-    fi
-    
-    # # 5. Initialize Conda environment
-    # if ! init_conda_env_if_necessary; then
-    #     exit 1
-    # fi
-
-    # Source the shell configuration to ensure all changes take effect
-    local config_file="$HOME/.zshrc"
-    if [[ -f "$config_file" ]]; then
-        log_info "Applying final shell configuration..."
-        source "$config_file"
-        log_success "Shell configuration applied"
     fi
 
     log_success "Installation complete!"

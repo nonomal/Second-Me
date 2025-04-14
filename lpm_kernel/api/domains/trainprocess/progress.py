@@ -9,6 +9,7 @@ class Status(Enum):
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     FAILED = "failed"
+    SUSPENDED = "suspended"
 
 
 class TrainProgress:
@@ -188,11 +189,11 @@ class TrainProgress:
                 if stage_info["status"] != "completed":
                     next_stage = stage_name
                     break
-            self.data["current_stage"] = next_stage
-        elif any(s["status"] == "failed" for s in stage_data["steps"]):
-            stage_data["status"] = "failed"
-            stage_data["current_step"] = step_data["name"]
-            self.data["current_stage"] = stage_data["name"]
+            self.current_stage = next_stage
+        elif any(s.status == Status.FAILED for s in stage_obj.steps.values()):
+            stage_obj.status = Status.FAILED
+        elif any(s.status == Status.SUSPENDED for s in stage_obj.steps.values()):
+            stage_obj.status = Status.SUSPENDED
         else:
             stage_data["status"] = "in_progress"
             stage_data["current_step"] = step_data["name"]
@@ -203,14 +204,16 @@ class TrainProgress:
         self.data["overall_progress"] = completed_progress / len(self.data["stages"])
         
         # Update overall status
-        if all(s["status"] == "completed" for s in self.data["stages"]):
-            self.data["status"] = "completed"
-        elif any(s["status"] == "failed" for s in self.data["stages"]):
-            self.data["status"] = "failed"
-        elif any(s["status"] == "in_progress" for s in self.data["stages"]):
-            self.data["status"] = "in_progress"
+        if all(s.status == Status.COMPLETED for s in self.stages.values()):
+            self.status = Status.COMPLETED
+        elif any(s.status == Status.FAILED for s in self.stages.values()):
+            self.status = Status.FAILED
+        elif any(s.status == Status.SUSPENDED for s in self.stages.values()):
+            self.status = Status.SUSPENDED
+        elif any(s.status == Status.IN_PROGRESS for s in self.stages.values()):
+            self.status = Status.IN_PROGRESS
         else:
-            self.data["status"] = "pending"
+            self.status = Status.PENDING
 
     def to_dict(self) -> dict:
         """Convert progress status to dictionary format"""

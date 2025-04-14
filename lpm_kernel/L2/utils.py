@@ -277,7 +277,7 @@ def create_chat_data(data_args, tokenizer):
         sample['assistant'] = sample['assistant'].strip('\n')
         
         messages = [
-            {"role": "system", "content": MEMORY_COT_PROMPT if is_cot else MEMORY_PROMPT.format(user_name=user_name)},
+            {"role": "system", "content": MEMORY_COT_PROMPT.format(user_name=user_name) if is_cot else MEMORY_PROMPT.format(user_name=user_name)},
             {"role": "user", "content": sample['user']},
             {"role": "assistant", "content": sample['assistant']},
         ]

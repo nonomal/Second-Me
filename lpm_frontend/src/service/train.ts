@@ -18,8 +18,8 @@ interface StartTrainResponse {
   progress_id: string;
 }
 
-export type StepStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
-export type StageStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
+export type StepStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'suspended';
+export type StageStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'suspended';
 
 interface TrainStep {
   completed: boolean;
@@ -35,12 +35,31 @@ interface TrainStage {
   current_step: string | null;
 }
 
+<<<<<<< HEAD
 export type StageName =
   | 'downloading_the_base_model'
   | 'activating_the_memory_matrix'
   | 'synthesize_your_life_narrative'
   | 'prepare_training_data_for_deep_comprehension'
   | 'training_to_create_second_me';
+=======
+export type SynthesisMode = 'low' | 'medium' | 'high';
+
+export interface TrainingParams {
+  number_of_epochs?: number;
+  learning_rate?: number;
+  concurrency_threads?: number;
+  data_synthesis_mode?: SynthesisMode;
+}
+
+export enum StageName {
+  Stage1 = 'downloading_the_base_model',
+  Stage2 = 'activating_the_memory_matrix',
+  Stage3 = 'synthesize_your_life_narrative',
+  Stage4 = 'prepare_training_data_for_deep_comprehension',
+  Stage5 = 'training_to_create_second_me'
+}
+>>>>>>> origin/master
 
 export type StageDisplayName =
   | 'Downloading the Base Model'
@@ -56,7 +75,7 @@ export interface TrainProgress {
   status: StageStatus;
 }
 
-export interface TrainingConfig {
+export interface TrainingConfig extends TrainingParams {
   model_name: string;
 }
 
@@ -116,5 +135,12 @@ export const getModelName = () => {
   return Request<CommonResponse<TrainingConfig>>({
     method: 'get',
     url: `/api/trainprocess/model_name`
+  });
+};
+
+export const getTrainingParams = () => {
+  return Request<CommonResponse<TrainingParams>>({
+    method: 'get',
+    url: `/api/trainprocess/training_params`
   });
 };
