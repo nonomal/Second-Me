@@ -35,31 +35,12 @@ interface TrainStage {
   current_step: string | null;
 }
 
-<<<<<<< HEAD
 export type StageName =
   | 'downloading_the_base_model'
   | 'activating_the_memory_matrix'
   | 'synthesize_your_life_narrative'
   | 'prepare_training_data_for_deep_comprehension'
   | 'training_to_create_second_me';
-=======
-export type SynthesisMode = 'low' | 'medium' | 'high';
-
-export interface TrainingParams {
-  number_of_epochs?: number;
-  learning_rate?: number;
-  concurrency_threads?: number;
-  data_synthesis_mode?: SynthesisMode;
-}
-
-export enum StageName {
-  Stage1 = 'downloading_the_base_model',
-  Stage2 = 'activating_the_memory_matrix',
-  Stage3 = 'synthesize_your_life_narrative',
-  Stage4 = 'prepare_training_data_for_deep_comprehension',
-  Stage5 = 'training_to_create_second_me'
-}
->>>>>>> origin/master
 
 export type StageDisplayName =
   | 'Downloading the Base Model'
