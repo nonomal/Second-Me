@@ -4,9 +4,11 @@
 ifeq ($(OS),Windows_NT)
     # Set Windows variables
     WINDOWS := 1
+    # Set UTF-8 code page for Windows to display Unicode characters
+    SET_UTF8 := $(shell chcp 65001 >nul 2>&1 || echo)
     # No need to check for Apple Silicon on Windows
     APPLE_SILICON := 0
-    # Define color codes for Windows (empty for compatibility)
+    # Define empty color codes for Windows to avoid display issues
     COLOR_CYAN := 
     COLOR_RESET := 
     COLOR_BOLD := 
