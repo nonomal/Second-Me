@@ -332,7 +332,7 @@ The following features have been completed internally and are being gradually in
 
 ### Model Enhancement Features
 - [ ] **Long Chain-of-Thought Training Pipeline**: Enhanced reasoning capabilities through extended thought process training
-- [ ] **Direct Preference Optimization for L2 Model**: Improved alignment with user preferences and intent
+- [✓] **Direct Preference Optimization for L2 Model**: Improved alignment with user preferences and intent
 - [ ] **Data Filtering for Training**: Advanced techniques for higher quality training data selection
 - [ ] **Apple Silicon Support**: Native support for Apple Silicon processors with MLX Training and Serving capabilities
 

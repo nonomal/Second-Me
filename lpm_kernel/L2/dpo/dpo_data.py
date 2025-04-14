@@ -75,7 +75,7 @@ class DPOData:
     def create_chat_data(self,data):
         def preprocess(sample, is_cot=False):
             if sample.get('assistant') is None and sample.get('enhanced_request') is not None:
-                user_message = f"{USER_NAME}的诉求是：" + sample['user_request']
+                user_message = f"{USER_NAME}'s request is " + sample['user_request']
                 infer_prompt = CONTEXT_COT_PROMPT.format(user_name=USER_NAME) if is_cot else CONTEXT_PROMPT.format(user_name=USER_NAME)
                 messages = [
                     {"role": "system", "content": infer_prompt},
@@ -84,7 +84,7 @@ class DPOData:
                 ]
                 return [{"messages": messages,"user":user_message,"label":sample['enhanced_request'].strip('\n'),"eval_prompt":CONTEXT_ENHANCE_EVAL_SYS,"infer_prompt":infer_prompt}]
             if sample.get('assistant') is None and sample.get('user_feedback') is not None:
-                user_message = f"{USER_NAME}的诉求是：" + sample['user_request'] + "\n" + "专家的回复是：" + sample['expert_response']
+                user_message = f"{USER_NAME}'s request is " + sample['user_request'] + "\n" + "The response of expert is " + sample['expert_response']
                 infer_prompt = JUDGE_COT_PROMPT.format(user_name=USER_NAME) if is_cot else JUDGE_PROMPT.format(user_name=USER_NAME)
                 messages = [
                     {"role": "system", "content": infer_prompt},
@@ -159,10 +159,10 @@ class DPOData:
         for instance  in tqdm(processed_data, desc=f"Generating traces"):
                 
                 message = instance.get("messages",[])
-                # 调用 generate_responses 生成轨迹
+                # generate trace for each message
                 traces = self.generate_traces(message,3)
                 
-                # 将轨迹附加到实例中
+                # attach traces to each instance
                 instance_with_traces = {
                     "user": instance["user"],
                     "label": instance["label"],
@@ -208,13 +208,13 @@ class DPOData:
         """
         all_eval_messages = []
         
-        # 为每个实例生成两两比较的消息
+        # compare traces
         for ins in instances:
             traces = ins["traces"]
             if len(traces) < 3:
                 raise ValueError("Each instance must have exactly 3 traces.")
             
-            # 生成两两比较的消息
+            # build messages
             eval_messages = [
                 [{
                     "role": "system",
@@ -255,11 +255,11 @@ class DPOData:
             ]
             all_eval_messages.extend(eval_messages)
 
-        # 发送请求并获取两两比较的评估结果
+        # access eval rs
         trying_limit = len(all_eval_messages)
         eval_results = self.multi_process_request(all_eval_messages[:trying_limit], 10, self.process_request_structered, Rate)
 
-        # 将两两比较的结果分组（每3个结果对应一个实例）
+        # group results
         for ins_idx, ins in enumerate(instances):
             start_idx = ins_idx * 3
             end_idx = start_idx + 3
@@ -267,7 +267,7 @@ class DPOData:
             
             print(instance_eval_results)
 
-            # 调用 compare_traces 函数，确定 chosen_response 和 rejected_response
+            # get rejected responses and chosen responses
             tmp_comparisons = []
             for result in instance_eval_results:
                 if type(result) == Rate:
@@ -280,12 +280,12 @@ class DPOData:
                 eval_results=tmp_comparisons
             )
 
-            # 将结果附加到实例中
+            # attach results to each instance
             ins["chosen_response"] = chosen_response
             ins["rejected_response"] = rejected_response
             ins["detailed_analysis"] = detailed_analysis
 
-        # 统计并打印结果
+        # print the results
         print(f"choose_response: {chosen_response}")
         print(f"rejected_response: {rejected_response}")
 
@@ -299,17 +299,17 @@ class DPOData:
         :param eval_results: The results of pairwise comparisons, formatted as [{"comparison": "first win"/"tie"/"second win", "detailed_analysis": "..."}, ...].
         :return: chosen_response, rejected_response, detailed_analysis
         """
-        # 初始化胜负统计
+        # initialization
         win_loss = defaultdict(lambda: {"wins": 0, "losses": 0, "ties": 0})
         
-        # 两两比较结果
+        # comparison res
         comparisons = [
             (0, 1, eval_results[0]),  # trace1 vs trace2
             (0, 2, eval_results[1]),  # trace1 vs trace3
             (1, 2, eval_results[2]),  # trace2 vs trace3
         ]
         
-        # 统计胜负
+        # calculate wins, losses, and ties
         for i, j, result in comparisons:
             if result == "first win":
                 win_loss[traces[i]]["wins"] += 1
@@ -323,19 +323,19 @@ class DPOData:
             else:
                 raise ValueError(f"Invalid comparison result: {result}")
         
-        # 计算每个轨迹的胜率
+        # calculate win rate for each trace
         def calculate_win_rate(trace):
             total = win_loss[trace]["wins"] + win_loss[trace]["losses"] + win_loss[trace]["ties"]
             if total == 0:
                 return 0
             return win_loss[trace]["wins"] / total
         
-        # 确定 chosen_response 和 rejected_response
+        # select chosen_response and rejected_response
         sorted_traces = sorted(traces, key=lambda x: calculate_win_rate(x), reverse=True)
         chosen_response = sorted_traces[0]
         rejected_response = sorted_traces[-1]
         
-        # 生成详细分析
+        # get detailed analysis
         detailed_analysis = f"Chosen Response: {chosen_response} (Win Rate: {calculate_win_rate(chosen_response):.2f})\n"
         detailed_analysis += f"Rejected Response: {rejected_response} (Win Rate: {calculate_win_rate(rejected_response):.2f})\n"
         detailed_analysis += "Comparison Details:\n"
@@ -364,14 +364,13 @@ class DPOData:
     
     def multi_process_request(self,all_messages, max_workers, func, structure=None):
         with concurrent.futures.ThreadPoolExecutor(max_workers=min(max_workers, len(all_messages))) as executor:
-            # 使用 (index, future) 结构来跟踪每个任务的索引
             futures = [(i, executor.submit(func, messages, structure)) if structure is not None else (i, executor.submit(func, messages)) for i, messages in enumerate(all_messages)]
-            results = [None] * len(all_messages)  # 初始化一个与 all_messages 等长的结果列表
+            results = [None] * len(all_messages) 
 
             for i, future in tqdm(futures):
                 try:
                     result = future.result()
-                    results[i] = result  # 按照原始索引存储结果
+                    results[i] = result
                 except Exception as e:
                     results[i] = f"Raise ERROR: {e} WHEN GENERATE RESPONSE"
 

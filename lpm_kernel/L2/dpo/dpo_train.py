@@ -10,11 +10,11 @@ from datetime import datetime, timedelta
 # from clearml import Task
 
 def get_east_eight_time_formatted():
-    # 获取当前的UTC时间
+    # Get the current UTC time
     utc_now = datetime.utcnow()
-    # 将UTC时间加8小时，转换为东八区时间
+    # Convert UTC time to East Eight Time by adding 8 hours
     east_eight_time = utc_now + timedelta(hours=8)
-    # 格式化时间为 mmdd-hhmm 的形式
+    # Format the time as mmdd-hhmm
     formatted_time = east_eight_time.strftime("%m%d-%H%M")
     return formatted_time
 
