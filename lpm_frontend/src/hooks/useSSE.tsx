@@ -37,9 +37,11 @@ export const useSSE = () => {
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [streamContent, setStreamContent] = useState('');
+  const [streamRawContent, setStreamRawContent] = useState('');
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const streamContentRef = useRef('');
+  const streamRawContentRef = useRef('');
 
   const stopSSE = () => {
     if (abortControllerRef.current) {
@@ -53,7 +55,9 @@ export const useSSE = () => {
     setStreaming(true);
     setError(null);
     setStreamContent('');
+    setStreamRawContent('');
     streamContentRef.current = ''; // Clear this as well
+    streamRawContentRef.current = ''; // Clear this as well
 
     // Use AbortController to cancel the request
     const controller = new AbortController();
@@ -106,6 +110,9 @@ export const useSSE = () => {
           const lines = chunk.split('\n');
 
           for (const line of lines) {
+            streamRawContentRef.current += line + '\n';
+            setStreamRawContent(streamRawContentRef.current);
+
             if (!line.startsWith('data: ')) continue;
 
             if (line === 'data: [DONE]') break;
@@ -144,6 +151,7 @@ export const useSSE = () => {
     sendStreamMessage,
     streaming,
     error,
-    streamContent
+    streamContent,
+    streamRawContent
   };
 };

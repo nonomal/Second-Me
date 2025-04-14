@@ -29,7 +29,6 @@ const APIMode = () => {
             type={activeTab === '2' ? 'primary' : 'default'}
           >
             <span>Bridge Mode API</span>
-            <span className="ml-2 text-xs text-blue-500">(Coming Soon)</span>
           </Button>
         </Space>
       </div>

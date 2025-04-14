@@ -4,12 +4,12 @@ import { Tabs } from 'antd';
 
 const items = [
   {
-    key: '1',
+    key: 'api',
     label: 'API',
     children: <APIMode />
   },
   {
-    key: '2',
+    key: 'mcp',
     label: 'MCP',
     children: <MCPMode />
   }
@@ -17,12 +17,12 @@ const items = [
 
 const Page = () => {
   return (
-    <div className="px-5 py-7">
+    <div className="px-5 py-7 w-full h-full">
       <div className="flex flex-col mb-10">
         <div className="font-extrabold text-2xl">Second Me Services</div>
         <div>Manage your API and intergration services</div>
       </div>
-      <Tabs className="w-full" items={items} />
+      <Tabs className="w-full h-full" defaultActiveKey="api" items={items} />
     </div>
   );
 };
