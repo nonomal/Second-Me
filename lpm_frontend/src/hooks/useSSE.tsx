@@ -18,26 +18,12 @@ interface ChatHistory {
   content: string;
 }
 
-// interface StreamResponse {
-//   id: string;
-//   object: string;
-//   created: number;
-//   model: string;
-//   system_fingerprint: string;
-//   choices: {
-//     index: number;
-//     delta: {
-//       content?: string;
-//     };
-//     finish_reason: string | null;
-//   }[];
-// }
-
 export const useSSE = () => {
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [streamContent, setStreamContent] = useState('');
   const [streamRawContent, setStreamRawContent] = useState('');
+  const [firstContentLoading, setFirstContentLoading] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const streamContentRef = useRef('');
@@ -56,6 +42,7 @@ export const useSSE = () => {
     setError(null);
     setStreamContent('');
     setStreamRawContent('');
+    setFirstContentLoading(true);
     streamContentRef.current = ''; // Clear this as well
     streamRawContentRef.current = ''; // Clear this as well
 
@@ -125,6 +112,7 @@ export const useSSE = () => {
             const content = parsedData?.choices[0].delta.content || '';
 
             // Use useRef to record the latest streamContent
+            setFirstContentLoading(false);
             streamContentRef.current += content;
             setStreamContent(streamContentRef.current);
           }
@@ -152,6 +140,7 @@ export const useSSE = () => {
     streaming,
     error,
     streamContent,
-    streamRawContent
+    streamRawContent,
+    firstContentLoading
   };
 };

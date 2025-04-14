@@ -1,17 +1,5 @@
 # MCP Content
 
-## Tool Introduction
-
-Mindverse MCP is a tool based on MCP (Model Communication Protocol) * *, aimed at remotely calling SecondMe * * models through model instance_id to achieve tasks such as natural language processing. It provides interactive model services through a concise API, which can efficiently process queries from users and return corresponding answers. This tool supports real-time streaming response and is suitable for building applications such as dialogue systems and intelligent question answering systems.
-
-## Prerequisites
-
-Before using this MCP, you need to:
-
-1. **Register**: The Secondme model you want to inquire about has already been registered
-2. **Status Check**: Wait for the status of this Secondme model instance to change to 'Online'
-3. **Get Instance ID**: Obtain unique `{instance_id}` from the registration response
-
 ## Installation and operation
 
 ### Installation dependencies
@@ -35,10 +23,6 @@ The tool manages server and client settings through a configuration file. Below 
 ```
 ### Configuration Items Explanation
 
-#### `mcpServers` (object)
-Defines MCP server settings.  
-Contains named server configurations (e.g., "mindverse" in this example).
-
 #### Server Configuration (object)
 - `command` (string):  
   The command to execute the script (typically the Python interpreter)
@@ -47,18 +31,7 @@ Contains named server configurations (e.g., "mindverse" in this example).
   Arguments passed to the script, including:
   - Path to the Python script (replace `{replace-with-your-path}` with your actual path)
 
-### Start the Service
-
-Make sure you have replaced the paths in the configuration file with your local paths. Then, you can directly run the following command to start the service and check for any errors:
-```bash
-python {replace with your path}/Second-Me/MCP/Mcp_public.py
-```
-If there are no errors, the service should start and wait for client requests.
-
-### `get_response` Tool Parameters and Functionality
-`get_response` is a tool used to interact with the SecondMe model. Below is a detailed explanation of the tool, including the required parameters and functionality.
-
-#### Input Parameter Explanation
+### Input Parameter Explanation
 The `get_response` function has two input parameters:
 
 `query`: This is the user input query that the tool will use to request the model. For example, the user might ask questions like "How is the weather?" or "What can you do for me?"
@@ -74,7 +47,6 @@ The `get_response` function has two input parameters:
 ### Response Format Example
 
 ```
-data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1694268190,"model":"lpm-registry-model","system_fingerprint":null,"choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}
 
 data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1694268190,"model":"lpm-registry-model","system_fingerprint":null,"choices":[{"index":0,"delta":{"content":" world!"},"finish_reason":null}]}
 

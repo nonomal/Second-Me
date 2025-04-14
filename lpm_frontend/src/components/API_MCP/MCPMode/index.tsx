@@ -16,8 +16,9 @@ const MCPMode = () => {
   const [query, setQuery] = useState('');
   const [response, setResponse] = useState('');
   const [rawResponse, setRawResponse] = useState('');
-  const [responseType, setResponseType] = useState<responseTypeOptions>('raw');
-  const { sendStreamMessage, streamContent, streamRawContent, streaming } = useSSE();
+  const [responseType, setResponseType] = useState<responseTypeOptions>('text');
+  const { sendStreamMessage, streamContent, streamRawContent, streaming, firstContentLoading } =
+    useSSE();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,14 +89,14 @@ const MCPMode = () => {
               ))}
             </div>
           </div>
-          <div className="overflow-scroll max-h-[60vh] markdown-content">
-            <div className="max-w-full h-fit">
+          <div className="markdown-content h-fit">
+            <div className="max-w-full">
               {items.find((item) => item.key === activeTab)?.children}
             </div>
           </div>
         </div>
       </div>
-      {chosenTool && (
+      {chosenTool && activeTab === 'tools' && (
         <div className="w-1/3 shrink-0 h-fit">
           <div className="shadow-md rounded-lg h-full p-4 border border-gray-200 bg-white">
             <div className="text-lg font-medium mb-4">Test API</div>
@@ -141,22 +142,31 @@ const MCPMode = () => {
               </button>
             </form>
 
-            {(response || rawResponse) && (
-              <>
-                <Segmented
-                  className="mt-4"
-                  onChange={(value) => setResponseType(value as responseTypeOptions)}
-                  options={['raw', 'text']}
-                  value={responseType}
-                />
-                <div className="mt-6">
-                  <div className="text-sm font-medium text-gray-700 mb-2">Response:</div>
-                  <div className="bg-gray-50 border border-gray-200 rounded-md p-3 whitespace-pre-wrap text-sm font-mono max-h-[300px] overflow-auto">
-                    {responseType === 'raw' ? rawResponse : response}
-                  </div>
+            <div>
+              <Segmented
+                className="mt-4"
+                onChange={(value) => setResponseType(value as responseTypeOptions)}
+                options={['text', 'raw']}
+                value={responseType}
+              />
+              <div className="mt-6">
+                <div className="text-sm font-medium text-gray-700 mb-2">Response:</div>
+                <div className="bg-gray-50 border border-gray-200 rounded-md p-3 whitespace-pre-wrap text-sm font-mono max-h-[300px] min-h-[100px] overflow-auto relative">
+                  {firstContentLoading ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-gray-50 bg-opacity-80 z-10">
+                      <div className="flex flex-col items-center">
+                        <div className="w-8 h-8 border-t-2 border-b-2 border-blue-500 rounded-full animate-spin mb-2" />
+                        <div className="text-sm text-gray-600">Loading...</div>
+                      </div>
+                    </div>
+                  ) : responseType === 'raw' ? (
+                    rawResponse
+                  ) : (
+                    response
+                  )}
                 </div>
-              </>
-            )}
+              </div>
+            </div>
           </div>
         </div>
       )}

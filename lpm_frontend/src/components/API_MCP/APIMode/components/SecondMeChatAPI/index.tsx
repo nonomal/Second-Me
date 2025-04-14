@@ -22,39 +22,43 @@ const SecondMeChatAPI = () => {
 
   return (
     <div className="space-y-4">
-      {/* API Status Card */}
-      <div className="bg-white border border-solid border-gray-200 rounded-md shadow-sm p-4">
-        <div className="text-base font-medium mb-2">Second Me Chat API</div>
-        <div className="flex items-center">
-          <Badge status={isRegistered ? 'success' : 'error'} />
-          {isRegistered ? (
-            <div className="ml-2 text-[#2bee9d] font-medium">In Service</div>
-          ) : (
-            <div className="ml-2 text-[#ff4d4f] font-medium">Not In Service</div>
-          )}
+      <div className="bg-[#FEFCFB] border border-solid border-gray-200 rounded-md shadow-sm">
+        <div className="flex items-center justify-between gap-2 p-4">
+          <div className="flex items-center text-center gap-2">
+            <div className="bg-blue-50 rounded-md p-2">⚡️</div>
+            <div className="font-extrabold text-xl">Second Me Chat API</div>
+          </div>
+          <div className="flex items-center">
+            <Badge status={isRegistered ? 'success' : 'error'} />
+            {isRegistered ? (
+              <div className="ml-2 text-[#5EC268] font-medium">IN SERVICE</div>
+            ) : (
+              <div className="ml-2 text-[#ff4d4f] font-medium">NOT IN SERVICE</div>
+            )}
+          </div>
         </div>
-      </div>
+        <div className="border-b border-gray-200" />
+        <div className="p-4 bg-[#F8F9FA]">
+          <div className="text-sm font-medium mb-2">Service API Endpoint</div>
+          <div className="flex items-center mb-2">
+            <Input
+              className="font-mono"
+              readOnly
+              suffix={
+                <div
+                  className="ml-2 cursor-pointer flex items-center justify-center hover:bg-gray-100 p-1 rounded-md transition-colors"
+                  onClick={handleCopyEndpoint}
+                >
+                  {copied ? <CheckCircleFilled className="text-[#5EC268]" /> : <CopyOutlined />}
+                </div>
+              }
+              value={endpoint}
+            />
+          </div>
+        </div>
 
-      {/* API Endpoint Card */}
-      <div className="bg-white border border-solid border-gray-200 rounded-md shadow-sm p-4">
-        <div className="text-base font-medium mb-2">Service API Endpoint</div>
-        <div className="flex items-center mb-2">
-          <Input
-            className="font-mono"
-            readOnly
-            suffix={
-              <div
-                className="ml-2 cursor-pointer flex items-center justify-center hover:bg-gray-100 p-1 rounded-md transition-colors"
-                onClick={handleCopyEndpoint}
-              >
-                {copied ? <CheckCircleFilled className="text-green-500" /> : <CopyOutlined />}
-              </div>
-            }
-            value={endpoint}
-          />
-        </div>
-        <div className="text-base font-medium mb-3 mt-4">API Management</div>
-        <div className="flex flex-wrap gap-4">
+        <div className="border-b border-gray-200" />
+        <div className="flex p-4">
           <a
             href="https://github.com/mindverse/Second-Me/blob/master/docs/Public%20Chat%20API.md"
             rel="noreferrer"
@@ -68,6 +72,14 @@ const SecondMeChatAPI = () => {
               API Reference
             </Button>
           </a>
+        </div>
+      </div>
+
+      <div className="bg-[#FEFCFB] flex flex-col border border-solid border-gray-200 rounded-md shadow-sm p-4 gap-4">
+        <div className="text-lg font-medium">Second Me Chat API Documentation</div>
+        <div className="text-sm">
+          This API is used to create chat completions, process provided messages, and generate
+          responses. The API supports streaming responses and is compatible with OpenAI format.
         </div>
       </div>
     </div>
