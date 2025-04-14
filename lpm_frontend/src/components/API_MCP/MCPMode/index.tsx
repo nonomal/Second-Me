@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Content from './content';
 import Tools from './tools';
 import './markdown.css';
 import { useSSE } from '@/hooks/useSSE';
-import { Segmented } from 'antd';
+import { Badge, Segmented } from 'antd';
+import { useLoadInfoStore } from '@/store/useLoadInfoStore';
 
 type responseTypeOptions = 'raw' | 'text';
 
@@ -17,6 +18,10 @@ const MCPMode = () => {
   const [response, setResponse] = useState('');
   const [rawResponse, setRawResponse] = useState('');
   const [responseType, setResponseType] = useState<responseTypeOptions>('text');
+  const loadInfo = useLoadInfoStore((state) => state.loadInfo);
+  const isRegistered = useMemo(() => {
+    return loadInfo?.status === 'online';
+  }, [loadInfo]);
   const { sendStreamMessage, streamContent, streamRawContent, streaming, firstContentLoading } =
     useSSE();
 
@@ -76,7 +81,7 @@ const MCPMode = () => {
     <div className="flex gap-4 p-4 justify-between w-full">
       <div className="w-[calc(66%-16px)] h-fit">
         <div className="shadow-md rounded-lg h-full border border-gray-200 bg-white">
-          <div className="border-b border-gray-200">
+          <div className="border-b border-gray-200 flex justify-between">
             <div className="flex">
               {items.map((item) => (
                 <div
@@ -87,6 +92,15 @@ const MCPMode = () => {
                   {item.label}
                 </div>
               ))}
+            </div>
+
+            <div className="flex items-center pr-4">
+              <Badge status={isRegistered ? 'success' : 'error'} />
+              {isRegistered ? (
+                <div className="ml-2 text-[#5EC268] font-medium">IN SERVICE</div>
+              ) : (
+                <div className="ml-2 text-[#ff4d4f] font-medium">NOT IN SERVICE</div>
+              )}
             </div>
           </div>
           <div className="markdown-content h-fit">

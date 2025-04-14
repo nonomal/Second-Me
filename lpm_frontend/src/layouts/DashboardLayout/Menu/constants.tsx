@@ -10,6 +10,8 @@ import AppsIcon from '@/components/svgs/AppsIcon';
 import RoleplayIcon from '@/components/svgs/RoleplayIcon';
 import NetworkIcon from '@/components/svgs/NetworkIcon';
 import GlobeIcon from '@/components/svgs/GlobeIcon';
+import LightningIcon from '@/components/svgs/LightningIcon';
+import ChatBubbleIcon from '@/components/svgs/ChatBubbleIcon';
 
 export const tabs = [
   {
@@ -59,7 +61,7 @@ export const tabs = [
       {
         name: 'API + MCP',
         path: ROUTER_PATH.APPLICATIONS_API_MCP,
-        icon: <RoleplayIcon className="w-4 h-4" />
+        icon: <LightningIcon className="w-4 h-4" />
       },
       {
         name: 'Roleplay Apps',
@@ -77,9 +79,9 @@ export const tabs = [
         icon: <GlobeIcon className="w-4 h-4" />
       },
       {
-        name: 'Intergrations',
-        path: ROUTER_PATH.APPLICATIONS_INTERGRATIONS,
-        icon: <RoleplayIcon className="w-4 h-4" />
+        name: 'Integrations',
+        path: ROUTER_PATH.APPLICATIONS_INTEGRATIONS,
+        icon: <ChatBubbleIcon className="w-4 h-4" />
       }
     ]
   }

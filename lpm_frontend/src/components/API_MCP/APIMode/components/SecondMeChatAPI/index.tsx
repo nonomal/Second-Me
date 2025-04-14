@@ -5,14 +5,15 @@ import { CheckCircleFilled, CopyOutlined } from '@ant-design/icons';
 import { useState, useMemo } from 'react';
 import { useLoadInfoStore } from '@/store/useLoadInfoStore';
 
-const endpoint = '/api/chat/{instance_id}/chat/completions';
-
 const SecondMeChatAPI = () => {
   const [copied, setCopied] = useState(false);
   const loadInfo = useLoadInfoStore((state) => state.loadInfo);
   const isRegistered = useMemo(() => {
     return loadInfo?.status === 'online';
   }, [loadInfo]);
+  const endpoint = useMemo(() => {
+    return `https://app.secondme.io/api/chat/${loadInfo?.instance_id || 'instance_id'}/chat/completions`;
+  }, [loadInfo?.instance_id]);
 
   const handleCopyEndpoint = () => {
     navigator.clipboard.writeText(endpoint);
@@ -39,7 +40,7 @@ const SecondMeChatAPI = () => {
         </div>
         <div className="border-b border-gray-200" />
         <div className="p-4 bg-[#F8F9FA]">
-          <div className="text-sm font-medium mb-2">Service API Endpoint</div>
+          <div className="text-sm font-medium mb-2">Chat Endpoint</div>
           <div className="flex items-center mb-2">
             <Input
               className="font-mono"

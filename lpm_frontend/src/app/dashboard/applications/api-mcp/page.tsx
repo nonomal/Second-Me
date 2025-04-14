@@ -17,10 +17,10 @@ const items = [
 
 const Page = () => {
   return (
-    <div className="px-5 py-7 w-full h-[calc(100vh-64px)] overflow-scroll">
+    <div className="w-full h-[calc(100vh-64px)] overflow-scroll max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       <div className="flex flex-col mb-10">
-        <div className="font-extrabold text-2xl">Second Me Services</div>
-        <div>Manage your API and intergration services</div>
+        <div className="font-extrabold text-2xl">API & MCP</div>
+        <div>Manage your API and MCP services</div>
       </div>
       <Tabs className="w-full" defaultActiveKey="api" items={items} />
     </div>
