@@ -1,11 +1,13 @@
 'use client';
 
 import type React from 'react';
-import { Fragment } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
 import { PlayIcon, StopIcon } from '@heroicons/react/24/outline';
 import { EVENT } from '@/utils/event';
-import { Spin } from 'antd';
+import { InputNumber, Radio, Spin, Tooltip } from 'antd';
+import type { TrainingParams } from '@/service/train';
+import { QuestionCircleOutlined } from '@ant-design/icons';
 
 interface BaseModelOption {
   value: string;
@@ -33,12 +35,22 @@ interface TrainingConfigurationProps {
   baseModelOptions: BaseModelOption[];
   modelConfig: ModelConfig | null;
   isTraining: boolean;
+  updateTrainingParams: (params: TrainingParams) => void;
   status: string;
+  isResume: boolean;
+  nowTrainingParams: TrainingParams | null;
   changeBaseModel: boolean;
   handleTrainingAction: () => Promise<void>;
   trainActionLoading: boolean;
   setSelectedInfo: React.Dispatch<React.SetStateAction<boolean>>;
+  trainingParams: TrainingParams;
 }
+
+const synthesisModeOptions = [
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' }
+];
 
 const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
   config,
@@ -46,12 +58,22 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
   baseModelOptions,
   modelConfig,
   isTraining,
+  updateTrainingParams,
+  trainingParams,
+  nowTrainingParams,
   status,
+  isResume,
   changeBaseModel,
   trainActionLoading,
   handleTrainingAction,
   setSelectedInfo
 }) => {
+  const [disabledChangeParams, setDisabledChangeParams] = useState<boolean>(false);
+
+  useEffect(() => {
+    setDisabledChangeParams(isTraining || (isResume && !changeBaseModel));
+  }, [isTraining, isResume, changeBaseModel]);
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
       <div className="flex justify-between items-center mb-4">
@@ -162,6 +184,30 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                     </span>
                   </div>
                 )}
+                <div className="flex flex-col gap-3">
+                  <div className="font-medium">Data Synthesis Mode</div>
+                  <Radio.Group
+                    disabled={disabledChangeParams}
+                    onChange={(e) =>
+                      updateTrainingParams({
+                        ...trainingParams,
+                        data_synthesis_mode: e.target.value
+                      })
+                    }
+                    optionType="button"
+                    options={synthesisModeOptions}
+                    value={
+                      disabledChangeParams && nowTrainingParams && !changeBaseModel
+                        ? nowTrainingParams.data_synthesis_mode
+                        : trainingParams.data_synthesis_mode
+                    }
+                  />
+
+                  <span className="text-xs text-gray-500">
+                    Low: Fast data synthesis. Medium: Balanced synthesis and speed. High: Rich
+                    synthesis, slower speed.
+                  </span>
+                </div>
               </div>
 
               <div className="mt-8">
@@ -212,18 +258,14 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                           <Listbox.Option
                             key={option.value}
                             className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
-                                active ? 'bg-blue-100 text-blue-900' : 'text-gray-900'
-                              }`
+                              `relative cursor-pointer select-none py-2 pl-10 pr-4 ${active ? 'bg-blue-100 text-blue-900' : 'text-gray-900'}`
                             }
                             value={option.value}
                           >
                             {({ selected }) => (
                               <>
                                 <span
-                                  className={`block truncate ${
-                                    selected ? 'font-medium' : 'font-normal'
-                                  }`}
+                                  className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}
                                 >
                                   {option.label}
                                 </span>
@@ -250,6 +292,149 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                     </Transition>
                   </div>
                 </Listbox>
+              </div>
+
+              <div className="mt-8">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-base font-semibold text-gray-800 mb-1">
+                    Step 3: Configure Advanced Training Parameters
+                  </h4>
+                  <div className="text-xs text-gray-500">
+                    Adjust these parameters to control training quality and performance. Recommended
+                    settings will ensure stable training.
+                  </div>
+                </div>
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex gap-3 items-center">
+                      <div className="font-medium">Learning Rate</div>
+                      <Tooltip title="Lower values (0.0001) provide stable but slower learning, while higher values accelerate learning but risk overshooting optimal parameters, potentially causing training instability.">
+                        <QuestionCircleOutlined className="cursor-pointer" />
+                      </Tooltip>
+                    </div>
+                    <InputNumber
+                      className="!w-[300px]"
+                      disabled={disabledChangeParams}
+                      max={0.005}
+                      min={0.00003}
+                      onChange={(value) => {
+                        if (value == null) {
+                          return;
+                        }
+
+                        updateTrainingParams({ ...trainingParams, learning_rate: value });
+                      }}
+                      status={
+                        trainingParams.learning_rate == 0.005 ||
+                        trainingParams.learning_rate == 0.00003
+                          ? 'warning'
+                          : undefined
+                      }
+                      step={0.00001}
+                      value={
+                        disabledChangeParams && nowTrainingParams && !changeBaseModel
+                          ? nowTrainingParams.learning_rate
+                          : trainingParams.learning_rate
+                      }
+                    />
+                    {trainingParams.learning_rate == 0.00003 ||
+                    trainingParams.learning_rate == 0.005 ? (
+                      <div className="text-xs text-red-500">
+                        Please enter a valid number between 0.00003 and 0.005
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-500">
+                        Controls how quickly the model adapts to new information during training.
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex gap-3 items-center">
+                      <div className="font-medium">Number of Epochs</div>
+                      <Tooltip title="Controls how many complete passes the model makes through your entire dataset during training. More epochs allow deeper pattern recognition and memory integration but significantly increase training time and computational resources required.">
+                        <QuestionCircleOutlined className="cursor-pointer" />
+                      </Tooltip>
+                    </div>
+                    <InputNumber
+                      className="!w-[300px]"
+                      disabled={disabledChangeParams}
+                      max={10}
+                      min={1}
+                      onChange={(value) => {
+                        if (value == null) {
+                          return;
+                        }
+
+                        updateTrainingParams({ ...trainingParams, number_of_epochs: value });
+                      }}
+                      status={
+                        trainingParams.number_of_epochs == 10 ||
+                        trainingParams.number_of_epochs == 1
+                          ? 'warning'
+                          : undefined
+                      }
+                      step={1}
+                      value={
+                        disabledChangeParams && nowTrainingParams && !changeBaseModel
+                          ? nowTrainingParams.number_of_epochs
+                          : trainingParams.number_of_epochs
+                      }
+                    />
+                    {trainingParams.number_of_epochs == 10 ||
+                    trainingParams.number_of_epochs == 1 ? (
+                      <div className="text-xs text-red-500">
+                        Please enter a whole number between 1 and 10
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-500">
+                        Higher values result in deeper memory but longer training time.
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex gap-3 items-center">
+                      <div className="font-medium">Concurrency Threads</div>
+                      <Tooltip title="Defines the number of parallel processing streams used during data synthesis. Higher values can reduce overall training time but increase system resource consumption and may trigger API rate limits, potentially causing training failures.">
+                        <QuestionCircleOutlined className="cursor-pointer" />
+                      </Tooltip>
+                    </div>
+                    <InputNumber
+                      className="!w-[300px]"
+                      disabled={disabledChangeParams}
+                      max={10}
+                      min={1}
+                      onChange={(value) => {
+                        if (value == null) {
+                          return;
+                        }
+
+                        updateTrainingParams({ ...trainingParams, concurrency_threads: value });
+                      }}
+                      status={
+                        trainingParams.concurrency_threads == 10 ||
+                        trainingParams.concurrency_threads == 1
+                          ? 'warning'
+                          : undefined
+                      }
+                      step={1}
+                      value={
+                        disabledChangeParams && nowTrainingParams && !changeBaseModel
+                          ? nowTrainingParams.concurrency_threads
+                          : trainingParams.concurrency_threads
+                      }
+                    />
+                    {trainingParams.concurrency_threads == 10 ||
+                    trainingParams.concurrency_threads == 1 ? (
+                      <div className="text-xs text-red-500">
+                        Please enter a whole number between 1 and 10
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-500">
+                        Higher values may cause system errors or API request failures.
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -306,9 +491,7 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
             </div>
           )}
           <button
-            className={`inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${
-              isTraining ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
-            }
+            className={`inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${isTraining ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}
             ${!isTraining && !modelConfig?.provider_type ? 'bg-gray-300 hover:bg-gray-400 cursor-not-allowed' : 'cursor-pointer'}
             focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
             disabled={!isTraining && !modelConfig?.provider_type}
@@ -326,8 +509,12 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
             ) : (
               <>
                 <PlayIcon className="h-5 w-5 mr-2" />
-                {(status === 'trained' || status === 'running') && !changeBaseModel
-                  ? 'Retrain'
+                {!changeBaseModel
+                  ? status === 'trained' || status === 'running'
+                    ? 'Retrain'
+                    : isResume
+                      ? 'Resume Training'
+                      : 'Start Training'
                   : 'Start Training'}
               </>
             )}

@@ -9,6 +9,7 @@ class Status(Enum):
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     FAILED = "failed"
+    SUSPENDED = "suspended"
 
 
 @dataclass
@@ -121,6 +122,8 @@ class TrainProgress:
             self.current_stage = next_stage
         elif any(s.status == Status.FAILED for s in stage_obj.steps.values()):
             stage_obj.status = Status.FAILED
+        elif any(s.status == Status.SUSPENDED for s in stage_obj.steps.values()):
+            stage_obj.status = Status.SUSPENDED
         else:
             stage_obj.status = Status.IN_PROGRESS
             stage_obj.current_step = step
@@ -135,6 +138,8 @@ class TrainProgress:
             self.status = Status.COMPLETED
         elif any(s.status == Status.FAILED for s in self.stages.values()):
             self.status = Status.FAILED
+        elif any(s.status == Status.SUSPENDED for s in self.stages.values()):
+            self.status = Status.SUSPENDED
         elif any(s.status == Status.IN_PROGRESS for s in self.stages.values()):
             self.status = Status.IN_PROGRESS
         else:

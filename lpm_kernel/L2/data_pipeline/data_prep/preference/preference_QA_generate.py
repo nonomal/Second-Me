@@ -7,7 +7,7 @@ import re
 from dotenv import load_dotenv
 from tqdm import tqdm
 import openai
-
+from enum import Enum
 from lpm_kernel.api.services.user_llm_config_service import UserLLMConfigService
 from lpm_kernel.configs.config import Config
 from lpm_kernel.L2.data_pipeline.data_prep.preference.prompts import (
@@ -31,6 +31,18 @@ class TqdmLoggingHandler:
         pass
     
 tqdm_handler = TqdmLoggingHandler()
+
+
+class LowMode(Enum):
+    cluster_nums = 3
+
+
+class MediumMode(Enum):
+    cluster_nums = 2
+
+
+class HighMode(Enum):
+    cluster_nums = 1
 
 
 class PreferenceQAGenerator:
@@ -85,6 +97,8 @@ class PreferenceQAGenerator:
         self.preference_language = preference_language
         self.prompt_templates = self._get_prompt_templates(preference_language)
         self.sys_templates = self._get_sys_templates(preference_language)
+        self.max_workers = 1
+        self.data_synthesis_mode = os.environ.get("DATA_SYNTHESIS_MODE", "low")
 
 
     def generate_response(self, sys: str, prompt: str) -> str:
@@ -126,9 +140,17 @@ class PreferenceQAGenerator:
         
         
         try:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(get_remote_response, sys=sys, prompt=prompt)
-                return future.result()
+            with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                future = executor.submit(
+                    self.client.chat.completions.create,
+                    model=self.model_name,
+                    messages=[
+                        {"role": "system", "content": sys},
+                        {"role": "user", "content": prompt},
+                    ],
+                )
+                response = future.result()
+                return response.choices[0].message.content
         except Exception as e:
             logger.error(f"Error generating response: {e}")
             return None
@@ -198,8 +220,17 @@ class PreferenceQAGenerator:
         """
         cluster_items = list(self.pre_msg.items())
         count = 0
-
-        for _, cluster in tqdm(cluster_items, desc="preference_generate", file=tqdm_handler):
+        
+        if self.data_synthesis_mode == "low":
+            sample_num = max(1, len(cluster_items) // LowMode.cluster_nums.value) if 0 < len(cluster_items) < 3 else len(cluster_items) // LowMode.cluster_nums.value
+            new_cluster_items = random.sample(cluster_items, sample_num)
+        elif self.data_synthesis_mode == "medium":
+            sample_num = max(1, len(cluster_items) // MediumMode.cluster_nums.value) if 0 < len(cluster_items) < 2 else len(cluster_items) // MediumMode.cluster_nums.value
+            new_cluster_items = random.sample(cluster_items, sample_num)
+        else: # high or other case
+            new_cluster_items = cluster_items
+            
+        for _, cluster in tqdm(new_cluster_items, desc="preference_generate", file=tqdm_handler):
             chunk_concat = self._get_chunk_concat(cluster["contents"])
 
             tags = " ".join(cluster["tags"])

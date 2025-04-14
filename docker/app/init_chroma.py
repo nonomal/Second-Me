@@ -12,10 +12,10 @@ def init_chroma_db():
         
         # collection: init documents level
         try:
-            collection = client.get_collection(name="documents")
+            documents_collection = client.get_collection(name="documents")
             print(f"Collection 'documents' already exists")
         except ValueError:
-            collection = client.create_collection(
+            documents_collection = client.create_collection(
                 name="documents",
                 metadata={
                     "hnsw:space": "cosine",
@@ -26,10 +26,10 @@ def init_chroma_db():
             
         # collection: init chunk level
         try:
-            collection = client.get_collection(name="document_chunks")
+            chunks_collection = client.get_collection(name="document_chunks")
             print(f"Collection 'document_chunks' already exists")
         except ValueError:
-            collection = client.create_collection(
+            chunks_collection = client.create_collection(
                 name="document_chunks",
                 metadata={
                     "hnsw:space": "cosine",

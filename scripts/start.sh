@@ -3,46 +3,9 @@
 # Script version
 VERSION="1.0.0"
 
-# Source conda utilities
-SCRIPT_DIR="$( cd "$( dirname "${0:A}" )" && pwd )"
-source "$SCRIPT_DIR/conda_utils.sh"
-
-# Color definitions
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-MAGENTA='\033[0;35m'
-CYAN='\033[0;36m'
-GRAY='\033[0;90m'
-BOLD='\033[1m'
-NC='\033[0m' # No Color
-
-# Get current timestamp
-get_timestamp() {
-    date "+%Y-%m-%d %H:%M:%S"
-}
-
-# Print formatted log messages
-log_info() {
-    echo -e "${GRAY}[$(get_timestamp)]${NC} ${GREEN}[INFO]${NC}    $1"
-}
-
-log_success() {
-    echo -e "${GRAY}[$(get_timestamp)]${NC} ${GREEN}[SUCCESS]${NC} $1"
-}
-
-log_warning() {
-    echo -e "${GRAY}[$(get_timestamp)]${NC} ${YELLOW}[WARNING]${NC} $1"
-}
-
-log_error() {
-    echo -e "${GRAY}[$(get_timestamp)]${NC} ${RED}[ERROR]${NC}   $1"
-}
-
-log_section() {
-    echo -e "${GRAY}[$(get_timestamp)]${NC} ${BOLD}[SECTION]${NC} $1"
-}
+# Source the logging utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/utils/logging.sh"
 
 # Check if port is available
 check_port() {
@@ -53,56 +16,102 @@ check_port() {
     return 0
 }
 
-# Check if backend is healthy
+# Check if backend is healthy with real-time log display
 check_backend_health() {
     local max_attempts=$1
     local attempt=1
     local backend_url="http://127.0.0.1:${LOCAL_APP_PORT}/health"
+    local backend_log="logs/start.log"
+    local log_pid=0
+    
+    log_info "Waiting for backend service to be ready (showing real-time logs)..."
+    
+    # Start real-time log display in background if log file exists
+    if [ -f "$backend_log" ]; then
+        echo -e "${GRAY}---Backend logs begin (real-time)---${NC}"
+        tail -f "$backend_log" &
+        log_pid=$!
+    fi
     
     while [ $attempt -le $max_attempts ]; do
+        # Non-blocking health check
         if curl -s -f "$backend_url" &>/dev/null; then
+            # Stop the log display process
+            if [ $log_pid -ne 0 ]; then
+                kill $log_pid >/dev/null 2>&1
+                echo -e "${GRAY}---Backend logs end---${NC}"
+            fi
             return 0
         fi
+        
         sleep 1
         attempt=$((attempt + 1))
     done
+    
+    # Stop the log display process if it's still running
+    if [ $log_pid -ne 0 ]; then
+        kill $log_pid >/dev/null 2>&1
+        echo -e "${GRAY}---Backend logs end---${NC}"
+    fi
+    
     return 1
 }
 
-# Check if frontend is ready
+# Check if frontend is ready with real-time log display
 check_frontend_ready() {
+    
     local max_attempts=$1
     local attempt=1
-    local frontend_log="../logs/frontend.log"
+    local frontend_log="logs/frontend.log"
+    local log_pid=0
+    
+    log_info "Waiting for frontend service to be ready (showing real-time logs)..."
+    
+    # Don't wait for file to exist, just start tail which will wait for the file
+    echo -e "${GRAY}---Frontend logs begin (real-time)---${NC}"
+    tail -f "$frontend_log" 2>/dev/null &
+    log_pid=$!
+    
+    # Give a small delay to allow initial logs to appear
+    sleep 1
     
     while [ $attempt -le $max_attempts ]; do
-        if grep -q "Local:" "$frontend_log" 2>/dev/null; then
+        # Non-blocking ready check - check for "Local:" in the file or the existence of the frontend URL
+        if grep -q "Local:" "$frontend_log" 2>/dev/null || curl -s -f "http://localhost:${LOCAL_FRONTEND_PORT}" &>/dev/null; then
+            # Frontend is ready! Stop the log display process
+            if [ $log_pid -ne 0 ]; then
+                kill $log_pid >/dev/null 2>&1
+                echo -e "${GRAY}---Frontend logs end---${NC}"
+            fi
+            
+            # Display the frontend URL that was found in the logs
+            if grep -q "Local:" "$frontend_log" 2>/dev/null; then
+                local frontend_url=$(grep "Local:" "$frontend_log" | head -n 1)
+                log_success "Frontend URL detected: $frontend_url"
+            else
+                log_success "Frontend is responding at http://localhost:${LOCAL_FRONTEND_PORT}"
+            fi
+            
             return 0
         fi
+        
         sleep 1
         attempt=$((attempt + 1))
     done
+    
+    # Stop the log display process if it's still running
+    if [ $log_pid -ne 0 ]; then
+        kill $log_pid >/dev/null 2>&1
+        echo -e "${GRAY}---Frontend logs end---${NC}"
+    fi
+    
     return 1
 }
-
-# These functions are now sourced from conda_utils.sh
 
 # Check if setup is complete
 check_setup_complete() {
     log_info "Checking if setup is complete..."
-    
-    # Check conda environment
-    if is_custom_conda_mode; then
-        log_info "Custom conda mode enabled, verifying environment..."
-        if ! verify_conda_env; then
-            return 1
-        fi
-    else
-        if ! conda env list | grep -q "${CONDA_DEFAULT_ENV:-second-me}"; then
-            log_error "Conda environment '${CONDA_DEFAULT_ENV:-second-me}' not found. Please run 'make setup' first."
-            return 1
-        fi
-    fi
+   
     
     # Check if frontend dependencies are installed
     if [ ! -d "lpm_frontend/node_modules" ] && [ "$BACKEND_ONLY" != "true" ]; then
@@ -132,16 +141,14 @@ start_services() {
     if ! check_setup_complete; then
         return 1
     fi
+
+    log_step "Loading environment variables"
     
     # Load environment variables
     if [[ -f .env ]]; then
-        export CONDA_DEFAULT_ENV="$(grep '^CONDA_DEFAULT_ENV=' .env | cut -d '=' -f2)"
         export LOCAL_APP_PORT="$(grep '^LOCAL_APP_PORT=' .env | cut -d '=' -f2)"
         export LOCAL_FRONTEND_PORT="$(grep '^LOCAL_FRONTEND_PORT=' .env | cut -d '=' -f2)"
         
-        if [[ -z "$CONDA_DEFAULT_ENV" ]]; then
-            export CONDA_DEFAULT_ENV="second-me"
-        fi
         if [[ -z "$LOCAL_APP_PORT" ]]; then
             export LOCAL_APP_PORT="8002"
         fi
@@ -153,8 +160,10 @@ start_services() {
         return 1
     fi
     
+    log_success "Environment variables loaded"
+    
     # Check if ports are available
-    log_info "Checking port availability..."
+    log_step "Checking port availability..."
     if ! check_port ${LOCAL_APP_PORT}; then
         log_error "Backend port ${LOCAL_APP_PORT} is already in use!"
         return 1
@@ -165,50 +174,15 @@ start_services() {
     fi
     log_success "All ports are available"
     
-    # Initialize conda environment if not using custom configuration
-    if ! is_custom_conda_mode; then
-        log_info "Initializing conda environment..."
-        local conda_cmd
-        if ! conda_cmd=$(try_source_conda_sh_all); then
-            log_error "Failed to initialize conda environment"
-            return 1
-        fi
-        
-        # get conda.sh path
-        local conda_sh_path
-        if [[ -n "$conda_cmd" ]]; then
-            local conda_root="$(dirname "$(dirname "$conda_cmd")")"
-            if ! find_and_source_conda_sh "$conda_root" conda_sh_path; then
-                log_error "Could not find conda.sh activation script"
-                return 1
-            fi
-        else
-            log_error "conda command not found"
-            return 1
-        fi
-        log_info "Found conda.sh at: $conda_sh_path"
-        log_success "Conda initialized successfully: $conda_cmd"
-    else
-        log_info "Using custom conda environment, skipping conda initialization"
-        conda_sh_path="" # Set empty value since it won't be used
-    fi
-    
     # Create logs directory if it doesn't exist
     mkdir -p logs
     mkdir -p run
     
     # Start backend service
-    log_info "Starting backend service..."
+    log_step "Starting backend service..."
     
-    # Check if using custom conda mode
-    if is_custom_conda_mode; then
-        log_info "Using custom conda environment, skipping conda activation"
-        nohup zsh -c ./scripts/start_local.sh > logs/start.log 2>&1 &
-    else
-        log_info "Using conda environment: ${CONDA_DEFAULT_ENV}"
-        # Ensure conda is properly initialized in the subshell
-        nohup zsh -c "source ${conda_sh_path} && conda activate ${CONDA_DEFAULT_ENV} && exec ./scripts/start_local.sh" > logs/start.log 2>&1 &
-    fi
+    nohup bash -c ./scripts/start_local.sh > logs/start.log 2>&1 &
+
     
     echo $! > run/.backend.pid
     log_info "Backend service started in background with PID: $(cat run/.backend.pid)"
@@ -228,19 +202,9 @@ start_services() {
             return 1
         fi
         
-        log_info "Starting frontend service..."
+        log_step "Starting frontend service..."
         cd lpm_frontend
 
-        # Copy environment variables from root directory to frontend directory
-        log_info "Copying environment variables to frontend directory..."
-        if [[ -f "../.env" ]]; then
-            # Extract required environment variables and create frontend .env file
-            grep -E "^(HOST_ADDRESS|LOCAL_APP_PORT)=" "../.env" > .env
-            log_success "Environment variables copied to frontend .env file"
-        else
-            log_warning "Root directory .env file does not exist, cannot copy environment variables"
-        fi
-        
         # Copy environment variables from root directory to frontend directory
         log_info "Copying environment variables to frontend directory..."
         if [[ -f "../.env" ]]; then

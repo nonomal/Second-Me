@@ -26,7 +26,7 @@ services:
       resources:
         limits:
           # Set container memory limit to 24GB
-          memory: 24G
+          memory: 64G
         reservations:
           # Memory reservation
           memory: 6G
@@ -52,10 +52,10 @@ services:
       resources:
         limits:
           # Set container memory limit to 8GB
-          memory: 8G
+          memory: 2G
         reservations:
           # Memory reservation
-          memory: 2G
+          memory: 1G
     networks:
       - second-me-network
 
