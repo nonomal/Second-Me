@@ -1,5 +1,15 @@
 .PHONY: install test format lint all setup start stop restart restart-backend restart-force help docker-build docker-up docker-down docker-build-backend docker-build-frontend docker-restart-backend docker-restart-frontend docker-restart-all
 
+# Detect operating system and set environment
+ifeq ($(OS),Windows_NT)
+    # Set UTF-8 code page for Windows
+    WINDOWS := 1
+    # Ensure UTF-8 encoding is set for Windows
+    SET_UTF8 := $(shell chcp 65001 >nul 2>&1 || echo)
+else
+    WINDOWS := 0
+endif
+
 # Detect Apple Silicon without printing
 ifeq ($(shell uname -s),Darwin)
   ifeq ($(shell uname -m),arm64)
