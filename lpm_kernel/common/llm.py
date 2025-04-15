@@ -58,7 +58,6 @@ class LLMClient:
 
             raise Exception("No LLM configuration found")
         # Prepare request data
-
         try:
             # Send request to embedding endpoint
             embeddings_array = classification.strategy_classification(user_llm_config, chunked_texts)
