@@ -142,16 +142,16 @@ class TrainProgress:
                 step_name = step["name"].lower().replace(" ", "_")
                 self.steps_map[stage_name][step_name] = step
 
-    def update_progress(self, stage: str, step: str, status: Union[Status, str], progress: Optional[float] = None):
+    def update_progress(self, stage: str, step: str, currentStepStatus: Union[Status, str], stageProgress: Optional[float] = None):
         """Update progress status
         Args:
             stage: Stage key (snake_case format)
             step: Step key (snake_case format)
-            status: Status (enum or string)
-            progress: Optional progress value (0-100)
+            currentStepStatus: Status (enum or string)
+            stageProgress: Optional progress value (0-100)
         """
         stage_data = self.stage_map[stage]
-        status_value = status.value if isinstance(status, Status) else status
+        status_value = currentStepStatus.value if isinstance(currentStepStatus, Status) else currentStepStatus
         step_data = self.steps_map[stage][step]
         
         # Update step status
@@ -159,7 +159,7 @@ class TrainProgress:
         step_data["completed"] = status_value == "completed"
         
         # Update stage progress
-        self._update_stage_progress(stage_data, progress)
+        self._update_stage_progress(stage_data, stageProgress)
         
         # Update stage status and current step
         self._update_stage_status(stage_data, step_data)
@@ -170,15 +170,15 @@ class TrainProgress:
         # Update overall status
         self._update_overall_status()
 
-    def _update_stage_progress(self, stage_data: Dict, progress: Optional[float] = None):
+    def _update_stage_progress(self, stage_data: Dict, stageProgress: Optional[float] = None):
         """Update the progress of a stage
         
         Args:
             stage_data: Stage data dictionary
-            progress: Optional progress value (0-100)
+            stageProgress: Optional progress value (0-100)
         """
-        if progress is not None:
-            stage_data["progress"] = progress
+        if stageProgress is not None:
+            stage_data["progress"] = stageProgress
         else:
             completed_steps = sum(1 for s in stage_data["steps"] if s["completed"])
             total_steps = len(stage_data["steps"])
