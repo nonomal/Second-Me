@@ -88,6 +88,28 @@ class Progress:
             raise ValueError("Invalid progress file path")
         self.progress = TrainProgress()
         self.logger = logger
+        
+        # Stage mapping for process steps
+        self._stage_mapping = {
+            ProcessStep.MODEL_DOWNLOAD: "downloading_the_base_model",
+            
+            ProcessStep.LIST_DOCUMENTS: "activating_the_memory_matrix",
+            ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS: "activating_the_memory_matrix",
+            ProcessStep.CHUNK_DOCUMENT: "activating_the_memory_matrix",
+            ProcessStep.CHUNK_EMBEDDING: "activating_the_memory_matrix",
+            
+            ProcessStep.EXTRACT_DIMENSIONAL_TOPICS: "synthesize_your_life_narrative",
+            ProcessStep.MAP_ENTITY_NETWORK: "synthesize_your_life_narrative",
+            
+            ProcessStep.DECODE_PREFERENCE_PATTERNS: "prepare_training_data_for_deep_comprehension",
+            ProcessStep.REINFORCE_IDENTITY: "prepare_training_data_for_deep_comprehension",
+            ProcessStep.AUGMENT_CONTENT_RETENTION: "prepare_training_data_for_deep_comprehension",
+            
+            ProcessStep.TRAIN: "training_to_create_second_me",
+            ProcessStep.MERGE_WEIGHTS: "training_to_create_second_me",
+            ProcessStep.CONVERT_MODEL: "training_to_create_second_me",
+        }
+        
         self._load_progress()
 
     def _load_progress(self):
@@ -155,34 +177,12 @@ class Progress:
         with open(self.progress_file, "w") as f:
             json.dump(progress_dict, f, indent=2)
 
-    def _get_stage_and_step(self, step: ProcessStep) -> tuple:
-        """Get the stage and step name corresponding to the step"""
-        step_name = step.value
-        # Determine the stage based on step name
-        stage_mapping = {
-            ProcessStep.MODEL_DOWNLOAD: "downloading_the_base_model",
-            
-            ProcessStep.LIST_DOCUMENTS: "activating_the_memory_matrix",
-            ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS: "activating_the_memory_matrix",
-            ProcessStep.CHUNK_DOCUMENT: "activating_the_memory_matrix",
-            ProcessStep.CHUNK_EMBEDDING: "activating_the_memory_matrix",
-            
-            ProcessStep.EXTRACT_DIMENSIONAL_TOPICS: "synthesize_your_life_narrative",
-            ProcessStep.MAP_ENTITY_NETWORK: "synthesize_your_life_narrative",
-            
-            ProcessStep.DECODE_PREFERENCE_PATTERNS: "prepare_training_data_for_deep_comprehension",
-            ProcessStep.REINFORCE_IDENTITY: "prepare_training_data_for_deep_comprehension",
-            ProcessStep.AUGMENT_CONTENT_RETENTION: "prepare_training_data_for_deep_comprehension",
-            
-            ProcessStep.TRAIN: "training_to_create_second_me",
-            ProcessStep.MERGE_WEIGHTS: "training_to_create_second_me",
-            ProcessStep.CONVERT_MODEL: "training_to_create_second_me",
-        }
-        return stage_mapping[step], step_name
+
 
     def is_step_completed(self, step: ProcessStep) -> bool:
         """Check if a step is completed"""
-        stage_name, step_name = self._get_stage_and_step(step)        
+        stage_name = self._stage_mapping[step]
+        step_name = step.value
         step_info = self.progress.steps_map[stage_name][step_name]
         return step_info.get("completed", False)
 
@@ -193,7 +193,8 @@ class Progress:
             step: The process step to mark
             status: The status to set for the step
         """
-        stage_name, step_name = self._get_stage_and_step(step)
+        stage_name = self._stage_mapping[step]
+        step_name = step.value
         self.progress.update_progress(stage_name, step_name, status)
         self._save_progress()
 
@@ -264,7 +265,6 @@ class TrainProcessService:
             self.model_name = current_model_name
             # Create new progress instance with updated progress file name
             progress_file = f"trainprocess_progress_{current_model_name}.json"
-        
             self.progress = Progress(progress_file)
         self.is_cot = is_cot
 

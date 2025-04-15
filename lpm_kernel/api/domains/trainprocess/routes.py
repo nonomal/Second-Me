@@ -78,7 +78,7 @@ def start_process():
         # Check if there are any in_progress statuses that need to be reset
         if train_service.progress.progress.data["status"] == "in_progress":
             return jsonify(APIResponse.error(
-                message="There is an existing training process that was interrupted. Please reset the progress before starting a new one.",
+                message="There is an existing training process that was interrupted.",
                 code=409  # Conflict status code
             ))
             
@@ -324,7 +324,7 @@ def retrain():
         # Check if there are any in_progress statuses that need to be reset
         if train_service.progress.progress.data["status"] == "in_progress":
             # Reset the progress and continue
-            logger.info("Found interrupted training process, resetting status from in_progress to failed")
+            logger.info("There is an existing training process that was interrupted.")
             
         train_service.reset_progress()
 
