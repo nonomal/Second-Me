@@ -74,6 +74,14 @@ def start_process():
         train_service = TrainProcessService(
             model_name=model_name
         )
+        
+        # Check if there are any in_progress statuses that need to be reset
+        if train_service.progress.progress.data["status"] == "in_progress":
+            return jsonify(APIResponse.error(
+                message="There is an existing training process that was interrupted. Please reset the progress before starting a new one.",
+                code=409  # Conflict status code
+            ))
+            
         if not train_service.check_training_condition():
             train_service.reset_progress()
 
@@ -312,6 +320,12 @@ def retrain():
         train_service = TrainProcessService(
             model_name=model_name
         )
+        
+        # Check if there are any in_progress statuses that need to be reset
+        if train_service.progress.progress.data["status"] == "in_progress":
+            # Reset the progress and continue
+            logger.info("Found interrupted training process, resetting status from in_progress to failed")
+            
         train_service.reset_progress()
 
         thread = Thread(target=train_service.start_process)

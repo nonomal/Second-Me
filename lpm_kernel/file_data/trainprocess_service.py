@@ -110,10 +110,45 @@ class Progress:
                         for step in stage["steps"]:
                             step_name = step["name"].lower().replace(" ", "_")
                             self.progress.steps_map[stage_name][step_name] = step
+                    
+                    # Check and reset any in_progress status to failed
+                    self._reset_in_progress_status()
             except Exception as e:
                 self.logger.error(f"Error loading progress: {str(e)}")
                 # Reset progress on any error
                 self.progress = TrainProgress()
+                
+    def _reset_in_progress_status(self):
+        """Reset any in_progress status to failed after loading from file"""
+        need_save = False
+        
+        # Check overall status
+        if self.progress.data["status"] == "in_progress":
+            self.progress.data["status"] = "failed"
+            need_save = True
+            self.logger.info("Reset overall in_progress status to failed")
+        
+        # Check each stage
+        for stage in self.progress.data["stages"]:
+            if stage["status"] == "in_progress":
+                stage["status"] = "failed"
+                need_save = True
+                self.logger.info(f"Reset stage '{stage['name']}' in_progress status to failed")
+            
+            # Check each step in the stage
+            for step in stage["steps"]:
+                if step["status"] == "in_progress":
+                    step["status"] = "failed"
+                    step["completed"] = False
+                    need_save = True
+                    self.logger.info(f"Reset step '{step['name']}' in_progress status to failed")
+        
+        # Save changes if any were made
+        if need_save:
+            progress_dict = self.progress.to_dict()
+            with open(self.progress_file, "w") as f:
+                json.dump(progress_dict, f, indent=2)
+            self.logger.info("Saved progress after resetting in_progress statuses")
 
     def _save_progress(self):
         """Save progress"""
