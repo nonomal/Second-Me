@@ -62,7 +62,6 @@ class LLMClient:
         try:
             # Send request to embedding endpoint
             embeddings_array = classification.strategy_classification(user_llm_config, chunked_texts)
-
             # If we split any texts, we need to merge their embeddings back
             if sum(text_chunk_counts) > len(texts):
                 final_embeddings = []
