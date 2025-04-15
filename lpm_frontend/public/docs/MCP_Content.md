@@ -16,7 +16,7 @@ The tool manages server and client settings through a configuration file. Below 
   "mcpServers": {
     "mindverse": {
       "command": "python",
-      "args": ["{replace-with-your-path}/Second-Me/MCP/Mcp_public.py"]
+      "args": ["{replace-with-your-path}/Second-Me/mcp/mcp_public.py"]
     }
   }
 }
