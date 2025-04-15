@@ -87,8 +87,7 @@ class Progress:
         if not self.progress_file.startswith(progress_dir):
             raise ValueError("Invalid progress file path")
         self.progress = TrainProgress()
-        self.logger = logger
-        
+
         # Stage mapping for process steps
         self._stage_mapping = {
             ProcessStep.MODEL_DOWNLOAD: "downloading_the_base_model",
