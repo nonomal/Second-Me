@@ -13,7 +13,6 @@ def openai_strategy(user_llm_config: Optional[UserLLMConfigDTO], chunked_texts):
             "Authorization": f"Bearer {user_llm_config.embedding_api_key}",
             "Content-Type": "application/json",
         }
-
         data = {"input": chunked_texts, "model": user_llm_config.embedding_model_name}
 
         logger.info(f"Getting embedding for {data}, total chunks: {len(chunked_texts)}")
@@ -23,6 +22,7 @@ def openai_strategy(user_llm_config: Optional[UserLLMConfigDTO], chunked_texts):
         )
         response.raise_for_status()
         result = response.json()
+
 
         # Extract embedding vectors
         embeddings = [item["embedding"] for item in result["data"]]

@@ -12,7 +12,6 @@ def huggingface_strategy(user_llm_config: Optional[UserLLMConfigDTO], chunked_te
         model_name = "/".join(parts[-2:])
     else:
         raise ValueError("Endpoint error")
-
     try:
         model = SentenceTransformer(model_name)
         embeddings = model.encode(chunked_texts)
