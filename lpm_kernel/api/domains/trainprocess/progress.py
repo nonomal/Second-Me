@@ -142,26 +142,16 @@ class TrainProgress:
                 step_name = step["name"].lower().replace(" ", "_")
                 self.steps_map[stage_name][step_name] = step
 
-    def update_progress(self, stage: str, step: str, status: Union[Status, str], progress: Optional[float] = None):
+    def update_progress(self, stage: str, step: str, currentStepStatus: Union[Status, str], stageProgress: Optional[float] = None):
         """Update progress status
         Args:
             stage: Stage key (snake_case format)
             step: Step key (snake_case format)
-            status: Status (enum or string)
-            progress: Optional progress value (0-100)
+            currentStepStatus: Status (enum or string)
+            stageProgress: Optional progress value (0-100)
         """
-        if stage not in self.stage_map:
-            raise ValueError(f"Invalid stage: {stage}")
-            
         stage_data = self.stage_map[stage]
-        
-        # Convert status to string if it's an enum
-        status_value = status.value if isinstance(status, Status) else status
-        
-        # Find step in the stage
-        if stage not in self.steps_map or step not in self.steps_map[stage]:
-            raise ValueError(f"Invalid step {step} for stage {stage}")
-            
+        status_value = currentStepStatus.value if isinstance(currentStepStatus, Status) else currentStepStatus
         step_data = self.steps_map[stage][step]
         
         # Update step status
@@ -169,32 +159,52 @@ class TrainProgress:
         step_data["completed"] = status_value == "completed"
         
         # Update stage progress
-        if progress is not None:
-            # If progress value is provided, use it directly
-            stage_data["progress"] = progress
+        self._update_stage_progress(stage_data, stageProgress)
+        
+        # Update stage status and current step
+        self._update_stage_status(stage_data, step_data)
+        
+        # Update overall progress
+        self._update_overall_progress()
+        
+        # Update overall status
+        self._update_overall_status()
+
+    def _update_stage_progress(self, stage_data: Dict, stageProgress: Optional[float] = None):
+        """Update the progress of a stage
+        
+        Args:
+            stage_data: Stage data dictionary
+            stageProgress: Optional progress value (0-100)
+        """
+        if stageProgress is not None:
+            stage_data["progress"] = stageProgress
         else:
-            # Otherwise calculate progress based on the proportion of completed steps
             completed_steps = sum(1 for s in stage_data["steps"] if s["completed"])
             total_steps = len(stage_data["steps"])
             stage_data["progress"] = (completed_steps / total_steps) * 100.0
+
+    def _update_stage_status(self, stage_data: Dict, step_data: Dict):
+        """Update the status and current step of a stage
         
-        # Update stage status and current step
-        if all(s["completed"] for s in stage_data["steps"]):
+        Args:
+            stage_data: Stage data dictionary
+            step_data: Step data dictionary
+        """
+        if all(step["completed"] for step in stage_data["steps"]):
             stage_data["status"] = "completed"
             stage_data["current_step"] = None
-            
-            # If current stage is completed, find the next uncompleted stage
             next_stage = None
             for stage_name, stage_info in self.stage_map.items():
                 if stage_info["status"] != "completed":
                     next_stage = stage_name
                     break
             self.data["current_stage"] = next_stage
-        elif any(s["status"] == "failed" for s in stage_data["steps"]):
+        elif any(step["status"] == "failed" for step in stage_data["steps"]):
             stage_data["status"] = "failed"
             stage_data["current_step"] = step_data["name"]
             self.data["current_stage"] = stage_data["name"]
-        elif any(s["status"] == "suspended" for s in stage_data["steps"]):
+        elif any(step["status"] == "suspended" for step in stage_data["steps"]):
             stage_data["status"] = "suspended"
             stage_data["current_step"] = step_data["name"]
             self.data["current_stage"] = stage_data["name"]
@@ -202,12 +212,14 @@ class TrainProgress:
             stage_data["status"] = "in_progress"
             stage_data["current_step"] = step_data["name"]
             self.data["current_stage"] = stage_data["name"]
-        
-        # Update overall progress
+
+    def _update_overall_progress(self):
+        """Update the overall progress based on all stages"""
         completed_progress = sum(s["progress"] for s in self.data["stages"])
         self.data["overall_progress"] = completed_progress / len(self.data["stages"])
-        
-        # Update overall status
+
+    def _update_overall_status(self):
+        """Update the overall status based on all stages"""
         if all(s["status"] == "completed" for s in self.data["stages"]):
             self.data["status"] = "completed"
         elif any(s["status"] == "failed" for s in self.data["stages"]):

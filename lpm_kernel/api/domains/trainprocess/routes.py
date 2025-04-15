@@ -72,8 +72,16 @@ def start_process():
 
         # Create service instance with model name and additional parameters
         train_service = TrainProcessService(
-            model_name=model_name
+            current_model_name=model_name
         )
+        
+        # Check if there are any in_progress statuses that need to be reset
+        if train_service.progress.progress.data["status"] == "in_progress":
+            return jsonify(APIResponse.error(
+                message="There is an existing training process that was interrupted.",
+                code=409  # Conflict status code
+            ))
+            
         if not train_service.check_training_condition():
             train_service.reset_progress()
 
@@ -160,7 +168,7 @@ def get_progress(model_name):
     sanitized_model_name = secure_filename(model_name)  # Sanitize model_name
     progress_name = f'trainprocess_progress_{sanitized_model_name}.json'  # Build filename based on the sanitized model_name
     try:
-        train_service = TrainProcessService(progress_file=progress_name, model_name=sanitized_model_name)  # Pass in specific progress file
+        train_service = TrainProcessService(progress_file=progress_name, current_model_name=sanitized_model_name)  # Pass in specific progress file
         progress = train_service.progress.progress
 
         return jsonify(
@@ -212,7 +220,7 @@ def stop_training():
             progress = train_service.progress.progress
             
             # Check if status is SUSPENDED
-            if progress.data["status"] == "suspended":
+            if progress.data["status"] == "suspended" or progress.data["status"] == "failed":
                 return jsonify(APIResponse.success(
                     message="Training process has been stopped and status is confirmed as suspended",
                     data={"status": "suspended"}
@@ -310,8 +318,14 @@ def retrain():
         
         # Create training service instance
         train_service = TrainProcessService(
-            model_name=model_name
+            current_model_name=model_name
         )
+        
+        # Check if there are any in_progress statuses that need to be reset
+        if train_service.progress.progress.data["status"] == "in_progress":
+            # Reset the progress and continue
+            logger.info("There is an existing training process that was interrupted.")
+            
         train_service.reset_progress()
 
         thread = Thread(target=train_service.start_process)
