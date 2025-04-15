@@ -59,7 +59,7 @@ export interface TrainProgress {
 export interface TrainingParams {
   concurrency_threads?: number;
   data_synthesis_mode?: string;
-  learning_rate?: string;
+  learning_rate?: number;
   number_of_epochs?: number;
 }
 
