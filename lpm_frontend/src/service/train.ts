@@ -75,6 +75,13 @@ export const getTrainProgress = (config: TrainingConfig) => {
   });
 };
 
+export const resetProgress = () => {
+  return Request<CommonResponse<EmptyResponse>>({
+    method: 'post',
+    url: `/api/trainprocess/progress/reset`
+  });
+};
+
 export const stopTrain = () => {
   return Request<CommonResponse<EmptyResponse>>({
     method: 'post',

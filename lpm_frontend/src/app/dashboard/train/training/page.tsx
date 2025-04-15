@@ -4,7 +4,14 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import InfoModal from '@/components/InfoModal';
 import type { TrainingParams } from '@/service/train';
-import { startTrain, stopTrain, retrain, getModelName, getTrainingParams } from '@/service/train';
+import {
+  startTrain,
+  stopTrain,
+  retrain,
+  getModelName,
+  getTrainingParams,
+  resetProgress
+} from '@/service/train';
 import { useTrainingStore } from '@/store/useTrainingStore';
 import { getMemoryList } from '@/service/memory';
 import { message, Modal } from 'antd';
@@ -51,6 +58,25 @@ interface TrainingDetail {
   timestamp: string;
 }
 
+const baseModelOptions = [
+  {
+    value: 'Qwen2.5-0.5B-Instruct',
+    label: 'Qwen2.5-0.5B-Instruct (8GB+ RAM Recommended)'
+  },
+  {
+    value: 'Qwen2.5-1.5B-Instruct',
+    label: 'Qwen2.5-1.5B-Instruct (16GB+ RAM Recommended)'
+  },
+  {
+    value: 'Qwen2.5-3B-Instruct',
+    label: 'Qwen2.5-3B-Instruct (32GB+ RAM Recommended)'
+  },
+  {
+    value: 'Qwen2.5-7B-Instruct',
+    label: 'Qwen2.5-7B-Instruct (64GB+ RAM Recommended)'
+  }
+];
+
 export default function TrainingPage() {
   // Title and explanation section
   const pageTitle = 'Training Process';
@@ -69,25 +95,6 @@ export default function TrainingPage() {
   const [showMemoryModal, setShowMemoryModal] = useState(false);
   const modelConfig = useModelConfigStore((store) => store.modelConfig);
   const updateModelConfig = useModelConfigStore((store) => store.updateModelConfig);
-
-  const baseModelOptions = [
-    {
-      value: 'Qwen2.5-0.5B-Instruct',
-      label: 'Qwen2.5-0.5B-Instruct (8GB+ RAM Recommended)'
-    },
-    {
-      value: 'Qwen2.5-1.5B-Instruct',
-      label: 'Qwen2.5-1.5B-Instruct (16GB+ RAM Recommended)'
-    },
-    {
-      value: 'Qwen2.5-3B-Instruct',
-      label: 'Qwen2.5-3B-Instruct (32GB+ RAM Recommended)'
-    },
-    {
-      value: 'Qwen2.5-7B-Instruct',
-      label: 'Qwen2.5-7B-Instruct (64GB+ RAM Recommended)'
-    }
-  ];
 
   const [config, setConfig] = useState<TrainingConfig>({
     modelProvider: 'ollama',
@@ -402,6 +409,28 @@ export default function TrainingPage() {
     }
   };
 
+  const handleResetProgress = () => {
+    setTrainActionLoading(true);
+
+    resetProgress()
+      .then((res) => {
+        if (res.data.code === 0) {
+          setTrainingParams(nowTrainingParams || {});
+          setNowTrainingParams(null);
+          setIsResume(false);
+          resetTrainingState();
+        } else {
+          throw new Error(res.data.message || 'Failed to reset progress');
+        }
+      })
+      .catch((error) => {
+        console.error('Error resetting progress:', error);
+      })
+      .finally(() => {
+        setTrainActionLoading(false);
+      });
+  };
+
   // Start new training
   const handleStartNewTraining = async () => {
     setIsTraining(true);
@@ -579,6 +608,7 @@ export default function TrainingPage() {
           baseModelOptions={baseModelOptions}
           changeBaseModel={changeBaseModel}
           config={config}
+          handleResetProgress={handleResetProgress}
           handleTrainingAction={handleTrainingAction}
           isResume={isResume}
           isTraining={isTraining}
