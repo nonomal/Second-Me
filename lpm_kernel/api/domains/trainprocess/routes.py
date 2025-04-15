@@ -169,6 +169,7 @@ def get_progress(model_name):
             )
         )
     except Exception as e:
+        logger.error(f"Get progress failed: {str(e)}", exc_info=True)
         return jsonify(APIResponse.error(message=str(e)))
 
 @trainprocess_bp.route("/progress/reset", methods=["POST"])
@@ -190,7 +191,7 @@ def reset_progress():
 
         return jsonify(APIResponse.success(message="Progress reset successfully"))
     except Exception as e:
-        logger.error(f"Reset progress failed: {str(e)}")
+        logger.error(f"Reset progress failed: {str(e)}", exc_info=True)
         return jsonify(APIResponse.error(message=f"Failed to reset progress: {str(e)}"))
 
 
@@ -222,7 +223,7 @@ def stop_training():
             time.sleep(wait_interval)
 
     except Exception as e:
-        logger.error(f"Error stopping training process: {str(e)}")
+        logger.error(f"Error stopping training process: {str(e)}", exc_info=True)
         return jsonify(APIResponse.error(message=f"Error stopping training process: {str(e)}"))
 
 
@@ -248,7 +249,7 @@ def get_model_name():
         
         return jsonify(APIResponse.success(data={"model_name": model_name}))
     except Exception as e:
-        logger.error(f"Failed to get model name: {str(e)}")
+        logger.error(f"Failed to get model name: {str(e)}", exc_info=True)
         return jsonify(APIResponse.error(message=f"Failed to get model name: {str(e)}"))
 
 
@@ -277,7 +278,7 @@ def get_training_params():
         
         return jsonify(APIResponse.success(data=training_params))
     except Exception as e:
-        logger.error(f"Error getting training parameters: {str(e)}")
+        logger.error(f"Error getting training parameters: {str(e)}", exc_info=True)
         return jsonify(APIResponse.error(message=f"Error getting training parameters: {str(e)}"))
 
 
@@ -327,5 +328,5 @@ def retrain():
             )
         )
     except Exception as e:
-        logger.error(f"Retrain reset failed: {str(e)}")
+        logger.error(f"Retrain reset failed: {str(e)}", exc_info=True)
         return jsonify(APIResponse.error(message=f"Failed to reset progress to data processing stage: {str(e)}"))
