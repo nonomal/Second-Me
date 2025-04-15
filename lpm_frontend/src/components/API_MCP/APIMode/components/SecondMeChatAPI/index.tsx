@@ -4,6 +4,7 @@ import { Badge, Button, Input } from 'antd';
 import { CheckCircleFilled, CopyOutlined } from '@ant-design/icons';
 import { useState, useMemo } from 'react';
 import { useLoadInfoStore } from '@/store/useLoadInfoStore';
+import { copyToClipboard } from '@/utils/copy';
 
 const SecondMeChatAPI = () => {
   const [copied, setCopied] = useState(false);
@@ -16,9 +17,14 @@ const SecondMeChatAPI = () => {
   }, [loadInfo?.instance_id]);
 
   const handleCopyEndpoint = () => {
-    navigator.clipboard.writeText(endpoint);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    copyToClipboard(endpoint)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => {
+        console.error('Failed to copy endpoint');
+      });
   };
 
   return (
@@ -59,20 +65,22 @@ const SecondMeChatAPI = () => {
         </div>
 
         <div className="border-b border-gray-200" />
-        <div className="flex p-4">
-          <a
-            href="https://github.com/mindverse/Second-Me/blob/master/docs/Public%20Chat%20API.md"
-            rel="noreferrer"
-            target="_blank"
+        <div
+          className="flex p-4"
+          onClick={() => {
+            window.open(
+              'https://github.com/mindverse/Second-Me/blob/master/docs/Public%20Chat%20API.md',
+              '_blank'
+            );
+          }}
+        >
+          <Button
+            className="min-w-[160px] flex items-center justify-center"
+            icon={<span className="mr-2">📄</span>}
+            size="large"
           >
-            <Button
-              className="min-w-[160px] flex items-center justify-center"
-              icon={<span className="mr-2">📄</span>}
-              size="large"
-            >
-              API Reference
-            </Button>
-          </a>
+            API Reference
+          </Button>
         </div>
       </div>
 
