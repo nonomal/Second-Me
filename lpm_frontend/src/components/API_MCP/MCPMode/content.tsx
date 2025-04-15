@@ -29,7 +29,7 @@ const Content = (): ReactElement => {
   const [markdownContent, setMarkdownContent] = useState<string>('');
 
   useEffect(() => {
-    fetch('/docs/MCP_Content.md')
+    fetch('/docs/mcp_content.md')
       .then((response) => response.text())
       .then((text) => setMarkdownContent(text));
   }, []);
