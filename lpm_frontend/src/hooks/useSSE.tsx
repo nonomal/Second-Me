@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 
 export interface ChatRequest {
   messages: ChatHistory[];
-  metadata: ChatMetadata;
+  metadata?: ChatMetadata;
   temperature: number;
   max_tokens?: number;
   stream: boolean;
