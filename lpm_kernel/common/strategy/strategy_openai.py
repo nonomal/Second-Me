@@ -22,7 +22,6 @@ def openai_strategy(user_llm_config: Optional[UserLLMConfigDTO], chunked_texts):
         response.raise_for_status()
         result = response.json()
 
-
         # Extract embedding vectors
         embeddings = [item["embedding"] for item in result["data"]]
         embeddings_array = np.array(embeddings)

@@ -16,6 +16,5 @@ def huggingface_strategy(user_llm_config: Optional[UserLLMConfigDTO], chunked_te
         model = SentenceTransformer(model_name)
         embeddings = model.encode(chunked_texts)
         return embeddings
-
     except Exception as e:
         raise Exception(f"Failed to get embeddings: {str(e)}")
