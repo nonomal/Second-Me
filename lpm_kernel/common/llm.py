@@ -62,17 +62,6 @@ class LLMClient:
         try:
             # Send request to embedding endpoint
             embeddings_array = classification.strategy_classification(user_llm_config, chunked_texts)
-            # parts = user_llm_config.embedding_endpoint.strip("/").split("/")
-            # if len(parts) >= 2:
-            #     model_name = "/".join(parts[-2:])
-            # else:
-            #     raise ValueError("Invalid embedding endpoint format.")
-            #
-            # import os
-            # os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-            #
-            # model = SentenceTransformer(model_name)
-            # embeddings_array = model.encode(chunked_texts)
 
             # If we split any texts, we need to merge their embeddings back
             if sum(text_chunk_counts) > len(texts):
