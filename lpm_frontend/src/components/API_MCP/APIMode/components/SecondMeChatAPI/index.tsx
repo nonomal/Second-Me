@@ -65,18 +65,16 @@ const SecondMeChatAPI = () => {
         </div>
 
         <div className="border-b border-gray-200" />
-        <div
-          className="flex p-4"
-          onClick={() => {
-            window.open(
-              'https://github.com/mindverse/Second-Me/blob/master/docs/Public%20Chat%20API.md',
-              '_blank'
-            );
-          }}
-        >
+        <div className="flex p-4">
           <Button
             className="min-w-[160px] flex items-center justify-center"
             icon={<span className="mr-2">📄</span>}
+            onClick={() => {
+              window.open(
+                'https://github.com/mindverse/Second-Me/blob/master/docs/Public%20Chat%20API.md',
+                '_blank'
+              );
+            }}
             size="large"
           >
             API Reference
