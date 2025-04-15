@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import time
+import sys
 from dataclasses import asdict
 
 from flask import Blueprint, jsonify, Response, request
@@ -551,7 +552,17 @@ def start_llama_server():
         model_name = data["model_name"]
         paths = get_model_paths(model_name)
         gguf_path = os.path.join(paths["gguf_dir"], "model.gguf")
-        server_path = os.path.join(os.getcwd(), "llama.cpp/build/bin/llama-server")
+
+        server_path = os.path.join(os.getcwd(), "llama.cpp/build/bin")
+        if os.path.exists(os.path.join(os.getcwd(), "llama.cpp/build/bin/Release")):
+            server_path = os.path.join(os.getcwd(), "llama.cpp/build/bin/Release")
+            
+        # Determine the executable name based on platform (.exe for Windows)
+        if sys.platform.startswith("win"):
+            server_executable = "llama-server.exe"
+        else:
+            server_executable = "llama-server"
+        server_path = os.path.join(server_path, server_executable)
 
         # Check if service and model file exist
         if not os.path.exists(server_path):

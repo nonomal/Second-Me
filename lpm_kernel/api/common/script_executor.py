@@ -15,14 +15,6 @@ class ScriptExecutor:
     def __init__(self):
         # Check if running in Docker environment
         self.in_docker = os.getenv("IN_DOCKER_ENV") == "1" or os.path.exists("/.dockerenv")
-        
-        # Only check conda environment if not in Docker
-        if not self.in_docker:
-            self.conda_env = os.getenv("CONDA_DEFAULT_ENV")
-            if not self.conda_env:
-                raise ValueError("CONDA_DEFAULT_ENV environment variable is not set and not running in Docker")
-        else:
-            self.conda_env = "docker-env"  # Use a placeholder for Docker
 
     def execute(
         self,
@@ -33,7 +25,7 @@ class ScriptExecutor:
         log_file: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Execute scripts in the specified conda environment or directly in Docker
+        Execute scripts directly
 
         Args:
             script_path: Script path or command
@@ -47,39 +39,15 @@ class ScriptExecutor:
         """
         try:
             # Build the complete command
-            if self.in_docker:
-                # In Docker, directly execute Python or the command
-                if script_path.endswith(".py"):
-                    cmd = ["python", script_path]
-                else:
-                    cmd = [script_path]
+            if script_path.endswith(".py"):
+                # Python script
+                cmd = ["python", "-u", script_path]  # Add -u parameter to disable output buffering
+            elif script_path.endswith(".sh"):
+                # Shell script
+                cmd = ["bash", "-x", script_path]  # Add -x parameter to display executed commands
             else:
-                # In conda environment
-                if script_path.endswith(".py"):
-                    # Python script
-                    cmd = [
-                        "conda",
-                        "run",
-                        "-n",
-                        self.conda_env,
-                        "python",
-                        "-u",
-                        script_path,
-                    ]  # Add -u parameter to disable output buffering
-                elif script_path.endswith(".sh"):
-                    # Shell script
-                    cmd = [
-                        "conda",
-                        "run",
-                        "-n",
-                        self.conda_env,
-                        "bash",
-                        "-x",
-                        script_path,
-                    ]  # Add -x parameter to display executed commands
-                else:
-                    # Other commands
-                    cmd = ["conda", "run", "-n", self.conda_env, script_path]
+                # Other commands
+                cmd = [script_path]
 
             # Add additional parameters
             if args:

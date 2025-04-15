@@ -1,55 +1,19 @@
 import { create } from 'zustand';
-import type { StepStatus, StageStatus } from '@/service/train';
-import { getTrainProgress, StageName } from '@/service/train';
+import { getTrainProgress, type TrainProgress } from '@/service/train';
 
 export type ModelStatus = 'seed_identity' | 'memory_upload' | 'training' | 'trained' | 'running';
-
-interface StageSteps {
-  [key: string]: {
-    completed: boolean;
-    status: StepStatus;
-    name: string;
-  };
-}
-
-interface StageInfo {
-  name: string;
-  progress: number;
-  status: StageStatus;
-  current_step: string | null;
-  steps: StageSteps;
-}
-
-interface TrainingProgress {
-  overall: number;
-  stage1: number;
-  stage2: number;
-  stage3: number;
-  stage4: number;
-  stage5: number;
-  currentStage: StageName | null;
-  currentStageStep: string | null;
-  status: StageStatus;
-  stageDetails: {
-    stage1: StageInfo;
-    stage2: StageInfo;
-    stage3: StageInfo;
-    stage4: StageInfo;
-    stage5: StageInfo;
-  };
-}
 
 interface ModelState {
   status: ModelStatus;
   error: boolean;
   isServiceStarting: boolean;
   isServiceStopping: boolean;
-  trainingProgress: TrainingProgress;
+  trainingProgress: TrainProgress;
   setStatus: (status: ModelStatus) => void;
   setError: (error: boolean) => void;
   setServiceStarting: (isStarting: boolean) => void;
   setServiceStopping: (isStopping: boolean) => void;
-  setTrainingProgress: (progress: TrainingProgress) => void;
+  setTrainingProgress: (progress: TrainProgress) => void;
   checkTrainStatus: () => Promise<void>;
   resetTrainingState: () => void;
 }
@@ -60,52 +24,62 @@ export const useTrainingStore = create<ModelState>((set) => ({
   isServiceStopping: false,
   error: false,
   trainingProgress: {
-    overall: 0,
-    stage1: 0,
-    stage2: 0,
-    stage3: 0,
-    stage4: 0,
-    stage5: 0,
-    currentStage: null,
-    currentStageStep: null,
-    status: 'pending',
-    stageDetails: {
-      stage1: {
+    current_stage: 'downloading_the_base_model',
+    overall_progress: 0,
+    stages: [
+      {
+        current_step: null,
         name: 'Downloading the Base Model',
         progress: 0,
-        status: 'pending',
-        current_step: null,
-        steps: {}
+        status: 'in_progress',
+        steps: [{ completed: false, name: 'Model Download', status: 'pending' }]
       },
-      stage2: {
+      {
+        current_step: null,
         name: 'Activating the Memory Matrix',
         progress: 0,
-        status: 'pending',
-        current_step: null,
-        steps: {}
+        status: 'in_progress',
+        steps: [
+          { completed: false, name: 'List Documents', status: 'pending' },
+          { completed: false, name: 'Generate Document Embeddings', status: 'pending' },
+          { completed: false, name: 'Process Chunks', status: 'pending' },
+          { completed: false, name: 'Chunk Embedding', status: 'pending' }
+        ]
       },
-      stage3: {
+      {
+        current_step: null,
         name: 'Synthesize Your Life Narrative',
-        progress: 0,
-        status: 'pending',
-        current_step: null,
-        steps: {}
+        progress: 0.0,
+        status: 'in_progress',
+        steps: [
+          { completed: false, name: 'Extract Dimensional Topics', status: 'pending' },
+          { completed: false, name: 'Map Your Entity Network', status: 'pending' }
+        ]
       },
-      stage4: {
+      {
+        current_step: null,
         name: 'Prepare Training Data for Deep Comprehension',
-        progress: 0,
-        status: 'pending',
-        current_step: null,
-        steps: {}
+        progress: 0.0,
+        status: 'in_progress',
+        steps: [
+          { completed: false, name: 'Decode Preference Patterns', status: 'pending' },
+          { completed: false, name: 'Reinforce Identity', status: 'pending' },
+          { completed: false, name: 'Augment Content Retention', status: 'pending' }
+        ]
       },
-      stage5: {
-        name: 'Training to create Second Me',
-        progress: 0,
-        status: 'pending',
+      {
         current_step: null,
-        steps: {}
+        name: 'Training to create Second Me',
+        progress: 0.0,
+        status: 'in_progress',
+        steps: [
+          { completed: false, name: 'Train', status: 'pending' },
+          { completed: false, name: 'Merge Weights', status: 'pending' },
+          { completed: false, name: 'Convert Model', status: 'pending' }
+        ]
       }
-    }
+    ],
+    status: 'pending'
   },
   setStatus: (status) => set({ status }),
   setError: (error) => set({ error }),
@@ -117,58 +91,62 @@ export const useTrainingStore = create<ModelState>((set) => ({
       status: 'memory_upload',
       error: false,
       trainingProgress: {
-        overall: 0,
-        stage1: 0,
-        stage2: 0,
-        stage3: 0,
-        stage4: 0,
-        stage5: 0,
-        currentStage: StageName.Stage1,
-        currentStageStep: 'model_download',
-        status: 'in_progress',
-        stageDetails: {
-          stage1: {
+        current_stage: 'downloading_the_base_model',
+        overall_progress: 0,
+        stages: [
+          {
+            current_step: null,
             name: 'Downloading the Base Model',
             progress: 0,
             status: 'in_progress',
-            current_step: 'model_download',
-            steps: {
-              model_download: {
-                completed: false,
-                status: 'in_progress',
-                name: 'Downloading the Base Model'
-              }
-            }
+            steps: [{ completed: false, name: 'Model Download', status: 'pending' }]
           },
-          stage2: {
+          {
+            current_step: null,
             name: 'Activating the Memory Matrix',
             progress: 0,
-            status: 'pending',
-            current_step: null,
-            steps: {}
+            status: 'in_progress',
+            steps: [
+              { completed: false, name: 'List Documents', status: 'pending' },
+              { completed: false, name: 'Generate Document Embeddings', status: 'pending' },
+              { completed: false, name: 'Process Chunks', status: 'pending' },
+              { completed: false, name: 'Chunk Embedding', status: 'pending' }
+            ]
           },
-          stage3: {
+          {
+            current_step: null,
             name: 'Synthesize Your Life Narrative',
-            progress: 0,
-            status: 'pending',
-            current_step: null,
-            steps: {}
+            progress: 0.0,
+            status: 'in_progress',
+            steps: [
+              { completed: false, name: 'Extract Dimensional Topics', status: 'pending' },
+              { completed: false, name: 'Map Your Entity Network', status: 'pending' }
+            ]
           },
-          stage4: {
+          {
+            current_step: null,
             name: 'Prepare Training Data for Deep Comprehension',
-            progress: 0,
-            status: 'pending',
-            current_step: null,
-            steps: {}
+            progress: 0.0,
+            status: 'in_progress',
+            steps: [
+              { completed: false, name: 'Decode Preference Patterns', status: 'pending' },
+              { completed: false, name: 'Reinforce Identity', status: 'pending' },
+              { completed: false, name: 'Augment Content Retention', status: 'pending' }
+            ]
           },
-          stage5: {
-            name: 'Training to create Second Me',
-            progress: 0,
-            status: 'pending',
+          {
             current_step: null,
-            steps: {}
+            name: 'Training to create Second Me',
+            progress: 0.0,
+            status: 'in_progress',
+            steps: [
+              { completed: false, name: 'Train', status: 'pending' },
+              { completed: false, name: 'Merge Weights', status: 'pending' },
+              { completed: false, name: 'Convert Model', status: 'pending' }
+            ]
           }
-        }
+        ],
+        status: 'pending'
       }
     }),
   checkTrainStatus: async () => {
@@ -183,26 +161,9 @@ export const useTrainingStore = create<ModelState>((set) => ({
 
       if (res.data.code === 0) {
         const data = res.data.data;
-        const { stages, overall_progress, current_stage, status } = data;
+        const { overall_progress } = data;
 
-        const newProgress = {
-          overall: overall_progress,
-          stage1: stages.downloading_the_base_model.progress,
-          stage2: stages.activating_the_memory_matrix.progress,
-          stage3: stages.synthesize_your_life_narrative.progress,
-          stage4: stages.prepare_training_data_for_deep_comprehension.progress,
-          stage5: stages.training_to_create_second_me.progress,
-          currentStage: current_stage as StageName,
-          currentStageStep: current_stage ? stages[current_stage].current_step : null,
-          status: status,
-          stageDetails: {
-            stage1: stages.downloading_the_base_model,
-            stage2: stages.activating_the_memory_matrix,
-            stage3: stages.synthesize_your_life_narrative,
-            stage4: stages.prepare_training_data_for_deep_comprehension,
-            stage5: stages.training_to_create_second_me
-          }
-        };
+        const newProgress = data;
 
         if (newProgress.status === 'failed') {
           set({ error: true });

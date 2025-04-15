@@ -21,7 +21,10 @@
     ]
   },
   "overrides": {
-    "braces": "3.0.3"
+    "braces": "3.0.3",
+    "@babel/runtime": "^7.26.10",
+    "yargs-parser": "^20.2.9",
+    "postcss": "^8.4.31"
   },
   "dependencies": {
     "@headlessui/react": "^1.7.17",
@@ -41,9 +44,9 @@
     "framer-motion": "^12.3.1",
     "github-markdown-css": "^5.8.1",
     "lucide-react": "^0.475.0",
-    "next": "14",
-    "react": "18",
-    "react-dom": "18",
+    "next": "14.2.25",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
     "react-markdown": "^9.0.3",
     "remark-gfm": "^4.0.0",
     "styled-components": "^6.1.15",
@@ -56,8 +59,8 @@
     "@trivago/prettier-plugin-sort-imports": "^5.2.0",
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^20",
-    "@types/react": "18",
-    "@types/react-dom": "18",
+    "@types/react": "18.3.1",
+    "@types/react-dom": "18.3.1",
     "@typescript-eslint/eslint-plugin": "^8.26.1",
     "@typescript-eslint/parser": "^8.26.1",
     "eslint": "^8.57.0",
@@ -68,7 +71,7 @@
     "eslint-plugin-prettier": "^5.0.1",
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
-    "postcss": "^8",
+    "postcss": "^8.4.31",
     "prettier": "^3.1.0",
     "stylelint": "^15.11.0",
     "stylelint-config-rational-order": "^0.1.2",
