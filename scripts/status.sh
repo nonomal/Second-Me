@@ -1,55 +1,20 @@
 #!/bin/bash
 
-# Color definitions
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-MAGENTA='\033[0;35m'
-CYAN='\033[0;36m'
-GRAY='\033[0;90m'
-BOLD='\033[1m'
-NC='\033[0m' # No Color
-
-# Get current timestamp
-get_timestamp() {
-    date "+%Y-%m-%d %H:%M:%S"
-}
-
-# Print formatted log messages
-log_info() {
-    echo -e "${GRAY}[$(get_timestamp)]${NC} ${GREEN}[INFO]${NC}    $1"
-}
-
-log_success() {
-    echo -e "${GRAY}[$(get_timestamp)]${NC} ${GREEN}[SUCCESS]${NC} $1"
-}
-
-log_warning() {
-    echo -e "${GRAY}[$(get_timestamp)]${NC} ${YELLOW}[WARNING]${NC} $1"
-}
-
-log_error() {
-    echo -e "${GRAY}[$(get_timestamp)]${NC} ${RED}[ERROR]${NC}   $1"
-}
-
-log_section() {
-    echo -e "\n${CYAN}════════════════════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}  $1${NC}"
-    echo -e "${CYAN}════════════════════════════════════════════════════════════════════════════════${NC}\n"
-}
+# Source the logging utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/utils/logging.sh"
 
 # Load configuration from .env file
 load_env() {
     if [ -f .env ]; then
-        # Only load necessary environment variables
+        # Load necessary environment variables
         export LOCAL_APP_PORT=$(grep '^LOCAL_APP_PORT=' .env | cut -d '=' -f2)
         export LOCAL_FRONTEND_PORT=$(grep '^LOCAL_FRONTEND_PORT=' .env | cut -d '=' -f2)
     else
         # Use default ports if .env not found
         export LOCAL_APP_PORT=8002
         export LOCAL_FRONTEND_PORT=3000
-        log_info "Using default ports: Backend=${LOCAL_APP_PORT}, Frontend=${LOCAL_FRONTEND_PORT}"
+        log_warning "Using default ports: Backend=${LOCAL_APP_PORT}, Frontend=${LOCAL_FRONTEND_PORT}"
     fi
 }
 

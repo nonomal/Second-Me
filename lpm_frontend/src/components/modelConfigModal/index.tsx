@@ -3,6 +3,7 @@ import { useModelConfigStore } from '@/store/useModelConfigStore';
 import { Input, message, Modal, Radio } from 'antd';
 import Image from 'next/image';
 import { useCallback, useEffect, useState } from 'react';
+import { QuestionCircleOutlined } from '@ant-design/icons';
 
 interface IProps {
   open: boolean;
@@ -222,8 +223,18 @@ const ModelConfigModal = (props: IProps) => {
       onOk={handleUpdate}
       open={open}
       title={
-        <div className="text-xl font-semibold leading-6 text-gray-900">
-          Support Model Configuration
+        <div className="flex items-center gap-2">
+          <div className="text-xl font-semibold leading-6 text-gray-900">
+            Support Model Configuration
+          </div>
+          <a
+            className="text-gray-500 hover:text-gray-700"
+            href="https://secondme.gitbook.io/secondme/guides/create-second-me/support-model-config"
+            rel="noreferrer"
+            target="_blank"
+          >
+            <QuestionCircleOutlined />
+          </a>
         </div>
       }
     >

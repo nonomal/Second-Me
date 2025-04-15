@@ -571,16 +571,24 @@ class L2DataProcessor:
             f2.write(summarize_descriptions)
 
         # Run GraphRAG indexing
-        subprocess.run(
-            [
-                "bash",
-                os.path.join(
-                    os.getcwd(),
-                    "lpm_kernel/L2/data_pipeline/data_prep/scripts/graphrag_indexing.sh",
-                ),
-            ],
-            capture_output=False,
-        )
+        try:
+            result = subprocess.run(
+                [
+                    "bash",
+                    os.path.join(
+                        os.getcwd(),
+                        "lpm_kernel/L2/data_pipeline/data_prep/scripts/graphrag_indexing.sh",
+                    ),
+                ],
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+            logger.error(f"subprocess.run graphrag index error: {result.stderr}")
+            if result.stderr:
+                raise RuntimeError("subprocess.run graphrag index error")
+        except Exception as e:
+            raise
 
         """Post-processing"""
 

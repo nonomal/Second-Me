@@ -35,17 +35,9 @@ class ScriptRunner:
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         return os.path.join(log_dir, f"{script_type}_{timestamp}.log")
 
-    def _check_conda_env(self) -> Optional[str]:
-        """
-        Check current conda environment
-        Returns:
-            Optional[str]: conda environment name, returns None if not found
-        """
-        return os.environ.get("CONDA_DEFAULT_ENV")
-
     def _check_execution_env(self) -> Dict[str, str]:
         """
-        Get current execution environment information, supporting conda, docker or regular system environment
+        Get current execution environment information, supporting docker or regular system environment
         Returns:
             Dict[str, str]: Dictionary containing environment type and detailed information
         """
@@ -58,13 +50,6 @@ class ScriptRunner:
         if os.environ.get("IN_DOCKER_ENV") == "1":
             env_info["type"] = "docker"
             env_info["details"] = "docker-env-variable"
-            return env_info
-        
-        # Check if in conda environment
-        conda_env = self._check_conda_env()
-        if conda_env:
-            env_info["type"] = "conda"
-            env_info["details"] = conda_env
             return env_info
         
         # Regular system environment

@@ -25,8 +25,10 @@ from lpm_kernel.configs.config import Config
 from lpm_kernel.file_data.chunker import DocumentChunker
 from lpm_kernel.kernel.l1.l1_manager import generate_l1_from_l0
 import threading
-from ..api.domains.trainprocess.progress import TrainProgress, Status, Step, Status
+from ..api.domains.trainprocess.progress import TrainProgress, Status
 import gc
+import subprocess
+import shlex
 
 from lpm_kernel.configs.logging import get_train_process_logger, TRAIN_LOG_FILE
 logger = get_train_process_logger()
@@ -95,46 +97,30 @@ class Progress:
             try:
                 with open(self.progress_file, "r") as f:
                     saved_progress = json.load(f)
-                    # Restore saved progress state
-                    for stage_name, stage_data in saved_progress.get("stages", {}).items():
-                        if stage_name in self.progress.stages:
-                            stage = self.progress.stages[stage_name]
-                            # Restore stage progress
-                            if "progress" in stage_data:
-                                stage.progress = stage_data["progress"]
-                            # Restore stage status
-                            if "status" in stage_data:
-                                stage.status = Status[stage_data["status"].upper()]
-                            # Restore current step
-                            if "current_step" in stage_data:
-                                stage.current_step = stage_data["current_step"]
-                            
-                            # Restore step status
-                            for step_name, step_data in stage_data.get("steps", {}).items():
-                                if step_name in stage.steps:
-                                    step = stage.steps[step_name]
-                                    if "status" in step_data:
-                                        status = Status[step_data["status"].upper()]
-                                        self.progress.update_progress(
-                                            stage_name,
-                                            step_name,
-                                            status,
-                                            step_data.get("progress", None)
-                                        )
+                    self.progress.data = saved_progress
                     
-                    # Restore overall progress
-                    if "overall_progress" in saved_progress:
-                        self.progress.overall_progress = saved_progress["overall_progress"]
-                    # Restore current stage
-                    if "current_stage" in saved_progress:
-                        self.progress.current_stage = saved_progress["current_stage"]
-                    # Restore overall status
-                    if "status" in saved_progress:
-                        self.progress.status = Status[saved_progress["status"].upper()]
+                    self.progress.stage_map = {}
+                    for stage in self.progress.data["stages"]:
+                        stage_name = stage["name"].lower().replace(" ", "_")
+                        self.progress.stage_map[stage_name] = stage
+                    
+                    self.progress.steps_map = {}
+                    for stage_name, stage in self.progress.stage_map.items():
+                        self.progress.steps_map[stage_name] = {}
+                        for step in stage["steps"]:
+                            step_name = step["name"].lower().replace(" ", "_")
+                            self.progress.steps_map[stage_name][step_name] = step
+                            
             except json.JSONDecodeError as e:
                 self.logger.error(f"Failed to load progress file: {str(e)}")
+                # Reset progress if JSON is invalid
+                self.progress = TrainProgress()
+                # Save a valid progress file to prevent future errors
+                self._save_progress()
             except Exception as e:
                 self.logger.error(f"Error loading progress: {str(e)}")
+                # Reset progress on any error
+                self.progress = TrainProgress()
 
     def _save_progress(self):
         """Save progress"""
@@ -173,11 +159,16 @@ class Progress:
     def is_step_completed(self, step: ProcessStep) -> bool:
         """Check if a step is completed"""
         stage_name, step_name = self._get_stage_and_step(step)
-        stage = self.progress.stages.get(stage_name)
-        if not stage:
+        
+        # Using the new TrainProgress data structure
+        if stage_name not in self.progress.stage_map:
             return False
-        step_info = stage.steps.get(step_name)
-        return step_info and step_info.completed
+            
+        if step_name not in self.progress.steps_map.get(stage_name, {}):
+            return False
+            
+        step_info = self.progress.steps_map[stage_name][step_name]
+        return step_info.get("completed", False)
 
     def mark_step_completed(self, step: ProcessStep):
         """Mark a step as completed"""
@@ -190,7 +181,7 @@ class Progress:
                 "step": step_name,
                 "status": Status.COMPLETED.value
             })
-
+            
     def mark_step_failed(self, step: ProcessStep):
         """Mark a step as failed"""
         stage_name, step_name = self._get_stage_and_step(step)
@@ -202,7 +193,19 @@ class Progress:
                 "step": step_name,
                 "status": Status.FAILED.value
             })
-            
+
+    def mark_step_suspended(self, step: ProcessStep):
+        """Mark a step as suspended"""
+        stage_name, step_name = self._get_stage_and_step(step)
+        self.progress.update_progress(stage_name, step_name, Status.SUSPENDED)
+        self._save_progress()
+        if self.progress_callback:
+            self.progress_callback({
+                "stage": stage_name,
+                "step": step_name,
+                "status": Status.SUSPENDED.value
+            })
+
     def mark_step_in_progress(self, step: ProcessStep):
         """Mark a step as in progress"""
         stage_name, step_name = self._get_stage_and_step(step)
@@ -239,6 +242,15 @@ class TrainProcessService:
     
     _instance = None
     _initialized = False
+    
+    # Static variable to store the latest training parameters
+    _latest_training_params = {
+        "model_name": "Qwen2.5-0.5B-Instruct",
+        "learning_rate": 1e-4,
+        "number_of_epochs": 3,
+        "concurrency_threads": 2,
+        "data_synthesis_mode": "low"
+    }
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
@@ -482,6 +494,12 @@ class TrainProcessService:
     def decode_preference_patterns(self)->bool:
         """Decode preference patterns using notes and related data"""
         try:
+            training_params = self.__class__.get_latest_training_params()
+            concurrency_threads = training_params.get("concurrency_threads")
+            data_synthesis_mode = training_params.get("data_synthesis_mode")
+            os.environ["CONCURRENCY_THREADS"] = str(concurrency_threads)
+            os.environ["DATA_SYNTHESIS_MODE"] = data_synthesis_mode
+            
             # Mark step as in progress
             self.progress.mark_step_in_progress(ProcessStep.DECODE_PREFERENCE_PATTERNS)
             self.logger.info("Starting preference patterns decoding...")
@@ -710,18 +728,41 @@ class TrainProcessService:
             
             script_path = os.path.join(os.getcwd(), "lpm_kernel/L2/train_for_user.sh")
             
-            # Start training in a separate thread
-            training_thread = threading.Thread(
-                target=self._start_training,
-                args=(script_path, log_path),
+            # First start monitoring progress in a separate thread
+            self.logger.info("Starting monitoring thread first...")
+            monitor_thread = threading.Thread(
+                target=self._monitor_training_progress,
+                args=(log_path,),
                 daemon=True
             )
-            training_thread.start()
+            monitor_thread.start()
             
-            self.logger.info("Training started, monitoring progress")
-            # start monitoring training progress
-            return self._monitor_training_progress(log_path)
+            # Allow a moment for the monitoring thread to initialize
+            time.sleep(1)
             
+            # Then directly execute training process (blocking)
+            self.logger.info("Now starting training process (blocking)...")
+            training_result = self._start_training(script_path, log_path)
+            
+            if not training_result:
+                self.logger.error("Training process failed to start")
+                self.progress.mark_step_failed(ProcessStep.TRAIN)
+                return False
+                
+            # Wait for the monitoring thread to finish
+            self.logger.info("Training process completed, waiting for monitoring to finish...")
+            monitor_thread.join(timeout=10)  # Wait up to 10 seconds for monitor to finish
+            
+            # Check if the training was successful by checking the returncode
+            if hasattr(self, 'training_result') and self.training_result:
+                if self.training_result.get('returncode', 1) != 0:
+                    error_msg = f"Training failed: {self.training_result.get('error', 'Unknown error')}"
+                    self.logger.error(error_msg)
+                    self.progress.mark_step_failed(ProcessStep.TRAIN)
+                    return False
+        
+            return True
+        
         except Exception as e:
             self.logger.error(f"Failed to start training: {str(e)}")
             self.progress.mark_step_failed(ProcessStep.TRAIN)
@@ -778,21 +819,80 @@ class TrainProcessService:
             bool: True if the training process started successfully, False otherwise
         """
         try:
-            # Use ScriptRunner to execute the script
-            from lpm_kernel.api.common.script_runner import ScriptRunner
-            runner = ScriptRunner(log_path=log_path)
-            
             # Reset stop flag before starting
             self.is_stopped = False
             
-            # Start the training process
-            training_process = runner.execute_script(
-                script_path=script_path,
-                script_type="training",
-                is_python=False,  # This is a bash script
-            )
+            # Get the latest training parameters from the class
+            training_params = self.__class__.get_latest_training_params()
+            learning_rate = training_params.get("learning_rate")
+            num_train_epochs = training_params.get("number_of_epochs")
+            concurrency_threads = training_params.get("concurrency_threads")
+            data_synthesis_mode = training_params.get("data_synthesis_mode")
             
-            self.logger.info(f"Training process started: {training_process}")
+            # Log training parameters
+            self.logger.info("Training parameters from latest settings:")
+            self.logger.info(f"  Learning rate: {learning_rate}")
+            self.logger.info(f"  Number of epochs: {num_train_epochs}")
+            self.logger.info(f"  Concurrency threads: {concurrency_threads}")
+            self.logger.info(f"  Data synthesis mode: {data_synthesis_mode}")
+            
+            # Prepare arguments for the script
+            # Build command line arguments, need to include script path as the first parameter
+            cmd = [
+                script_path,
+                "--lr", str(learning_rate),
+                "--epochs", str(num_train_epochs),
+                "--threads", str(concurrency_threads),
+                "--mode", str(data_synthesis_mode)
+            ]
+            
+            # Ensure log directory exists
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
+            
+            # Set environment variables to improve tqdm output
+            env = os.environ.copy()
+            env["PYTHONUNBUFFERED"] = "1"  # Force Python to be unbuffered
+            env["FORCE_COLOR"] = "1"       # Force colored output
+            env["TQDM_FORCE_TTY"] = "1"    # Force tqdm to use TTY features
+            
+            # Ensure log directory exists
+            log_dir = os.path.dirname(log_path)
+            os.makedirs(log_dir, exist_ok=True)
+            
+            # Open log file
+            log_file = open(log_path, "ab")
+            
+            # Use subprocess.Popen to directly execute the training script, redirecting output to file
+            process = subprocess.Popen(
+                cmd,
+                env=env,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                bufsize=0,  # Unbuffered
+            )
+            self.process = process
+            self.current_pid = process.pid
+            self.logger.info(f"Training process started with PID: {self.current_pid}")
+            
+            # Wait for process to finish directly (blocking)
+            self.logger.info("Waiting for training process to complete...")
+            return_code = process.wait()
+            
+            # Close log file
+            log_file.close()
+            
+            # Save results for train method to check
+            self.training_result = {
+                "returncode": return_code,
+                "error": f"Execution failed, return code: {return_code}" if return_code != 0 else None
+            }
+            
+            if return_code != 0:
+                self.logger.error(f"Command execution failed, return code: {return_code}")
+                return False
+            else:
+                self.logger.info(f"Command execution successful, return code: {return_code}")
+            
             return True
             
         except Exception as e:
@@ -879,7 +979,7 @@ class TrainProcessService:
             )
             self.logger.info(f"Progress updated: {percentage}% - {message}")
         except Exception as e:
-            self.logger.error(f"Failed to update progress: {str(e)}")
+            self.logger.error(f"Progress callback error: {str(e)}")
 
     def _monitor_model_download(self) -> bool:
         """Monitor model download progress"""
@@ -1157,7 +1257,7 @@ class TrainProcessService:
                 self.current_step = step
                 if self.is_stopped:
                     self.logger.info("Training process aborted during step")
-                    self.progress.mark_step_failed(step)
+                    self.progress.mark_step_suspended(step)
                     break  # If stop is requested, exit the loop
             
                 self.logger.info(f"Starting step: {step.value}")
@@ -1238,19 +1338,19 @@ class TrainProcessService:
             self.logger.info("Training process has been requested to stop")
             # mark train stop
             if self.current_step == ProcessStep.TRAIN:
-                self.progress.mark_step_failed(ProcessStep.TRAIN)
+                self.progress.mark_step_suspended(ProcessStep.TRAIN)
             
             # First check if we have the current process PID
             if not hasattr(self, 'current_pid') or not self.current_pid:
                 self.logger.info("No active process PID found")
-                if self.progress.progress.current_stage:
-                    current_step = self.progress.progress.stages[self.progress.progress.current_stage].current_step
-                    if current_step:
-                        step = ProcessStep(current_step)
-                        self.progress.mark_step_failed(step)
+                if self.progress.progress.data["current_stage"]:
+                    current_stage_name = self.progress.progress.data["current_stage"]
+                    current_stage = next((s for s in self.progress.progress.data["stages"] if s["name"] == current_stage_name), None)
+                    if current_stage and current_stage["current_step"]:
+                        step = ProcessStep(current_stage["current_step"].lower().replace(" ", "_"))
+                        self.progress.mark_step_suspended(step)
                 return True
-                
-            import psutil
+
             try:
                 self.logger.info(f"Attempting to terminate process with PID: {self.current_pid}")
                 
@@ -1294,3 +1394,25 @@ class TrainProcessService:
         except Exception as e:
             self.logger.error(f"Error stopping training process: {str(e)}")
             return False
+            
+    @classmethod
+    def update_training_params(cls, params):
+        """
+        Update the latest training parameters
+        
+        Args:
+            params: Dictionary containing training parameters
+        """
+        for key, value in params.items():
+            if key in cls._latest_training_params:
+                cls._latest_training_params[key] = value
+                
+    @classmethod
+    def get_latest_training_params(cls):
+        """
+        Get the latest training parameters
+        
+        Returns:
+            dict: Dictionary containing the latest training parameters
+        """
+        return cls._latest_training_params.copy()
