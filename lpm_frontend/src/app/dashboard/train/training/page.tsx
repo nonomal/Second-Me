@@ -433,7 +433,7 @@ export default function TrainingPage() {
     resetProgress()
       .then((res) => {
         if (res.data.code === 0) {
-          setTrainingParams(nowTrainingParams || {});
+          setTrainingParams(nowTrainingParams || ({} as TrainingParams));
           setNowTrainingParams(null);
           setIsResume(false);
           resetTrainingState();
@@ -473,8 +473,8 @@ export default function TrainingPage() {
 
       console.log('Using startTrain API to train new model:', config.baseModel);
       const res = await startTrain({
-        model_name: config.baseModel,
-        ...(isResume && !changeBaseModel ? {} : trainingParams)
+        ...(isResume && !changeBaseModel ? {} : trainingParams),
+        model_name: config.baseModel
       });
 
       if (res.data.code === 0) {

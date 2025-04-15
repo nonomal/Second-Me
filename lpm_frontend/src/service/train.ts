@@ -56,6 +56,13 @@ export interface TrainProgress {
   status: StageStatus;
 }
 
+export interface TrainingParams {
+  concurrency_threads?: number;
+  data_synthesis_mode?: string;
+  learning_rate?: string;
+  number_of_epochs?: number;
+}
+
 export interface TrainingConfig extends TrainingParams {
   model_name: string;
 }
