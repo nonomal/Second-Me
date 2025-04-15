@@ -28,7 +28,7 @@ The tool manages server and client settings through a configuration file. Below 
   "mcpServers": {
     "mindverse": {
       "command": "python",
-      "args": ["{replace-with-your-path}/Second-Me/MCP/Mcp_public.py"]
+      "args": ["{replace-with-your-path}/Second-Me/MCP/mcp_public.py"]
     }
   }
 }
@@ -51,7 +51,7 @@ Contains named server configurations (e.g., "mindverse" in this example).
 
 Make sure you have replaced the paths in the configuration file with your local paths. Then, you can directly run the following command to start the service and check for any errors:
 ```bash
-python {replace with your path}/Second-Me/MCP/Mcp_public.py
+python {replace with your path}/Second-Me/MCP/mcp_public.py
 ```
 If there are no errors, the service should start and wait for client requests.
 

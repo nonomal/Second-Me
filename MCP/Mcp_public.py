@@ -35,7 +35,6 @@ async def get_response(query:str, instance_id:str) -> str | None:
     }
 
     conn = http.client.HTTPSConnection(url)
-
     # Send the POST request
     conn.request("POST", path, body=json.dumps(data), headers=headers)
 

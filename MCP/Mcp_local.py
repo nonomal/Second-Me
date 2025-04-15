@@ -19,7 +19,6 @@ async def get_response(query:str) -> str | None | Any:
         query (str): Questions raised by users regarding the secondme model
 
     """
-
     headers = {
         "Content-Type": "application/json",
         "Accept": "text/event-stream"
