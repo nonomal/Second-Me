@@ -96,6 +96,8 @@ export default function TrainingPage() {
   const modelConfig = useModelConfigStore((store) => store.modelConfig);
   const updateModelConfig = useModelConfigStore((store) => store.updateModelConfig);
 
+  const cleanupEventSourceRef = useRef<(() => void) | undefined>();
+
   const [config, setConfig] = useState<TrainingConfig>({
     modelProvider: 'ollama',
     baseModel: 'Qwen2.5-0.5B-Instruct',
@@ -149,7 +151,7 @@ export default function TrainingPage() {
     }
   }, []);
 
-  const pollingInterval = useRef<any>(null);
+  const pollingStopRef = useRef<boolean>(false);
   const router = useRouter();
 
   const status = useTrainingStore((state) => state.status);
@@ -162,28 +164,39 @@ export default function TrainingPage() {
 
   // Start polling training progress
   const startPolling = () => {
-    // If already polling, stop first
-    stopPolling();
+    if (pollingStopRef.current) {
+      return;
+    }
 
     // Start new polling
-    pollingInterval.current = setInterval(async () => {
-      try {
-        await checkTrainStatus();
-      } catch (error) {
+    checkTrainStatus()
+      .then(() => {
+        if (pollingStopRef.current) {
+          return;
+        }
+
+        setTimeout(() => {
+          startPolling();
+        }, POLLING_INTERVAL);
+      })
+      .catch((error) => {
         console.error('Training status check failed:', error);
         stopPolling(); // Stop polling when error occurs
         setIsTraining(false);
         message.error('Training status check failed, monitoring stopped');
-      }
-    }, POLLING_INTERVAL);
+      });
+  };
+
+  const startGetTrainingProgress = () => {
+    pollingStopRef.current = false;
+    setStatus('training');
+    setIsTraining(true);
+    startPolling();
   };
 
   // Stop polling
   const stopPolling = () => {
-    if (pollingInterval.current) {
-      clearInterval(pollingInterval.current);
-      pollingInterval.current = null;
-    }
+    pollingStopRef.current = true;
   };
 
   useEffect(() => {
@@ -242,9 +255,7 @@ export default function TrainingPage() {
 
       if (isRetraining) {
         // If we were retraining, set status to training
-        setStatus('training');
-        setIsTraining(true);
-        startPolling();
+        startGetTrainingProgress();
       }
     };
 
@@ -253,15 +264,12 @@ export default function TrainingPage() {
 
   // Monitor training status changes and manage log connections
   useEffect(() => {
-    let cleanupEventSource: (() => void) | undefined;
-
     // If training is in progress, start polling and establish log connection
     if (trainingProgress.status === 'in_progress') {
-      startPolling();
       setIsTraining(true);
 
       // Create EventSource connection to get logs
-      cleanupEventSource = getDetails();
+      updateTrainLog();
 
       if (firstLoadRef.current) {
         scrollPageToBottom();
@@ -283,8 +291,8 @@ export default function TrainingPage() {
 
     // Return cleanup function to ensure EventSource is closed when component unmounts or dependencies change
     return () => {
-      if (cleanupEventSource) {
-        cleanupEventSource();
+      if (cleanupEventSourceRef.current) {
+        cleanupEventSourceRef.current();
       }
     };
   }, [trainingProgress]);
@@ -336,7 +344,7 @@ export default function TrainingPage() {
   };
 
   const updateTrainingParams = (params: TrainingParams) => {
-    setTrainingParams((state) => ({ ...state, ...params }));
+    setTrainingParams((state: TrainingParams) => ({ ...state, ...params }));
   };
 
   const getDetails = () => {
@@ -390,6 +398,14 @@ export default function TrainingPage() {
     return () => {
       eventSource.close();
     };
+  };
+
+  const updateTrainLog = () => {
+    if (cleanupEventSourceRef.current) {
+      cleanupEventSourceRef.current();
+    }
+
+    cleanupEventSourceRef.current = getDetails();
   };
 
   // Handler function for stopping training
@@ -450,7 +466,7 @@ export default function TrainingPage() {
     }
 
     try {
-      getDetails();
+      // updateTrainLog();
       setNowTrainingParams(trainingParams);
 
       console.log('Using startTrain API to train new model:', config.baseModel);
@@ -463,10 +479,8 @@ export default function TrainingPage() {
         // Save training configuration and start polling
         localStorage.setItem('trainingConfig', JSON.stringify(config));
         setChangeBaseModel(false);
-        console.log('API call successful, starting to poll for status updates');
-        setStatus('training');
         scrollPageToBottom();
-        startPolling();
+        startGetTrainingProgress();
       } else {
         message.error(res.data.message || 'Failed to start training');
         setIsTraining(false);
@@ -494,7 +508,7 @@ export default function TrainingPage() {
     resetTrainingState();
 
     try {
-      getDetails();
+      // updateTrainLog();
 
       console.log('Using retrain API to retrain model:', config.baseModel);
       const res = await retrain({ model_name: config.baseModel, ...trainingParams });
@@ -502,11 +516,8 @@ export default function TrainingPage() {
       if (res.data.code === 0) {
         // Save training configuration and start polling
         localStorage.setItem('trainingConfig', JSON.stringify(config));
-        console.log('API call successful, starting to poll for status updates');
-        // Set status as training to ensure UI displays correct training status
-        setStatus('training');
         scrollPageToBottom();
-        startPolling();
+        startGetTrainingProgress();
       } else {
         message.error(res.data.message || 'Failed to retrain model');
         setIsTraining(false);
