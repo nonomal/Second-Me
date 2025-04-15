@@ -1,176 +1,32 @@
-import { StageDisplayName } from '@/service/train';
+import type { TrainProgress } from '@/service/train';
 
 interface TrainingProgressProps {
-  trainingProgress: {
-    overall: number;
-    stage1: number;
-    stage2: number;
-    stage3: number;
-    stage4: number;
-    stage5: number;
-    currentStage: string | null;
-    currentStageStep: string | null;
-    stageDetails?:
-      | Record<
-          string,
-          {
-            name: string;
-            status: string;
-            steps: Record<
-              string,
-              {
-                name: string;
-                completed: boolean;
-                status: string;
-              }
-            >;
-          }
-        >
-      | undefined;
-  };
+  trainingProgress: TrainProgress;
   status: string;
 }
 
-// Define fixed step order for each stage, must be consistent with step key names in API response
-const stageStepsOrder: Record<string, string[]> = {
-  stage1: ['model_download'],
-  stage2: ['chunk_embedding', 'generate_document_embeddings', 'list_documents', 'process_chunks'],
-  stage3: ['extract_dimensional_topics', 'map_your_entity_network'],
-  stage4: ['decode_preference_patterns', 'reinforce_identity', 'augment_content_retention'],
-  stage5: ['train']
-};
-
-// Get stage description
-const getStageDescription = (stageKey: string) => {
-  const descriptionMap: Record<string, string> = {
-    stage1:
-      'At this stage, we obtain the foundational model that will serve as the starting point for your Second Me. This base structure is a blank slate, ready to be shaped and enriched with your personal data, acting as the vessel that will eventually carry your unique presence.',
-    stage2:
-      "This step starts by processing and organizing your memories into a structured digital format that forms the groundwork for your Second Me. We break down your life experiences into smaller, meaningful pieces, encode them systematically, and extract essential insights to create a solid base. It's the first move toward building an entity that reflects your past and present.",
-    stage3:
-      "Here, we take the fragments of your memories and weave them into a complete, flowing biography that captures your essence. This process connects the dots between your experiences, shaping them into a coherent story that defines who you are. It's like crafting the blueprint of a new being born from your life's journey.",
-    stage4:
-      "To enable your Second Me to understand you fully, we create specialized training data tailored to your unique profile. This step lays the groundwork for it to grasp your preferences, identity, and knowledge accurately, ensuring the entity we're constructing can think and respond in ways that feel authentic to you.",
-    stage5:
-      'Finally, we train the core model with your specific memories, traits, and preferences, blending them seamlessly into its framework. This step transforms the model into a living representation of you, merging technology with your individuality to create a Second Me that feels real and true to your essence.'
-  };
-
-  return descriptionMap[stageKey] || 'Processing data...';
-};
+const descriptionMap = [
+  'At this stage, we obtain the foundational model that will serve as the starting point for your Second Me. This base structure is a blank slate, ready to be shaped and enriched with your personal data, acting as the vessel that will eventually carry your unique presence.',
+  "This step starts by processing and organizing your memories into a structured digital format that forms the groundwork for your Second Me. We break down your life experiences into smaller, meaningful pieces, encode them systematically, and extract essential insights to create a solid base. It's the first move toward building an entity that reflects your past and present.",
+  "Here, we take the fragments of your memories and weave them into a complete, flowing biography that captures your essence. This process connects the dots between your experiences, shaping them into a coherent story that defines who you are. It's like crafting the blueprint of a new being born from your life's journey.",
+  "To enable your Second Me to understand you fully, we create specialized training data tailored to your unique profile. This step lays the groundwork for it to grasp your preferences, identity, and knowledge accurately, ensuring the entity we're constructing can think and respond in ways that feel authentic to you.",
+  'Finally, we train the core model with your specific memories, traits, and preferences, blending them seamlessly into its framework. This step transforms the model into a living representation of you, merging technology with your individuality to create a Second Me that feels real and true to your essence.'
+];
 
 const TrainingProgress = (props: TrainingProgressProps) => {
   const { trainingProgress, status } = props;
-  // Get display name for the stage
-  const getStageDisplayName = (stageKey: string) => {
-    // Use StageDisplayName enum as fallback
-    const fallbackName = StageDisplayName[stageKey as keyof typeof StageDisplayName] || '';
 
-    if (!trainingProgress.stageDetails) return fallbackName;
+  const formatUnderscoreToName = (_str: string) => {
+    const str = _str || '';
 
-    const stageDetail =
-      trainingProgress.stageDetails[stageKey as keyof typeof trainingProgress.stageDetails];
-
-    return stageDetail.name || fallbackName;
+    return str
+      .split('_')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   };
-
-  // Get step descriptions and status for each stage
-  const getStageSteps = (stageKey: string) => {
-    if (!trainingProgress.stageDetails) return [];
-
-    const stageDetail =
-      trainingProgress.stageDetails[stageKey as keyof typeof trainingProgress.stageDetails];
-
-    if (!stageDetail.steps) return [];
-
-    // Get fixed step order for this stage
-    const orderedSteps = stageStepsOrder[stageKey] || [];
-
-    // Create step array according to fixed order
-    return orderedSteps.map((stepName) => {
-      const stepInfo = stageDetail.steps[stepName];
-
-      // Special handling for model_download step
-      if (
-        !!stepInfo &&
-        stageKey === 'stage1' &&
-        stepName === 'model_download' &&
-        !stepInfo.completed
-      ) {
-        return {
-          name: stepInfo.name || stepName,
-          completed: stepInfo.completed || false,
-          status: 'in_progress', // Always set to in_progress unless completed
-          // Always mark as current step unless completed
-          isCurrent: true
-        };
-      }
-
-      return {
-        name: stepInfo?.name || stepName, // Use step name returned by API, or use key name if not available
-        completed: stepInfo?.completed || false,
-        status: stepInfo?.status || '',
-        // Determine if this is the currently executing step
-        isCurrent:
-          trainingProgress.currentStage === stageKey &&
-          trainingProgress.currentStageStep === stepName
-      };
-    });
-  };
-
-  // Determine stage status
-  const getStageStatus = (stageKey: string) => {
-    if (!trainingProgress.stageDetails) return 'pending';
-
-    const stageDetail =
-      trainingProgress.stageDetails[stageKey as keyof typeof trainingProgress.stageDetails];
-
-    if (!stageDetail) return 'pending';
-
-    // Special handling for stage1 (model download)
-    if (stageKey === 'stage1') {
-      const modelDownloadStep = stageDetail.steps.model_download;
-
-      if (modelDownloadStep && !modelDownloadStep.completed) {
-        return 'in_progress';
-      }
-    }
-
-    if (stageDetail.status === 'completed') return 'completed';
-
-    if (stageDetail.status === 'in_progress' || trainingProgress.currentStage === stageKey)
-      return 'in_progress';
-
-    return 'pending';
-  };
-
-  // Define all training stages
-  const trainingStages = [
-    {
-      key: 'stage1',
-      name: getStageDisplayName('stage1'),
-      description: getStageDescription('stage1')
-    },
-    {
-      key: 'stage2',
-      name: getStageDisplayName('stage2'),
-      description: getStageDescription('stage2')
-    },
-    {
-      key: 'stage3',
-      name: getStageDisplayName('stage3'),
-      description: getStageDescription('stage3')
-    },
-    {
-      key: 'stage4',
-      name: getStageDisplayName('stage4'),
-      description: getStageDescription('stage4')
-    },
-    {
-      key: 'stage5',
-      name: getStageDisplayName('stage5'),
-      description: getStageDescription('stage5')
-    }
-  ];
+  const trainingStages = trainingProgress.stages.map((stage, index) => {
+    return { ...stage, description: descriptionMap[index] };
+  });
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
@@ -191,13 +47,13 @@ const TrainingProgress = (props: TrainingProgressProps) => {
             <div className="flex justify-between items-center">
               <span className="text-lg font-semibold text-gray-900">Overall Progress</span>
               <span className="text-2xl font-bold text-blue-600">
-                {Math.round(trainingProgress.overall)}%
+                {Math.round(trainingProgress.overall_progress)}%
               </span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-3">
               <div
                 className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-500"
-                style={{ width: `${trainingProgress.overall}%` }}
+                style={{ width: `${trainingProgress.overall_progress}%` }}
               />
             </div>
           </div>
@@ -208,24 +64,18 @@ const TrainingProgress = (props: TrainingProgressProps) => {
           <h4 className="text-sm font-medium text-gray-700">Training Stages</h4>
           <div className="space-y-4">
             {trainingStages.map((stage) => {
-              const stageStatus = getStageStatus(stage.key);
-              const progress = trainingProgress[
-                stage.key as keyof typeof trainingProgress
-              ] as number;
+              const stageStatus = stage.status;
+              const progress = stage.progress;
 
               // Handle NaN case
               const displayProgress = isNaN(progress) ? 0 : progress;
 
-              const isCurrentStage = trainingProgress.currentStage?.replace(/-/g, '') === stage.key;
-              // Get detailed information for current stage
-              const stageDetail =
-                trainingProgress.stageDetails?.[
-                  stage.key as keyof typeof trainingProgress.stageDetails
-                ];
+              const isCurrentStage =
+                formatUnderscoreToName(trainingProgress.current_stage) == stage.name;
 
               return (
                 <div
-                  key={stage.key}
+                  key={stage.name}
                   className="bg-white rounded-lg border border-gray-100 p-4 shadow-sm"
                 >
                   <div className="flex items-center space-x-3 mb-3">
@@ -266,12 +116,9 @@ const TrainingProgress = (props: TrainingProgressProps) => {
                             }`}
                           >
                             {stage.name}
-                            {isCurrentStage && (
+                            {isCurrentStage && stage.current_step && (
                               <span className="ml-2 text-xs text-gray-500">
-                                {trainingProgress.currentStageStep &&
-                                stageDetail?.steps[trainingProgress.currentStageStep]?.name
-                                  ? `(${stageDetail.steps[trainingProgress.currentStageStep].name})`
-                                  : `(${trainingProgress.currentStageStep})`}
+                                {formatUnderscoreToName(stage.current_step)}
                               </span>
                             )}
                           </span>
@@ -340,9 +187,9 @@ const TrainingProgress = (props: TrainingProgressProps) => {
 
                   {/* Step list */}
                   <div className="mt-3 pl-9">
-                    {getStageSteps(stage.key).length > 0 ? (
+                    {stage.steps.length > 0 ? (
                       <div className="space-y-2">
-                        {getStageSteps(stage.key).map((step, stepIndex) => (
+                        {stage.steps.map((step, stepIndex) => (
                           <div key={stepIndex} className="flex items-center space-x-2">
                             <div className="flex-shrink-0">
                               {step.completed ? (
@@ -361,7 +208,8 @@ const TrainingProgress = (props: TrainingProgressProps) => {
                                     />
                                   </svg>
                                 </div>
-                              ) : step.isCurrent ? (
+                              ) : stage.current_step &&
+                                formatUnderscoreToName(stage.current_step) == step.name ? (
                                 <div className="w-4 h-4 rounded-full bg-blue-100 flex items-center justify-center">
                                   <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                                 </div>
@@ -373,7 +221,10 @@ const TrainingProgress = (props: TrainingProgressProps) => {
                             </div>
                             <span
                               className={`text-xs ${
-                                step.isCurrent ? 'text-blue-600 font-medium' : 'text-gray-600'
+                                stage.current_step &&
+                                formatUnderscoreToName(stage.current_step) == step.name
+                                  ? 'text-blue-600 font-medium'
+                                  : 'text-gray-600'
                               }`}
                             >
                               {step.name}

@@ -196,7 +196,7 @@ def reset_progress():
 
 @trainprocess_bp.route("/stop", methods=["POST"])
 def stop_training():
-    """Stop training process and wait until status is failed"""
+    """Stop training process and wait until status is suspended"""
     try:
         # Get the TrainProcessService instance
         train_service = TrainProcessService()  # Need to get instance based on your implementation
@@ -204,15 +204,15 @@ def stop_training():
         # Stop the process
         train_service.stop_process()
         
-        # Wait for the status to change to FAILED
+        # Wait for the status to change to SUSPENDED
         wait_interval = 1  # Check interval in seconds
         
         while True:
             # Get the current progress
             progress = train_service.progress.progress
             
-            # Check if status is FAILED
-            if progress.status == Status.SUSPENDED:
+            # Check if status is SUSPENDED
+            if progress.data["status"] == "suspended":
                 return jsonify(APIResponse.success(
                     message="Training process has been stopped and status is confirmed as suspended",
                     data={"status": "suspended"}

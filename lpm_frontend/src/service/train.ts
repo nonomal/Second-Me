@@ -31,43 +31,26 @@ interface TrainStage {
   name: string;
   progress: number;
   status: StageStatus;
-  steps: Record<string, TrainStep>;
+  steps: TrainStep[];
   current_step: string | null;
 }
 
-export type SynthesisMode = 'low' | 'medium' | 'high';
+export type StageName =
+  | 'downloading_the_base_model'
+  | 'activating_the_memory_matrix'
+  | 'synthesize_your_life_narrative'
+  | 'prepare_training_data_for_deep_comprehension'
+  | 'training_to_create_second_me';
 
-export interface TrainingParams {
-  number_of_epochs?: number;
-  learning_rate?: number;
-  concurrency_threads?: number;
-  data_synthesis_mode?: SynthesisMode;
-}
+export type StageDisplayName =
+  | 'Downloading the Base Model'
+  | 'Activating the Memory Matrix'
+  | 'Synthesize Your Life Narrative'
+  | 'Prepare Training Data for Deep Comprehension'
+  | 'Training to create Second Me';
 
-export enum StageName {
-  Stage1 = 'downloading_the_base_model',
-  Stage2 = 'activating_the_memory_matrix',
-  Stage3 = 'synthesize_your_life_narrative',
-  Stage4 = 'prepare_training_data_for_deep_comprehension',
-  Stage5 = 'training_to_create_second_me'
-}
-
-export enum StageDisplayName {
-  Stage1 = 'Downloading the Base Model',
-  Stage2 = 'Activating the Memory Matrix',
-  Stage3 = 'Synthesize Your Life Narrative',
-  Stage4 = 'Prepare Training Data for Deep Comprehension',
-  Stage5 = 'Training to create Second Me'
-}
-
-interface TrainProgressResponse {
-  stages: {
-    downloading_the_base_model: TrainStage;
-    activating_the_memory_matrix: TrainStage;
-    synthesize_your_life_narrative: TrainStage;
-    prepare_training_data_for_deep_comprehension: TrainStage;
-    training_to_create_second_me: TrainStage;
-  };
+export interface TrainProgress {
+  stages: TrainStage[];
   overall_progress: number;
   current_stage: StageName;
   status: StageStatus;
@@ -86,7 +69,7 @@ export const startTrain = (config: TrainingConfig) => {
 };
 
 export const getTrainProgress = (config: TrainingConfig) => {
-  return Request<CommonResponse<TrainProgressResponse>>({
+  return Request<CommonResponse<TrainProgress>>({
     method: 'get',
     url: `/api/trainprocess/progress/${config.model_name}`
   });

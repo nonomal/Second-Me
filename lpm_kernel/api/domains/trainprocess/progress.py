@@ -1,6 +1,6 @@
-from typing import Dict, Optional
+from typing import List, Dict, Optional, Union, Any
 import json
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, field
 from enum import Enum
 
 
@@ -12,163 +12,216 @@ class Status(Enum):
     SUSPENDED = "suspended"
 
 
-@dataclass
-class Step:
-    name: str = ""
-    completed: bool = False
-    status: Status = Status.PENDING
-
-
-@dataclass
-class Stage:
-    name: str
-    progress: float = 0
-    status: Status = Status.PENDING
-    steps: Dict[str, Step] = None
-    current_step: Optional[str] = None
-
-    def __post_init__(self):
-        if self.steps is None:
-            self.steps = {}
-
-
 class TrainProgress:
     def __init__(self):
-        self.stages = {
-            "downloading_the_base_model": Stage(
-                name="Downloading the Base Model",
-                steps={
-                    "model_download": Step(name="Model Download")
+        # Define the complete data structure directly in the format matching the desired JSON output
+        self.data = {
+            "stages": [
+                {
+                    "name": "Downloading the Base Model",
+                    "progress": 0.0,
+                    "status": "pending",
+                    "current_step": None,
+                    "steps": [
+                        {
+                            "name": "Model Download",
+                            "completed": False,
+                            "status": "pending"
+                        }
+                    ]
+                },
+                {
+                    "name": "Activating the Memory Matrix",
+                    "progress": 0.0,
+                    "status": "pending",
+                    "current_step": None,
+                    "steps": [
+                        {
+                            "name": "List Documents",
+                            "completed": False,
+                            "status": "pending"
+                        },
+                        {
+                            "name": "Generate Document Embeddings",
+                            "completed": False,
+                            "status": "pending"
+                        },
+                        {
+                            "name": "Process Chunks",
+                            "completed": False,
+                            "status": "pending"
+                        },
+                        {
+                            "name": "Chunk Embedding",
+                            "completed": False,
+                            "status": "pending"
+                        }
+                    ]
+                },
+                {
+                    "name": "Synthesize Your Life Narrative",
+                    "progress": 0.0,
+                    "status": "pending",
+                    "current_step": None,
+                    "steps": [
+                        {
+                            "name": "Extract Dimensional Topics",
+                            "completed": False,
+                            "status": "pending"
+                        },
+                        {
+                            "name": "Map Your Entity Network",
+                            "completed": False,
+                            "status": "pending"
+                        }
+                    ]
+                },
+                {
+                    "name": "Prepare Training Data for Deep Comprehension",
+                    "progress": 0.0,
+                    "status": "pending",
+                    "current_step": None,
+                    "steps": [
+                        {
+                            "name": "Decode Preference Patterns",
+                            "completed": False,
+                            "status": "pending"
+                        },
+                        {
+                            "name": "Reinforce Identity",
+                            "completed": False,
+                            "status": "pending"
+                        },
+                        {
+                            "name": "Augment Content Retention",
+                            "completed": False,
+                            "status": "pending"
+                        }
+                    ]
+                },
+                {
+                    "name": "Training to create Second Me",
+                    "progress": 0.0,
+                    "status": "pending",
+                    "current_step": None,
+                    "steps": [
+                        {
+                            "name": "Train",
+                            "completed": False,
+                            "status": "pending"
+                        },
+                        {
+                            "name": "Merge Weights",
+                            "completed": False,
+                            "status": "pending"
+                        },
+                        {
+                            "name": "Convert Model",
+                            "completed": False,
+                            "status": "pending"
+                        }
+                    ]
                 }
-            ),
-            "activating_the_memory_matrix": Stage(
-                name="Activating the Memory Matrix",
-                steps={
-                    "list_documents": Step(name="List Documents"),
-                    "generate_document_embeddings": Step(name="Generate Document Embeddings"),
-                    "process_chunks": Step(name="Process Chunks"),
-                    "chunk_embedding": Step(name="Chunk Embedding"),
-                }
-            ),
-            "synthesize_your_life_narrative": Stage(
-                name="Synthesize Your Life Narrative",
-                steps={
-                    "extract_dimensional_topics": Step(name="Extract Dimensional Topics"),
-                    "map_your_entity_network": Step(name="Map Your Entity Network"),
-                }
-            ),
-            "prepare_training_data_for_deep_comprehension": Stage(
-                name="Prepare Training Data for Deep Comprehension",
-                steps={
-                    "decode_preference_patterns": Step(name="Decode Preference Patterns"),
-                    "reinforce_identity": Step(name="Reinforce Identity"),
-                    "augment_content_retention": Step(name="Augment Content Retention"),
-                }
-            ),
-            "training_to_create_second_me": Stage(
-                name="Training to create Second Me",
-                steps={
-                    "train": Step(name="Train"),
-                    "merge_weights": Step(name="Merge Weights"),
-                    "convert_model": Step(name="Convert Model"),                    
-                }
-            )
+            ],
+            "overall_progress": 0.0,
+            "current_stage": None,
+            "status": "pending"
         }
-        self.overall_progress: float = 0
-        self.current_stage: Optional[str] = None
-        self.status: Status = Status.PENDING
+        
+        # Create stage name to stage data mapping
+        self.stage_map = {}
+        for stage in self.data["stages"]:
+            stage_name = stage["name"].lower().replace(" ", "_")
+            self.stage_map[stage_name] = stage
+            
+        # Create step name to step data mapping for each stage
+        self.steps_map = {}
+        for stage_name, stage in self.stage_map.items():
+            self.steps_map[stage_name] = {}
+            for step in stage["steps"]:
+                step_name = step["name"].lower().replace(" ", "_")
+                self.steps_map[stage_name][step_name] = step
 
-    def update_progress(self, stage: str, step: str, status: Status, progress: Optional[float] = None):
+    def update_progress(self, stage: str, step: str, status: Union[Status, str], progress: Optional[float] = None):
         """Update progress status
         Args:
             stage: Stage key (snake_case format)
             step: Step key (snake_case format)
-            status: Status
+            status: Status (enum or string)
             progress: Optional progress value (0-100)
         """
-        if stage not in self.stages:
+        if stage not in self.stage_map:
             raise ValueError(f"Invalid stage: {stage}")
+            
+        stage_data = self.stage_map[stage]
         
-        stage_obj = self.stages[stage]
-        if step not in stage_obj.steps:
+        # Convert status to string if it's an enum
+        status_value = status.value if isinstance(status, Status) else status
+        
+        # Find step in the stage
+        if stage not in self.steps_map or step not in self.steps_map[stage]:
             raise ValueError(f"Invalid step {step} for stage {stage}")
+            
+        step_data = self.steps_map[stage][step]
         
         # Update step status
-        step_obj = stage_obj.steps[step]
-        step_obj.status = status
-        step_obj.completed = status == Status.COMPLETED
+        step_data["status"] = status_value
+        step_data["completed"] = status_value == "completed"
         
         # Update stage progress
         if progress is not None:
             # If progress value is provided, use it directly
-            stage_obj.progress = progress
+            stage_data["progress"] = progress
         else:
             # Otherwise calculate progress based on the proportion of completed steps
-            completed_steps = sum(1 for s in stage_obj.steps.values() if s.completed)
-            total_steps = len(stage_obj.steps)
-            stage_obj.progress = (completed_steps / total_steps) * 100
+            completed_steps = sum(1 for s in stage_data["steps"] if s["completed"])
+            total_steps = len(stage_data["steps"])
+            stage_data["progress"] = (completed_steps / total_steps) * 100.0
         
-        # Update stage status
-        if all(s.completed for s in stage_obj.steps.values()):
-            stage_obj.status = Status.COMPLETED
-            stage_obj.current_step = None
+        # Update stage status and current step
+        if all(s["completed"] for s in stage_data["steps"]):
+            stage_data["status"] = "completed"
+            stage_data["current_step"] = None
             
             # If current stage is completed, find the next uncompleted stage
             next_stage = None
-            for stage_name, stage_data in self.stages.items():
-                if stage_data.status != Status.COMPLETED:
+            for stage_name, stage_info in self.stage_map.items():
+                if stage_info["status"] != "completed":
                     next_stage = stage_name
                     break
-            self.current_stage = next_stage
-        elif any(s.status == Status.FAILED for s in stage_obj.steps.values()):
-            stage_obj.status = Status.FAILED
-        elif any(s.status == Status.SUSPENDED for s in stage_obj.steps.values()):
-            stage_obj.status = Status.SUSPENDED
+            self.data["current_stage"] = next_stage
+        elif any(s["status"] == "failed" for s in stage_data["steps"]):
+            stage_data["status"] = "failed"
+            stage_data["current_step"] = step_data["name"]
+            self.data["current_stage"] = stage_data["name"]
+        elif any(s["status"] == "suspended" for s in stage_data["steps"]):
+            stage_data["status"] = "suspended"
+            stage_data["current_step"] = step_data["name"]
+            self.data["current_stage"] = stage_data["name"]
         else:
-            stage_obj.status = Status.IN_PROGRESS
-            stage_obj.current_step = step
-            self.current_stage = stage
+            stage_data["status"] = "in_progress"
+            stage_data["current_step"] = step_data["name"]
+            self.data["current_stage"] = stage_data["name"]
         
         # Update overall progress
-        completed_progress = sum(s.progress for s in self.stages.values())
-        self.overall_progress = completed_progress / len(self.stages)
+        completed_progress = sum(s["progress"] for s in self.data["stages"])
+        self.data["overall_progress"] = completed_progress / len(self.data["stages"])
         
         # Update overall status
-        if all(s.status == Status.COMPLETED for s in self.stages.values()):
-            self.status = Status.COMPLETED
-        elif any(s.status == Status.FAILED for s in self.stages.values()):
-            self.status = Status.FAILED
-        elif any(s.status == Status.SUSPENDED for s in self.stages.values()):
-            self.status = Status.SUSPENDED
-        elif any(s.status == Status.IN_PROGRESS for s in self.stages.values()):
-            self.status = Status.IN_PROGRESS
+        if all(s["status"] == "completed" for s in self.data["stages"]):
+            self.data["status"] = "completed"
+        elif any(s["status"] == "failed" for s in self.data["stages"]):
+            self.data["status"] = "failed"
+        elif any(s["status"] == "suspended" for s in self.data["stages"]):
+            self.data["status"] = "suspended"
+        elif any(s["status"] == "in_progress" for s in self.data["stages"]):
+            self.data["status"] = "in_progress"
         else:
-            self.status = Status.PENDING
+            self.data["status"] = "pending"
 
     def to_dict(self) -> dict:
         """Convert progress status to dictionary format"""
-        result = {
-            "stages": {},
-            "overall_progress": self.overall_progress,
-            "current_stage": self.current_stage,
-            "status": self.status.value
-        }
-        
-        for stage_name, stage in self.stages.items():
-            stage_dict = asdict(stage)
-            # Convert enum values to strings
-            stage_dict["status"] = stage.status.value
-            stage_dict["steps"] = {
-                step_key: {
-                    "name": step.name,
-                    "completed": step.completed,
-                    "status": step.status.value
-                }
-                for step_key, step in stage.steps.items()
-            }
-            result["stages"][stage_name] = stage_dict
-        
-        return result
+        return self.data
     
     def reset(self):
         """Reset all progress statuses"""

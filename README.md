@@ -155,7 +155,7 @@ http://localhost:3000
 
 
 ## Tutorial and Use Cases
-🛠️ Feel free to follow [User tutorial](https://second-me.gitbook.io/a-new-ai-species-making-we-matter-again) to build your Second Me.
+🛠️ Feel free to follow [User tutorial](https://secondme.gitbook.io/secondme/getting-started) to build your Second Me.
 
 💡 Check out the links below to see how Second Me can be used in real-life scenarios:
 - [Felix AMA (Roleplay app)](https://app.secondme.io/example/ama)
@@ -173,7 +173,7 @@ The following features have been completed internally and are being gradually in
 
 ### Model Enhancement Features
 - [✓] **Long Chain-of-Thought Training Pipeline**: Enhanced reasoning capabilities through extended thought process training
-- [ ] **Direct Preference Optimization for L2 Model**: Improved alignment with user preferences and intent
+- [✓] **Direct Preference Optimization for L2 Model**: Improved alignment with user preferences and intent
 - [ ] **Data Filtering for Training**: Advanced techniques for higher quality training data selection
 - [✓] **Apple Silicon Support**: Native support for Apple Silicon processors with MLX Training and Serving capabilities
 

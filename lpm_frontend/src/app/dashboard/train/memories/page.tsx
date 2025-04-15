@@ -85,7 +85,7 @@ export default function TrainPage() {
             // Only update status when there are no training steps
             const trainingProgress = useTrainingStore.getState().trainingProgress;
 
-            if (trainingProgress.overall === 0) {
+            if (trainingProgress.overall_progress === 0) {
               setStatus(newMemories.length > 0 ? 'memory_upload' : 'seed_identity');
             }
           }
@@ -126,7 +126,7 @@ export default function TrainPage() {
       const updatedMemories = [...newMemories, ...prev];
       const trainingProgress = useTrainingStore.getState().trainingProgress;
 
-      if (trainingProgress.overall === 0) {
+      if (trainingProgress.overall_progress === 0) {
         setStatus(newMemories.length > 0 ? 'memory_upload' : 'seed_identity');
       }
 
@@ -144,7 +144,7 @@ export default function TrainPage() {
         const updatedMemories = prev.filter((memory) => memory.id !== id);
         const trainingProgress = useTrainingStore.getState().trainingProgress;
 
-        if (trainingProgress.overall === 0) {
+        if (trainingProgress.overall_progress === 0) {
           setStatus(updatedMemories.length > 0 ? 'memory_upload' : 'seed_identity');
         }
 

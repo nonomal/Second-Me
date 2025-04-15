@@ -74,7 +74,7 @@ const TrainingLog: React.FC<TrainingLogProps> = ({ trainingDetails }: TrainingLo
         <div className="space-y-1">
           {trainingDetails.length > 0 ? (
             trainingDetails.map((detail, index) => (
-              <div key={index} className="text-gray-300">
+              <div key={detail.timestamp + detail.message + index} className="text-gray-300">
                 {detail.message}
               </div>
             ))

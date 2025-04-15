@@ -518,7 +518,13 @@ def save_hf_model(model_name="Qwen2.5-0.5B-Instruct", log_file_path=None) -> str
             logger.info(f"Model {model_name} downloaded with {file_count} files.")
         except Exception:
             logger.info(f"Download completed for model: {model_name}.")
-        
+    except requests.RequestException:
+        try:
+            from modelscope.hub.snapshot_download import snapshot_download
+            snapshot_download(model_id=hf_model_name, local_dir=save_path)
+        except Exception as e:
+            logger.error(f"Error downloading model: {str(e)}")
+            raise
     except KeyboardInterrupt:
         logger.warning(f"Download interrupted by user for model: {model_name}")
         raise

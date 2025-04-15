@@ -25,7 +25,7 @@ from lpm_kernel.configs.config import Config
 from lpm_kernel.file_data.chunker import DocumentChunker
 from lpm_kernel.kernel.l1.l1_manager import generate_l1_from_l0
 import threading
-from ..api.domains.trainprocess.progress import TrainProgress, Status, Step, Status
+from ..api.domains.trainprocess.progress import TrainProgress, Status
 import gc
 import subprocess
 import shlex
@@ -97,46 +97,30 @@ class Progress:
             try:
                 with open(self.progress_file, "r") as f:
                     saved_progress = json.load(f)
-                    # Restore saved progress state
-                    for stage_name, stage_data in saved_progress.get("stages", {}).items():
-                        if stage_name in self.progress.stages:
-                            stage = self.progress.stages[stage_name]
-                            # Restore stage progress
-                            if "progress" in stage_data:
-                                stage.progress = stage_data["progress"]
-                            # Restore stage status
-                            if "status" in stage_data:
-                                stage.status = Status[stage_data["status"].upper()]
-                            # Restore current step
-                            if "current_step" in stage_data:
-                                stage.current_step = stage_data["current_step"]
-                            
-                            # Restore step status
-                            for step_name, step_data in stage_data.get("steps", {}).items():
-                                if step_name in stage.steps:
-                                    step = stage.steps[step_name]
-                                    if "status" in step_data:
-                                        status = Status[step_data["status"].upper()]
-                                        self.progress.update_progress(
-                                            stage_name,
-                                            step_name,
-                                            status,
-                                            step_data.get("progress", None)
-                                        )
+                    self.progress.data = saved_progress
                     
-                    # Restore overall progress
-                    if "overall_progress" in saved_progress:
-                        self.progress.overall_progress = saved_progress["overall_progress"]
-                    # Restore current stage
-                    if "current_stage" in saved_progress:
-                        self.progress.current_stage = saved_progress["current_stage"]
-                    # Restore overall status
-                    if "status" in saved_progress:
-                        self.progress.status = Status[saved_progress["status"].upper()]
+                    self.progress.stage_map = {}
+                    for stage in self.progress.data["stages"]:
+                        stage_name = stage["name"].lower().replace(" ", "_")
+                        self.progress.stage_map[stage_name] = stage
+                    
+                    self.progress.steps_map = {}
+                    for stage_name, stage in self.progress.stage_map.items():
+                        self.progress.steps_map[stage_name] = {}
+                        for step in stage["steps"]:
+                            step_name = step["name"].lower().replace(" ", "_")
+                            self.progress.steps_map[stage_name][step_name] = step
+                            
             except json.JSONDecodeError as e:
                 self.logger.error(f"Failed to load progress file: {str(e)}")
+                # Reset progress if JSON is invalid
+                self.progress = TrainProgress()
+                # Save a valid progress file to prevent future errors
+                self._save_progress()
             except Exception as e:
                 self.logger.error(f"Error loading progress: {str(e)}")
+                # Reset progress on any error
+                self.progress = TrainProgress()
 
     def _save_progress(self):
         """Save progress"""
@@ -175,11 +159,16 @@ class Progress:
     def is_step_completed(self, step: ProcessStep) -> bool:
         """Check if a step is completed"""
         stage_name, step_name = self._get_stage_and_step(step)
-        stage = self.progress.stages.get(stage_name)
-        if not stage:
+        
+        # Using the new TrainProgress data structure
+        if stage_name not in self.progress.stage_map:
             return False
-        step_info = stage.steps.get(step_name)
-        return step_info and step_info.completed
+            
+        if step_name not in self.progress.steps_map.get(stage_name, {}):
+            return False
+            
+        step_info = self.progress.steps_map[stage_name][step_name]
+        return step_info.get("completed", False)
 
     def mark_step_completed(self, step: ProcessStep):
         """Mark a step as completed"""
@@ -192,7 +181,7 @@ class Progress:
                 "step": step_name,
                 "status": Status.COMPLETED.value
             })
-
+            
     def mark_step_failed(self, step: ProcessStep):
         """Mark a step as failed"""
         stage_name, step_name = self._get_stage_and_step(step)
@@ -1354,10 +1343,11 @@ class TrainProcessService:
             # First check if we have the current process PID
             if not hasattr(self, 'current_pid') or not self.current_pid:
                 self.logger.info("No active process PID found")
-                if self.progress.progress.current_stage:
-                    current_step = self.progress.progress.stages[self.progress.progress.current_stage].current_step
-                    if current_step:
-                        step = ProcessStep(current_step)
+                if self.progress.progress.data["current_stage"]:
+                    current_stage_name = self.progress.progress.data["current_stage"]
+                    current_stage = next((s for s in self.progress.progress.data["stages"] if s["name"] == current_stage_name), None)
+                    if current_stage and current_stage["current_step"]:
+                        step = ProcessStep(current_stage["current_step"].lower().replace(" ", "_"))
                         self.progress.mark_step_suspended(step)
                 return True
 
