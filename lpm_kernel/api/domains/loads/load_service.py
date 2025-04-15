@@ -28,14 +28,13 @@ class LoadService:
         """
         try:
             with DatabaseSession.session() as session:
-                # Check if there are multiple loads
+                # Check if there are any loads
                 load_count = session.query(Load).count()
-                if load_count > 1:
-                    return None, "Multiple load records exist in the system, please clean up first", 400
-                
-                current_load = session.query(Load).first()
-                if not current_load:
+                if load_count == 0:
                     return None, "Load record not found", 404
+                
+                # Get the most recently created load
+                current_load = session.query(Load).order_by(Load.created_at.desc()).first()
                 
                 return LoadDTO.from_model(current_load, with_password), None, 200
         except Exception as e:
