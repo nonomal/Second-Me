@@ -14,7 +14,6 @@ def openai_strategy(user_llm_config: Optional[UserLLMConfigDTO], chunked_texts):
             "Content-Type": "application/json",
         }
         data = {"input": chunked_texts, "model": user_llm_config.embedding_model_name}
-
         logger.info(f"Getting embedding for {data}, total chunks: {len(chunked_texts)}")
 
         response = requests.post(
