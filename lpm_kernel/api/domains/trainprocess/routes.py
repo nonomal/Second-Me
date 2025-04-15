@@ -220,7 +220,7 @@ def stop_training():
             progress = train_service.progress.progress
             
             # Check if status is SUSPENDED
-            if progress.data["status"] == "suspended":
+            if progress.data["status"] == "suspended" or progress.data["status"] == "failed":
                 return jsonify(APIResponse.success(
                     message="Training process has been stopped and status is confirmed as suspended",
                     data={"status": "suspended"}
