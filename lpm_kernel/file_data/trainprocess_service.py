@@ -134,7 +134,7 @@ class Progress:
                     # Check and reset any in_progress status to failed
                     self._reset_in_progress_status()
             except Exception as e:
-                self.logger.error(f"Error loading progress: {str(e)}")
+                logger.error(f"Error loading progress: {str(e)}")
                 # Reset progress on any error
                 self.progress = TrainProgress()
                 
@@ -146,14 +146,14 @@ class Progress:
         if self.progress.data["status"] == "in_progress":
             self.progress.data["status"] = "failed"
             need_save = True
-            self.logger.info("Reset overall in_progress status to failed")
+            logger.info("Reset overall in_progress status to failed")
         
         # Check each stage
         for stage in self.progress.data["stages"]:
             if stage["status"] == "in_progress":
                 stage["status"] = "failed"
                 need_save = True
-                self.logger.info(f"Reset stage '{stage['name']}' in_progress status to failed")
+                logger.info(f"Reset stage '{stage['name']}' in_progress status to failed")
             
             # Check each step in the stage
             for step in stage["steps"]:
@@ -161,14 +161,14 @@ class Progress:
                     step["status"] = "failed"
                     step["completed"] = False
                     need_save = True
-                    self.logger.info(f"Reset step '{step['name']}' in_progress status to failed")
+                    logger.info(f"Reset step '{step['name']}' in_progress status to failed")
         
         # Save changes if any were made
         if need_save:
             progress_dict = self.progress.to_dict()
             with open(self.progress_file, "w") as f:
                 json.dump(progress_dict, f, indent=2)
-            self.logger.info("Saved progress after resetting in_progress statuses")
+            logger.info("Saved progress after resetting in_progress statuses")
 
     def _save_progress(self):
         """Save progress"""
@@ -239,7 +239,6 @@ class TrainProcessService:
             if current_model_name:
                 progress_file = f"trainprocess_progress_{current_model_name}.json"
             self.progress = Progress(progress_file)
-            self.logger = logger
             self.model_name = None  # Initialize as None
             self._initialized = True
             
@@ -279,7 +278,7 @@ class TrainProcessService:
                 
             return [doc.to_dict() for doc in documents]
         except Exception as e:
-            self.logger.error(f"List documents failed: {str(e)}")
+            logger.error(f"List documents failed: {str(e)}")
             self.progress.mark_step_status(ProcessStep.LIST_DOCUMENTS, Status.FAILED)
             return []
 
@@ -295,16 +294,16 @@ class TrainProcessService:
                 # Directly call document service instead of API
                 embedding = document_service.process_document_embedding(doc_id)
                 if embedding is None:
-                    self.logger.error(
+                    logger.error(
                         f"Generate document embeddings failed for doc_id: {doc_id}"
                     )
                     self.progress.mark_step_status(ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS, Status.FAILED)
                     return False
                 self.progress.mark_step_status(ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS, Status.COMPLETED)
-                self.logger.info(f"Successfully generated embedding for document {doc_id}") 
+                logger.info(f"Successfully generated embedding for document {doc_id}") 
             return True
         except Exception as e:
-            self.logger.error(f"Generate document embeddings failed: {str(e)}")
+            logger.error(f"Generate document embeddings failed: {str(e)}")
             self.progress.mark_step_status(ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS, Status.FAILED)
             return False
 
@@ -325,7 +324,7 @@ class TrainProcessService:
             for doc in documents:
                 try:
                     if not doc.raw_content:
-                        self.logger.warning(f"Document {doc.id} has no content, skipping...")
+                        logger.warning(f"Document {doc.id} has no content, skipping...")
                         failed += 1
                         continue
 
@@ -336,16 +335,16 @@ class TrainProcessService:
                         chunk_service.save_chunk(chunk)
 
                     processed += 1
-                    self.logger.info(
+                    logger.info(
                         f"Document {doc.id} processed: {len(chunks)} chunks created"
                     )
                 except Exception as e:
-                    self.logger.error(f"Failed to process document {doc.id}: {str(e)}")
+                    logger.error(f"Failed to process document {doc.id}: {str(e)}")
                     failed += 1      
             self.progress.mark_step_status(ProcessStep.CHUNK_DOCUMENT, Status.COMPLETED)
             return True
         except Exception as e:
-            self.logger.error(f"Process chunks failed: {str(e)}")
+            logger.error(f"Process chunks failed: {str(e)}")
             self.progress.mark_step_status(ProcessStep.CHUNK_DOCUMENT, Status.FAILED)
             return False
 
@@ -361,10 +360,10 @@ class TrainProcessService:
                     # Directly call document service to generate chunk embeddings
                     processed_chunks = document_service.generate_document_chunk_embeddings(doc_id)
                     if not processed_chunks:
-                        self.logger.warning(f"No chunks to process for document: {doc_id}")
+                        logger.warning(f"No chunks to process for document: {doc_id}")
                         continue
                 except Exception as e:
-                    self.logger.error(
+                    logger.error(
                         f"Generate chunk embeddings failed for doc_id: {doc_id}: {str(e)}"
                     )
                     self.progress.mark_step_status(ProcessStep.CHUNK_EMBEDDING, Status.FAILED)
@@ -373,7 +372,7 @@ class TrainProcessService:
             self.progress.mark_step_status(ProcessStep.CHUNK_EMBEDDING, Status.COMPLETED)
             return True
         except Exception as e:
-            self.logger.error(f"Generate chunk embeddings failed: {str(e)}")
+            logger.error(f"Generate chunk embeddings failed: {str(e)}")
             self.progress.mark_step_status(ProcessStep.CHUNK_EMBEDDING, Status.FAILED)
             return False
 
@@ -382,25 +381,25 @@ class TrainProcessService:
         try:
             # Mark step as in progress
             self.progress.mark_step_status(ProcessStep.EXTRACT_DIMENSIONAL_TOPICS, Status.IN_PROGRESS)
-            self.logger.info("Starting dimensional topics extraction (L0 and L1)...")
+            logger.info("Starting dimensional topics extraction (L0 and L1)...")
             
             # Step 1: Generate L0 - Call document_service to analyze all documents
-            self.logger.info("Generating L0 data...")
+            logger.info("Generating L0 data...")
             analyzed_docs = document_service.analyze_all_documents()
-            self.logger.info(f"Successfully analyzed {len(analyzed_docs)} documents for L0")
+            logger.info(f"Successfully analyzed {len(analyzed_docs)} documents for L0")
             
             # Step 2: Generate L1 - Direct call to L1 generator service
-            self.logger.info("Generating L1 data...")
+            logger.info("Generating L1 data...")
             generate_l1_from_l0()      
-            self.logger.info("Successfully generated L1 data")
+            logger.info("Successfully generated L1 data")
             
             # Mark step as completed
             self.progress.mark_step_status(ProcessStep.EXTRACT_DIMENSIONAL_TOPICS, Status.COMPLETED)
-            self.logger.info("Dimensional topics extraction completed successfully")
+            logger.info("Dimensional topics extraction completed successfully")
             return True
 
         except Exception as e:
-            self.logger.error(f"Extract dimensional topics failed: {str(e)}")
+            logger.error(f"Extract dimensional topics failed: {str(e)}")
             self.progress.mark_step_status(ProcessStep.EXTRACT_DIMENSIONAL_TOPICS, Status.FAILED)
             return False
 
@@ -410,7 +409,7 @@ class TrainProcessService:
             # Mark step as in progress
             self.progress.mark_step_status(ProcessStep.MODEL_DOWNLOAD, Status.IN_PROGRESS)
             # Directly call save_hf_model function to download model
-            self.logger.info(f"Starting model download: {self.model_name}")
+            logger.info(f"Starting model download: {self.model_name}")
             
             # Start monitoring the download progress in a separate thread
             monitor_thread = threading.Thread(target=self._monitor_model_download)
@@ -421,16 +420,16 @@ class TrainProcessService:
             model_path = save_hf_model(self.model_name)
             
             if model_path and os.path.exists(model_path):
-                self.logger.info(f"Model downloaded successfully to {model_path}")
+                logger.info(f"Model downloaded successfully to {model_path}")
                 self.progress.mark_step_status(ProcessStep.MODEL_DOWNLOAD, Status.COMPLETED)
                 return True
             else:
-                self.logger.error(f"Model path does not exist after download: {model_path}")
+                logger.error(f"Model path does not exist after download: {model_path}")
                 self.progress.mark_step_status(ProcessStep.MODEL_DOWNLOAD, Status.FAILED)
                 return False
 
         except Exception as e:
-            self.logger.error(f"Download model failed: {str(e)}")
+            logger.error(f"Download model failed: {str(e)}")
             self.progress.mark_step_status(ProcessStep.MODEL_DOWNLOAD, Status.FAILED)
             return False
 
@@ -439,7 +438,7 @@ class TrainProcessService:
         try:
             # Mark step as in progress
             self.progress.mark_step_status(ProcessStep.MAP_ENTITY_NETWORK, Status.IN_PROGRESS)
-            self.logger.info("Starting entity network mapping...")
+            logger.info("Starting entity network mapping...")
         
             # Get or prepare L2 data
             self._prepare_l2_data()
@@ -450,11 +449,11 @@ class TrainProcessService:
             l2_generator.data_preprocess(self.l2_data["notes"], self.l2_data["basic_info"])
             
             self.progress.mark_step_status(ProcessStep.MAP_ENTITY_NETWORK, Status.COMPLETED)
-            self.logger.info("Entity network mapping completed successfully")
+            logger.info("Entity network mapping completed successfully")
             return True
             
         except Exception as e:
-            self.logger.error(f"Map entity network failed: {str(e)}")
+            logger.error(f"Map entity network failed: {str(e)}")
             self.progress.mark_step_status(ProcessStep.MAP_ENTITY_NETWORK, Status.FAILED)
             self._cleanup_resources()
             return False
@@ -470,7 +469,7 @@ class TrainProcessService:
             
             # Mark step as in progress
             self.progress.mark_step_status(ProcessStep.DECODE_PREFERENCE_PATTERNS, Status.IN_PROGRESS)
-            self.logger.info("Starting preference patterns decoding...")
+            logger.info("Starting preference patterns decoding...")
             # Get or prepare L2 data
             self._prepare_l2_data()
 
@@ -486,11 +485,11 @@ class TrainProcessService:
                     )
             
             self.progress.mark_step_status(ProcessStep.DECODE_PREFERENCE_PATTERNS, Status.COMPLETED)
-            self.logger.info("Preference patterns decoding completed successfully")
+            logger.info("Preference patterns decoding completed successfully")
             return True
             
         except Exception as e:
-            self.logger.error(f"Decode preference patterns failed: {str(e)}")
+            logger.error(f"Decode preference patterns failed: {str(e)}")
             self.progress.mark_step_status(ProcessStep.DECODE_PREFERENCE_PATTERNS, Status.FAILED)
             return False
 
@@ -499,7 +498,7 @@ class TrainProcessService:
         try:
             # Mark step as in progress
             self.progress.mark_step_status(ProcessStep.REINFORCE_IDENTITY, Status.IN_PROGRESS)
-            self.logger.info("Starting identity reinforcement...")
+            logger.info("Starting identity reinforcement...")
             # Get or prepare L2 data
             self._prepare_l2_data()
 
@@ -518,17 +517,17 @@ class TrainProcessService:
                     )
             
             self.progress.mark_step_status(ProcessStep.REINFORCE_IDENTITY, Status.COMPLETED)
-            self.logger.info("Identity reinforcement completed successfully")
+            logger.info("Identity reinforcement completed successfully")
             return True
             
         except Exception as e:
-            self.logger.error(f"Reinforce identity failed: {str(e)}")
+            logger.error(f"Reinforce identity failed: {str(e)}")
             self.progress.mark_step_status(ProcessStep.REINFORCE_IDENTITY, Status.FAILED)
             return False
             
     def _cleanup_resources(self):
         """Clean up resources to prevent memory leaks"""
-        self.logger.info("Cleaning up resources to prevent memory leaks")
+        logger.info("Cleaning up resources to prevent memory leaks")
         
         # Clean up large data structures in l2_data dictionary
         for key in self.l2_data:
@@ -542,14 +541,14 @@ class TrainProcessService:
         # Log memory usage after cleanup
         process = psutil.Process(os.getpid())
         memory_info = process.memory_info()
-        self.logger.info(f"Memory usage after cleanup: {memory_info.rss / 1024 / 1024:.2f} MB")
+        logger.info(f"Memory usage after cleanup: {memory_info.rss / 1024 / 1024:.2f} MB")
     
     def augment_content_retention(self) -> bool:
         """Augment content retention using notes, basic info and graph data"""
         try:
             # Mark step as in progress
             self.progress.mark_step_status(ProcessStep.AUGMENT_CONTENT_RETENTION, Status.IN_PROGRESS)
-            self.logger.info("Starting content retention augmentation...")
+            logger.info("Starting content retention augmentation...")
             # Get or prepare L2 data
             self._prepare_l2_data()
 
@@ -566,7 +565,7 @@ class TrainProcessService:
             )
             l2_generator.merge_json_files(self.l2_data["data_output_base_dir"])
             # Mark step as completed
-            self.logger.info("Content retention augmentation completed successfully")
+            logger.info("Content retention augmentation completed successfully")
             self.progress.mark_step_status(ProcessStep.AUGMENT_CONTENT_RETENTION, Status.COMPLETED)
             
             # Clean up resources after completion
@@ -575,7 +574,7 @@ class TrainProcessService:
             return True
             
         except Exception as e:
-            self.logger.error(f"Failed to augment content retention: {str(e)}")
+            logger.error(f"Failed to augment content retention: {str(e)}")
             self.progress.mark_step_status(ProcessStep.AUGMENT_CONTENT_RETENTION, Status.FAILED)
             # Clean up resources even if there was an error
             self._cleanup_resources()
@@ -596,10 +595,10 @@ class TrainProcessService:
         """
         # If data is already prepared, return cached data directly
         if self.l2_data_prepared and all(self.l2_data.values()):
-            self.logger.info("Using cached L2 data")
+            logger.info("Using cached L2 data")
             return self.l2_data
         
-        self.logger.info("Preparing L2 data...")
+        logger.info("Preparing L2 data...")
         
         # Setup directories and paths
         config = Config.from_env()
@@ -611,18 +610,18 @@ class TrainProcessService:
         # get topic
         topics_path = os.path.join(base_dir, "topics.json")
         self.l2_data["topics_path"] = topics_path
-        self.logger.info("Topics data not found, generating it...")
+        logger.info("Topics data not found, generating it...")
         chunk_service = ChunkService()
         topics_data = chunk_service.query_topics_data()
         save_true_topics(topics_data, topics_path)
 
         # Initialize storage
         storage = NotesStorage()
-        self.logger.info("Notes not found, preparing them...")
+        logger.info("Notes not found, preparing them...")
         documents = document_service.list_documents_with_l0()
-        self.logger.info(f"list_documents_with_l0 len: {len(documents)}")
+        logger.info(f"list_documents_with_l0 len: {len(documents)}")
         notes_list, _ = extract_notes_from_documents(documents)
-        self.logger.info(f"extract_notes_from_documents len: {len(notes_list)}")
+        logger.info(f"extract_notes_from_documents len: {len(notes_list)}")
         note_service = NoteService()
         note_service.prepareNotes(notes_list)
         storage.save_notes(notes_list)
@@ -644,7 +643,7 @@ class TrainProcessService:
         self.l2_data["data_output_base_dir"] = os.path.join(os.getcwd(), "resources/L2/data")
 
         # Lazy load user information
-        self.logger.info("Loading user information...")
+        logger.info("Loading user information...")
         status_bio = get_latest_status_bio()
         global_bio = get_latest_global_bio()
         self.l2_data["basic_info"] = {
@@ -673,11 +672,11 @@ class TrainProcessService:
             # Check if the model directory exists and has the necessary files
             config_file = os.path.join(paths["base_path"], "config.json")
             if not os.path.exists(paths["base_path"]) or not os.path.exists(config_file):
-                self.logger.info(f"Model '{self.model_name}' needs to be downloaded or is missing config.json")
+                logger.info(f"Model '{self.model_name}' needs to be downloaded or is missing config.json")
                 # Call model_download to download the model
                 download_success = self.model_download()
                 if not download_success:
-                    self.logger.error(f"Failed to download model '{self.model_name}'")
+                    logger.error(f"Failed to download model '{self.model_name}'")
                     self.progress.mark_step_status(ProcessStep.MODEL_DOWNLOAD, Status.FAILED)
                     return False
             
@@ -685,19 +684,19 @@ class TrainProcessService:
             log_dir = os.path.join(os.getcwd(), "logs")
             os.makedirs(log_dir, exist_ok=True)
             log_path = os.path.join(log_dir, "train", "train.log")
-            self.logger.info(f"Log file path: {log_path}")
+            logger.info(f"Log file path: {log_path}")
             
             # Ensure output directory exists
             os.makedirs(paths["personal_dir"], exist_ok=True)
             
             # Set USER_NAME environment variable
             os.environ["USER_NAME"] = LoadService.get_current_upload_name()
-            self.logger.info(f"USER_NAME environment variable set: {os.environ['USER_NAME']}")
+            logger.info(f"USER_NAME environment variable set: {os.environ['USER_NAME']}")
             
             script_path = os.path.join(os.getcwd(), "lpm_kernel/L2/train_for_user.sh")
             
             # First start monitoring progress in a separate thread
-            self.logger.info("Starting monitoring thread first...")
+            logger.info("Starting monitoring thread first...")
             monitor_thread = threading.Thread(
                 target=self._monitor_training_progress,
                 args=(log_path,),
@@ -709,30 +708,30 @@ class TrainProcessService:
             time.sleep(1)
             
             # Then directly execute training process (blocking)
-            self.logger.info("Now starting training process (blocking)...")
+            logger.info("Now starting training process (blocking)...")
             training_result = self._start_training(script_path, log_path)
             
             if not training_result:
-                self.logger.error("Training process failed to start")
+                logger.error("Training process failed to start")
                 self.progress.mark_step_status(ProcessStep.TRAIN, Status.FAILED)
                 return False
                 
             # Wait for the monitoring thread to finish
-            self.logger.info("Training process completed, waiting for monitoring to finish...")
+            logger.info("Training process completed, waiting for monitoring to finish...")
             monitor_thread.join(timeout=10)  # Wait up to 10 seconds for monitor to finish
             
             # Check if the training was successful by checking the returncode
             if hasattr(self, 'training_result') and self.training_result:
                 if self.training_result.get('returncode', 1) != 0:
                     error_msg = f"Training failed: {self.training_result.get('error', 'Unknown error')}"
-                    self.logger.error(error_msg)
+                    logger.error(error_msg)
                     self.progress.mark_step_status(ProcessStep.TRAIN, Status.FAILED)
                     return False
         
             return True
         
         except Exception as e:
-            self.logger.error(f"Failed to start training: {str(e)}")
+            logger.error(f"Failed to start training: {str(e)}")
             self.progress.mark_step_status(ProcessStep.TRAIN, Status.FAILED)
             return False
             
@@ -768,11 +767,11 @@ class TrainProcessService:
         os.environ["MODEL_GGUF_DIR"] = paths["gguf_dir"]
         
         # Log environment variables
-        self.logger.info("Set environment variables:")
-        self.logger.info(f"MODEL_BASE_PATH: {paths['base_path']}")
-        self.logger.info(f"MODEL_PERSONAL_DIR: {paths['personal_dir']}")
-        self.logger.info(f"MODEL_MERGED_DIR: {paths['merged_dir']}")
-        self.logger.info(f"MODEL_GGUF_DIR: {paths['gguf_dir']}")
+        logger.info("Set environment variables:")
+        logger.info(f"MODEL_BASE_PATH: {paths['base_path']}")
+        logger.info(f"MODEL_PERSONAL_DIR: {paths['personal_dir']}")
+        logger.info(f"MODEL_MERGED_DIR: {paths['merged_dir']}")
+        logger.info(f"MODEL_GGUF_DIR: {paths['gguf_dir']}")
         
         return paths
         
@@ -798,11 +797,11 @@ class TrainProcessService:
             data_synthesis_mode = training_params.get("data_synthesis_mode")
             
             # Log training parameters
-            self.logger.info("Training parameters from latest settings:")
-            self.logger.info(f"  Learning rate: {learning_rate}")
-            self.logger.info(f"  Number of epochs: {num_train_epochs}")
-            self.logger.info(f"  Concurrency threads: {concurrency_threads}")
-            self.logger.info(f"  Data synthesis mode: {data_synthesis_mode}")
+            logger.info("Training parameters from latest settings:")
+            logger.info(f"  Learning rate: {learning_rate}")
+            logger.info(f"  Number of epochs: {num_train_epochs}")
+            logger.info(f"  Concurrency threads: {concurrency_threads}")
+            logger.info(f"  Data synthesis mode: {data_synthesis_mode}")
             
             # Prepare arguments for the script
             # Build command line arguments, need to include script path as the first parameter
@@ -840,10 +839,10 @@ class TrainProcessService:
             )
             self.process = process
             self.current_pid = process.pid
-            self.logger.info(f"Training process started with PID: {self.current_pid}")
+            logger.info(f"Training process started with PID: {self.current_pid}")
             
             # Wait for process to finish directly (blocking)
-            self.logger.info("Waiting for training process to complete...")
+            logger.info("Waiting for training process to complete...")
             return_code = process.wait()
             
             # Close log file
@@ -856,15 +855,15 @@ class TrainProcessService:
             }
             
             if return_code != 0:
-                self.logger.error(f"Command execution failed, return code: {return_code}")
+                logger.error(f"Command execution failed, return code: {return_code}")
                 return False
             else:
-                self.logger.info(f"Command execution successful, return code: {return_code}")
+                logger.info(f"Command execution successful, return code: {return_code}")
             
             return True
             
         except Exception as e:
-            self.logger.error(f"Failed to start training process: {str(e)}")
+            logger.error(f"Failed to start training process: {str(e)}")
             return False
 
     def _monitor_training_progress(self, log_file) -> bool:
@@ -899,7 +898,7 @@ class TrainProcessService:
                         if not training_started:
                             if "***** Running training *****" in line:
                                 training_started = True
-                                self.logger.info("Training started")
+                                logger.info("Training started")
                             continue  # Skip progress matching until training starts
                         
                         progress_match = re.search(r"(\d+)%\|[^|]+\| (\d+)/(\d+)", line)
@@ -911,7 +910,7 @@ class TrainProcessService:
                             # Update progress at most once per second
                             current_time = time.time()
                             if current_time - last_update_time >= 1.0:
-                                # self.logger.info(f"Training progress: {percentage}% ({current_step}/{total_steps})")
+                                # logger.info(f"Training progress: {percentage}% ({current_step}/{total_steps})")
                                 if percentage == 100.0:
                                     self.progress.mark_step_status(ProcessStep.TRAIN, Status.COMPLETED)
                                     return True
@@ -921,18 +920,18 @@ class TrainProcessService:
                         # Check if we have exited the training record interval
                         if "=== Training Ended ===" in line:
                             # in_training_section = False  # Exit training record interval
-                            self.logger.info("Exited training record interval")
+                            logger.info("Exited training record interval")
                         
                     # Briefly pause to avoid excessive CPU usage
                     time.sleep(0.1)  
                     
                 except IOError as e:
-                    self.logger.error(f"Failed to read log file: {str(e)}")
+                    logger.error(f"Failed to read log file: {str(e)}")
                     time.sleep(0.1)
                     continue
                     
         except Exception as e:
-            self.logger.error(f"Failed to monitor training progress: {str(e)}")
+            logger.error(f"Failed to monitor training progress: {str(e)}")
             self.progress.mark_step_status(ProcessStep.TRAIN, Status.FAILED)
             return False
 
@@ -945,9 +944,9 @@ class TrainProcessService:
                 Status.IN_PROGRESS,
                 percentage
             )
-            self.logger.info(f"Progress updated: {percentage}% - {message}")
+            logger.info(f"Progress updated: {percentage}% - {message}")
         except Exception as e:
-            self.logger.error(f"Progress callback error: {str(e)}")
+            logger.error(f"Progress callback error: {str(e)}")
 
     def _monitor_model_download(self) -> bool:
         """Monitor model download progress"""
@@ -985,7 +984,7 @@ class TrainProcessService:
                         
                         # Check for download start
                         if "Starting download of model:" in line:
-                            self.logger.info("Model download started")
+                            logger.info("Model download started")
                             continue
                         
                         # Get file size information when a download starts
@@ -996,7 +995,7 @@ class TrainProcessService:
                                 file_size = float(match.group(2))
                                 file_sizes[current_file] = file_size
                                 total_size = sum(file_sizes.values())
-                                # self.logger.info(f"Starting download of {current_file} ({file_size} MB)")
+                                # logger.info(f"Starting download of {current_file} ({file_size} MB)")
                         
                         # Track file download progress
                         if "Downloaded" in line and "MB /" in line:
@@ -1034,19 +1033,19 @@ class TrainProcessService:
 
                         if "Download completed." in line:
                             self.progress.mark_step_status(ProcessStep.MODEL_DOWNLOAD, Status.COMPLETED)
-                            self.logger.info("Model download completed")
+                            logger.info("Model download completed")
                             return True
                     
                     # Briefly pause to avoid excessive CPU usage
                     time.sleep(0.1)
                     
                 except IOError as e:
-                    self.logger.error(f"Failed to read log file: {str(e)}")
+                    logger.error(f"Failed to read log file: {str(e)}")
                     time.sleep(0.1)
                     continue
                     
         except Exception as e:
-            self.logger.error(f"Failed to monitor model download progress: {str(e)}")
+            logger.error(f"Failed to monitor model download progress: {str(e)}")
             return False
             
     def merge_weights(self) -> bool:
@@ -1059,7 +1058,7 @@ class TrainProcessService:
             
             # Check if model exists
             if not os.path.exists(paths["base_path"]):
-                self.logger.error(f"Model '{self.model_name}' does not exist, please download first")
+                logger.error(f"Model '{self.model_name}' does not exist, please download first")
                 self.progress.mark_step_status(ProcessStep.MERGE_WEIGHTS, Status.FAILED)
                 return False
             
@@ -1086,12 +1085,12 @@ class TrainProcessService:
                 script_path=script_path, script_type="merge_weights", log_file=log_path
             )
             
-            self.logger.info(f"Weight merge task result: {result}")
+            logger.info(f"Weight merge task result: {result}")
             
             # Check if script execution was successful
             if result.get('returncode', 1) != 0:
                 error_msg = f"Merge weights failed: {result.get('error', 'Unknown error')}"
-                self.logger.error(error_msg)
+                logger.error(error_msg)
                 self.progress.mark_step_status(ProcessStep.MERGE_WEIGHTS, Status.FAILED)
                 return False
                 
@@ -1099,17 +1098,17 @@ class TrainProcessService:
             config_path = os.path.join(paths["merged_dir"], "config.json")
             if not os.path.exists(config_path):
                 error_msg = f"Merged model files not found in {paths['merged_dir']}"
-                self.logger.error(error_msg)
+                logger.error(error_msg)
                 self.progress.mark_step_status(ProcessStep.MERGE_WEIGHTS, Status.FAILED)
                 return False
             
-            self.logger.info("Weight merge completed successfully")
+            logger.info("Weight merge completed successfully")
             self.progress.mark_step_status(ProcessStep.MERGE_WEIGHTS, Status.COMPLETED)
             return True
 
         except Exception as e:
             self.progress.mark_step_status(ProcessStep.MERGE_WEIGHTS, Status.FAILED)
-            self.logger.error(f"Merge weights failed: {str(e)}")
+            logger.error(f"Merge weights failed: {str(e)}")
             return False
 
     def convert_model(self) -> bool:
@@ -1123,19 +1122,19 @@ class TrainProcessService:
             
             # Check if merged model exists
             merged_model_dir = paths["merged_dir"]
-            self.logger.info(f"Merged model path: {merged_model_dir}")
+            logger.info(f"Merged model path: {merged_model_dir}")
             if not os.path.exists(merged_model_dir):
-                self.logger.error(f"Model '{self.model_name}' merged output does not exist, please merge model first")
+                logger.error(f"Model '{self.model_name}' merged output does not exist, please merge model first")
                 self.progress.mark_step_status(ProcessStep.CONVERT_MODEL, Status.FAILED)
                 return False
             
             # Get GGUF output directory
             gguf_dir = paths["gguf_dir"]
-            self.logger.info(f"GGUF output directory: {gguf_dir}")
+            logger.info(f"GGUF output directory: {gguf_dir}")
             
             script_path = os.path.join(os.getcwd(), "lpm_kernel/L2/convert_hf_to_gguf.py")
             gguf_path = os.path.join(gguf_dir, "model.gguf")
-            self.logger.info(f"GGUF output path: {gguf_path}")
+            logger.info(f"GGUF output path: {gguf_path}")
             
             # Build parameters
             args = [
@@ -1145,7 +1144,7 @@ class TrainProcessService:
                 "--outtype",
                 "f16",
             ]
-            self.logger.info(f"Parameters: {args}")
+            logger.info(f"Parameters: {args}")
             
             
             # Ensure GGUF output directory exists
@@ -1159,29 +1158,29 @@ class TrainProcessService:
                 args=args
             )
             
-            self.logger.info(f"Model conversion result: {result}")
+            logger.info(f"Model conversion result: {result}")
             
             # Check if script execution was successful
             if result.get('returncode', 1) != 0:
                 error_msg = f"Model conversion failed: {result.get('error', 'Unknown error')}"
-                self.logger.error(error_msg)
+                logger.error(error_msg)
                 self.progress.mark_step_status(ProcessStep.CONVERT_MODEL, Status.FAILED)
                 return False
                 
             # Check if GGUF model file exists
             if not os.path.exists(gguf_path):
                 error_msg = f"GGUF model file not found at {gguf_path}"
-                self.logger.error(error_msg)
+                logger.error(error_msg)
                 self.progress.mark_step_status(ProcessStep.CONVERT_MODEL, Status.FAILED)
                 return False
             
-            self.logger.info("Model conversion completed successfully")
+            logger.info("Model conversion completed successfully")
             self.progress.mark_step_status(ProcessStep.CONVERT_MODEL, Status.COMPLETED)
             return True
             
         except Exception as e:
             self.progress.mark_step_status(ProcessStep.CONVERT_MODEL, Status.FAILED)
-            self.logger.error(f"Convert model failed: {str(e)}")
+            logger.error(f"Convert model failed: {str(e)}")
             return False
 
     def check_training_condition(self) -> bool:
@@ -1193,11 +1192,11 @@ class TrainProcessService:
         try:
             # Check if there are any documents that need embedding
             if document_service.check_all_documents_embeding_status():
-                self.logger.warning("Cannot start training: There are documents that need embedding process first")
+                logger.warning("Cannot start training: There are documents that need embedding process first")
                 return False
             return True
         except Exception as e:
-            self.logger.error(f"Error checking training conditions: {str(e)}", exc_info=True)
+            logger.error(f"Error checking training conditions: {str(e)}", exc_info=True)
             if self.progress.progress.current_stage:
                 current_step = self.progress.progress.stages[self.progress.progress.current_stage].current_step
                 if current_step:
@@ -1210,7 +1209,7 @@ class TrainProcessService:
             self.is_stopped = False
             # Store the current process PID
             self.current_pid = os.getpid()  # Store the PID
-            self.logger.info(f"Training process started with PID: {self.current_pid}")
+            logger.info(f"Training process started with PID: {self.current_pid}")
             # Get the ordered list of all steps
             ordered_steps = ProcessStep.get_ordered_steps()
 
@@ -1224,16 +1223,16 @@ class TrainProcessService:
             for step in ordered_steps[start_index:]:
                 self.current_step = step
                 if self.is_stopped:
-                    self.logger.info("Training process aborted during step")
+                    logger.info("Training process aborted during step")
                     self.progress.mark_step_status(step, Status.SUSPENDED)
                     break  # If stop is requested, exit the loop
             
-                self.logger.info(f"Starting step: {step.value}")
+                logger.info(f"Starting step: {step.value}")
 
                 # Execute the corresponding method
                 method_name = step.get_method_name()
                 if not hasattr(self, method_name):
-                    self.logger.error(f"Method {method_name} not found")
+                    logger.error(f"Method {method_name} not found")
                     self.progress.mark_step_status(step, Status.FAILED)
                     return False
 
@@ -1241,20 +1240,20 @@ class TrainProcessService:
                 success = method()
 
                 if not success:
-                    self.logger.error(f"Step {step.value} failed")
-                    self.logger.info(f'Marking step as failed: stage={step.value}, step={step.value}')
+                    logger.error(f"Step {step.value} failed")
+                    logger.info(f'Marking step as failed: stage={step.value}, step={step.value}')
                     self.progress.mark_step_status(step, Status.FAILED)
                     return False
-                self.logger.info(f"Step {step.value} completed successfully")
+                logger.info(f"Step {step.value} completed successfully")
                 # self.progress.mark_step_status(step, Status.COMPLETED)
             if self.is_stopped:
-                self.logger.info("Training process was stopped during a step")
+                logger.info("Training process was stopped during a step")
             else:
-               self.logger.info("Training process completed...")
+               logger.info("Training process completed...")
 
             return True
         except Exception as e:
-            self.logger.error(f"Exception occurred: {str(e)}")
+            logger.error(f"Exception occurred: {str(e)}")
             self.progress.mark_step_status(step, Status.FAILED)
             return False
 
@@ -1266,9 +1265,9 @@ class TrainProcessService:
         try:
             self.progress.reset_progress()
             self.progress._save_progress()
-            self.logger.info("Progress saved successfully")
+            logger.info("Progress saved successfully")
         except Exception as e:
-            self.logger.error(f"Failed to save progress: {str(e)}")
+            logger.error(f"Failed to save progress: {str(e)}")
             
     def stop_process(self):
         """Stop training process
@@ -1279,14 +1278,14 @@ class TrainProcessService:
         try:
             # Set the stop flag
             self.is_stopped = True
-            self.logger.info("Training process has been requested to stop")
+            logger.info("Training process has been requested to stop")
             # mark train stop
             if self.current_step == ProcessStep.TRAIN:
                 self.progress.mark_step_status(ProcessStep.TRAIN, Status.SUSPENDED)
             
             # First check if we have the current process PID
             if not hasattr(self, 'current_pid') or not self.current_pid:
-                self.logger.info("No active process PID found")
+                logger.info("No active process PID found")
                 if self.progress.progress.data["current_stage"]:
                     current_stage_name = self.progress.progress.data["current_stage"]
                     current_stage = next((s for s in self.progress.progress.data["stages"] if s["name"] == current_stage_name), None)
@@ -1296,7 +1295,7 @@ class TrainProcessService:
                 return True
 
             try:
-                self.logger.info(f"Attempting to terminate process with PID: {self.current_pid}")
+                logger.info(f"Attempting to terminate process with PID: {self.current_pid}")
                 
                 # Check if the process exists
                 if psutil.pid_exists(self.current_pid):
@@ -1308,7 +1307,7 @@ class TrainProcessService:
                     
                     # Terminate all child processes first
                     for child in children:
-                        self.logger.info(f"Terminating child process with PID: {child.pid}")
+                        logger.info(f"Terminating child process with PID: {child.pid}")
                         try:
                             child.terminate()
                         except psutil.NoSuchProcess:
@@ -1319,24 +1318,24 @@ class TrainProcessService:
                     
                     # Kill any remaining children
                     for child in still_alive:
-                        self.logger.info(f"Killing child process with PID: {child.pid}")
+                        logger.info(f"Killing child process with PID: {child.pid}")
                         try:
                             child.kill()
                         except psutil.NoSuchProcess:
                             pass
                     
                     # Note: We don't terminate the main process as it's this process
-                    self.logger.info(f"All child processes of {self.current_pid} have been terminated") 
+                    logger.info(f"All child processes of {self.current_pid} have been terminated") 
                     gc.collect()
                     return True
                 else:
-                    self.logger.warning(f"Process with PID {self.current_pid} no longer exists")
+                    logger.warning(f"Process with PID {self.current_pid} no longer exists")
                     return True
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess) as e:
-                self.logger.error(f"Failed to terminate process: {str(e)}")
+                logger.error(f"Failed to terminate process: {str(e)}")
                 
         except Exception as e:
-            self.logger.error(f"Error stopping training process: {str(e)}")
+            logger.error(f"Error stopping training process: {str(e)}")
             return False
             
     @classmethod
