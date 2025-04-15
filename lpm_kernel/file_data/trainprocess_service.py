@@ -78,7 +78,7 @@ class Progress:
     """Progress management class"""
 
     def __init__(
-        self, progress_file: str = "trainprocess_progress.json", progress_callback=None
+        self, progress_file: str = "trainprocess_progress.json"
     ):
         progress_dir = os.path.join(os.getcwd(), "data", "progress")
         if not os.path.exists(progress_dir):
@@ -87,7 +87,6 @@ class Progress:
         if not self.progress_file.startswith(progress_dir):
             raise ValueError("Invalid progress file path")
         self.progress = TrainProgress()
-        self.progress_callback = progress_callback
         self.logger = logger
         self._load_progress()
 
@@ -155,8 +154,6 @@ class Progress:
         progress_dict = self.progress.to_dict()
         with open(self.progress_file, "w") as f:
             json.dump(progress_dict, f, indent=2)
-        if self.progress_callback:
-            self.progress_callback(progress_dict)
 
     def _get_stage_and_step(self, step: ProcessStep) -> tuple:
         """Get the stage and step name corresponding to the step"""
@@ -199,22 +196,11 @@ class Progress:
         stage_name, step_name = self._get_stage_and_step(step)
         self.progress.update_progress(stage_name, step_name, status)
         self._save_progress()
-        if self.progress_callback:
-            self.progress_callback({
-                "stage": stage_name,
-                "step": step_name,
-                "status": status.value
-            })
 
     def reset_progress(self):
         """Reset all progress"""
         self.progress = TrainProgress()
         self._save_progress()
-        if self.progress_callback:
-            self.progress_callback({
-                "reset": True,
-                "status": Status.PENDING.value
-            })
 
     def get_last_successful_step(self) -> Optional[ProcessStep]:
         """Get the last successfully completed step"""
@@ -245,14 +231,14 @@ class TrainProcessService:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, base_url: str = None, progress_file: str = "trainprocess_progress.json", progress_callback=None, current_model_name: str = None, is_cot: bool = False):
+    def __init__(self, base_url: str = None, progress_file: str = "trainprocess_progress.json", current_model_name: str = None, is_cot: bool = False):
         if not self._initialized:
             config = Config.from_env()
             self.base_url = base_url or config.KERNEL2_SERVICE_URL
             # Generate a unique progress file name based on model name
             if current_model_name:
                 progress_file = f"trainprocess_progress_{current_model_name}.json"
-            self.progress = Progress(progress_file, self.progress_callback)
+            self.progress = Progress(progress_file)
             self.logger = logger
             self.model_name = None  # Initialize as None
             self._initialized = True
@@ -273,16 +259,13 @@ class TrainProcessService:
             }
             self.l2_data_prepared = False
         
-        # Always use our internal callback
-        self.progress.progress_callback = self.progress_callback
-            
         # Update model name and progress instance if model name changes
         if current_model_name is not None and current_model_name != self.model_name:
             self.model_name = current_model_name
             # Create new progress instance with updated progress file name
             progress_file = f"trainprocess_progress_{current_model_name}.json"
         
-            self.progress = Progress(progress_file, self.progress_callback)
+            self.progress = Progress(progress_file)
         self.is_cot = is_cot
 
     def list_documents(self):
@@ -1279,7 +1262,7 @@ class TrainProcessService:
     def reset_progress(self):
         """Save current progress
         
-        This method saves the current progress to the progress file and triggers the progress callback if available.
+        This method saves the current progress to the progress file.
         """
         try:
             self.progress.reset_progress()
@@ -1288,30 +1271,6 @@ class TrainProcessService:
         except Exception as e:
             self.logger.error(f"Failed to save progress: {str(e)}")
             
-    def progress_callback(self, progress_update):
-        """Progress callback function to update training progress
-        
-        Args:
-            progress_update: Dictionary containing progress update information
-        """
-        if not isinstance(progress_update, dict):
-            return
-
-        try:
-            # Get current progress
-            progress = self.progress.progress
-
-            # Update progress
-            stage = progress_update.get("stage")
-            step = progress_update.get("step")
-            status = Status[progress_update.get("status", "IN_PROGRESS").upper()]
-            prog = progress_update.get("progress")
-
-            if stage and step:
-                progress.update_progress(stage, step, status, prog)
-        except Exception as e:
-            self.logger.error(f"Progress callback error: {str(e)}")
-    
     def stop_process(self):
         """Stop training process
         

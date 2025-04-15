@@ -72,7 +72,7 @@ def start_process():
 
         # Create service instance with model name and additional parameters
         train_service = TrainProcessService(
-            model_name=model_name
+            current_model_name=model_name
         )
         
         # Check if there are any in_progress statuses that need to be reset
@@ -168,7 +168,7 @@ def get_progress(model_name):
     sanitized_model_name = secure_filename(model_name)  # Sanitize model_name
     progress_name = f'trainprocess_progress_{sanitized_model_name}.json'  # Build filename based on the sanitized model_name
     try:
-        train_service = TrainProcessService(progress_file=progress_name, model_name=sanitized_model_name)  # Pass in specific progress file
+        train_service = TrainProcessService(progress_file=progress_name, current_model_name=sanitized_model_name)  # Pass in specific progress file
         progress = train_service.progress.progress
 
         return jsonify(
@@ -318,7 +318,7 @@ def retrain():
         
         # Create training service instance
         train_service = TrainProcessService(
-            model_name=model_name
+            current_model_name=model_name
         )
         
         # Check if there are any in_progress statuses that need to be reset
