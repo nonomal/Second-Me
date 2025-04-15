@@ -15,4 +15,4 @@ class ChatRequest(BaseModel):
     stream: bool = True  # Whether to stream response
     
     # Metadata for request processing - contains extension parameters
-    metadata: Dict[str, Any] = Field(default_factory=dict)  # Additional parameters for LLM request processing
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)  # Additional parameters for LLM request processing

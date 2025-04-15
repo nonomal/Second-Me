@@ -152,7 +152,7 @@ docker-%: export IN_DOCKER_ENV=1
 ifeq ($(OS),Windows_NT)
 DOCKER_COMPOSE_CMD := docker compose
 else
-DOCKER_COMPOSE_CMD := $(shell if command -v docker compose >/dev/null 2>&1; then echo "docker compose"; else echo "docker-compose"; fi)
+DOCKER_COMPOSE_CMD := $(shell if command -v docker-compose >/dev/null 2>&1; then echo "docker-compose"; else echo "docker compose"; fi)
 endif
 
 docker-build:
