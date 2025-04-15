@@ -156,7 +156,9 @@ export default function TrainingPage() {
 
   const status = useTrainingStore((state) => state.status);
   const trainingProgress = useTrainingStore((state) => state.trainingProgress);
-  const [isResume, setIsResume] = useState(trainingProgress.status === 'suspended');
+  const [isResume, setIsResume] = useState(
+    trainingProgress.status === 'suspended' || trainingProgress.status === 'failed'
+  );
   const checkTrainStatus = useTrainingStore((state) => state.checkTrainStatus);
   const resetTrainingState = useTrainingStore((state) => state.resetTrainingState);
   const trainingError = useTrainingStore((state) => state.error);
@@ -200,7 +202,7 @@ export default function TrainingPage() {
   };
 
   useEffect(() => {
-    setIsResume(trainingProgress.status === 'suspended');
+    setIsResume(trainingProgress.status === 'suspended' || trainingProgress.status === 'failed');
   }, [trainingProgress]);
 
   useEffect(() => {
