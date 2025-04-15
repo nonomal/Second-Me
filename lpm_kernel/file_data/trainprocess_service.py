@@ -110,13 +110,6 @@ class Progress:
                         for step in stage["steps"]:
                             step_name = step["name"].lower().replace(" ", "_")
                             self.progress.steps_map[stage_name][step_name] = step
-                            
-            except json.JSONDecodeError as e:
-                self.logger.error(f"Failed to load progress file: {str(e)}")
-                # Reset progress if JSON is invalid
-                self.progress = TrainProgress()
-                # Save a valid progress file to prevent future errors
-                self._save_progress()
             except Exception as e:
                 self.logger.error(f"Error loading progress: {str(e)}")
                 # Reset progress on any error
@@ -129,7 +122,6 @@ class Progress:
             json.dump(progress_dict, f, indent=2)
         if self.progress_callback:
             self.progress_callback(progress_dict)
-        self._load_progress()
 
     def _get_stage_and_step(self, step: ProcessStep) -> tuple:
         """Get the stage and step name corresponding to the step"""
