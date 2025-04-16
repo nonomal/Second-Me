@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ILoadInfo, updateLoadInfo } from '@/service/info';
+import type { ILoadInfo } from '@/service/info';
+import { updateLoadInfo } from '@/service/info';
 import { useLoadInfoStore } from '@/store/useLoadInfoStore';
 import { ROUTER_PATH } from '@/utils/router';
 import { message } from 'antd';

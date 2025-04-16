@@ -24,6 +24,7 @@ export default function Home() {
   const [contentVisible, setContentVisible] = useState(false);
 
   const loadInfo = useLoadInfoStore((state) => state.loadInfo);
+  const firstLoaded = useLoadInfoStore((state) => state.firstLoaded);
 
   useEffect(() => {
     setIsMounted(true);
@@ -114,19 +115,21 @@ export default function Home() {
           </div>
         </div>
 
-        <div
-          className={`transition-opacity duration-700 ease-in-out delay-[300ms] ${contentVisible ? 'opacity-100' : 'opacity-0'}`}
-        >
-          {loadInfo ? (
-            <button className="btn-primary" onClick={handleExistingUploadClick}>
-              Continue as {loadInfo.name}
-            </button>
-          ) : (
-            <button className="btn-primary" onClick={() => setShowCreate(true)}>
-              Create my Second Me
-            </button>
-          )}
-        </div>
+        {firstLoaded && (
+          <div
+            className={`transition-opacity duration-700 ease-in-out delay-[300ms] ${contentVisible ? 'opacity-100' : 'opacity-0'}`}
+          >
+            {loadInfo ? (
+              <button className="btn-primary" onClick={handleExistingUploadClick}>
+                Continue as {loadInfo.name}
+              </button>
+            ) : (
+              <button className="btn-primary" onClick={() => setShowCreate(true)}>
+                Create my Second Me
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {showCreate && <CreateSecondMe onClose={() => setShowCreate(false)} />}
