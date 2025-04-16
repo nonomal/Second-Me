@@ -70,6 +70,11 @@ class TrainProgress:
                             "status": "pending"
                         },
                         {
+                            "name": "Generate Biography",
+                            "completed": False,
+                            "status": "pending"
+                        },
+                        {
                             "name": "Map Your Entity Network",
                             "completed": False,
                             "status": "pending"
