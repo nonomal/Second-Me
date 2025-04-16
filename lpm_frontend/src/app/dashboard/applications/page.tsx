@@ -75,7 +75,7 @@ export default function ApplicationsPage() {
             multi-AI spaces, or explore the future with Second X.
           </p>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-6 pb-4">
           {applications.map((app, index) => (
             <div
               key={index}

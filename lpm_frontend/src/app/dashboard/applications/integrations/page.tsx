@@ -2,7 +2,7 @@ import { CalendarOutlined } from '@ant-design/icons';
 
 const Page = () => {
   return (
-    <div className="w-full h-[calc(100vh-64px)] overflow-scroll max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="w-full h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       <div className="flex flex-col mb-10">
         <div className="font-extrabold text-2xl">Integrations</div>
         <div>Manage your third-party integrations and services</div>
