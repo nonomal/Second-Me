@@ -162,9 +162,8 @@ def stream_logs():
 def get_progress(model_name):
     """Get current progress (non-real-time)"""
     sanitized_model_name = secure_filename(model_name)  # Sanitize model_name
-    progress_name = f'trainprocess_progress_{sanitized_model_name}.json'  # Build filename based on the sanitized model_name
     try:
-        train_service = TrainProcessService(progress_file=progress_name, current_model_name=sanitized_model_name)  # Pass in specific progress file
+        train_service = TrainProcessService(current_model_name=sanitized_model_name)  # Pass in specific progress file
         progress = train_service.progress.progress
 
         return jsonify(
