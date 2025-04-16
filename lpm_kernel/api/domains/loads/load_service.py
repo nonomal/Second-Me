@@ -419,7 +419,7 @@ class LoadService:
         try:
             import os
             # Import training service
-            from lpm_kernel.train.trainprocess_service import TrainProcessService
+            from lpm_kernel.api.domains.trainprocess.trainprocess_service import TrainProcessService
             
             # Get all possible training progress file patterns
             base_dir = os.getenv('LOCAL_BASE_DIR', '.')
