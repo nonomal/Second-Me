@@ -555,6 +555,85 @@ class TrainProcessService:
             self._cleanup_resources()
             return False
 
+    def _prepare_l2_data(self) -> dict:
+        """Prepare common data needed for L2 generation tasks using lazy loading
+
+        Returns:
+            Dictionary containing all L2 data:
+            - notes: List of prepared notes
+            - basic_info: Dict containing user information
+            - data_output_base_dir: Path to output directory
+            - topics_path: Path to topics data
+            - entitys_path: Path to entity mapping file
+            - graph_path: Path to graph data
+            - config_path: Path to config file
+        """
+        # If data is already prepared, return cached data directly
+        if self.l2_data_prepared and all(self.l2_data.values()):
+            logger.info("Using cached L2 data")
+            return self.l2_data
+
+        logger.info("Preparing L2 data...")
+
+        # Setup directories and paths
+        config = Config.from_env()
+        base_dir = os.path.join(
+            os.getcwd(), config.get("USER_DATA_PIPELINE_DIR") + "/raw_data"
+        )
+        os.makedirs(base_dir, exist_ok=True)
+
+        # get topic
+        topics_path = os.path.join(base_dir, "topics.json")
+        self.l2_data["topics_path"] = topics_path
+        logger.info("Topics data not found, generating it...")
+        chunk_service = ChunkService()
+        topics_data = chunk_service.query_topics_data()
+        save_true_topics(topics_data, topics_path)
+
+        # Initialize storage
+        storage = NotesStorage()
+        logger.info("Notes not found, preparing them...")
+        documents = document_service.list_documents_with_l0()
+        logger.info(f"list_documents_with_l0 len: {len(documents)}")
+        notes_list, _ = extract_notes_from_documents(documents)
+        logger.info(f"extract_notes_from_documents len: {len(notes_list)}")
+        note_service = NoteService()
+        note_service.prepareNotes(notes_list)
+        storage.save_notes(notes_list)
+        self.l2_data["notes"] = storage.load_notes()
+
+        # Get paths
+        self.l2_data["config_path"] = os.path.join(
+            os.getcwd(),
+            "resources/L2/data_pipeline/data_prep/subjective/config/config.json",
+        )
+        self.l2_data["entitys_path"] = os.path.join(
+            os.getcwd(),
+            "resources/L2/data_pipeline/raw_data/id_entity_mapping_subjective_v2.json",
+        )
+        self.l2_data["graph_path"] = os.path.join(
+            os.getcwd(),
+            "resources/L1/graphrag_indexing_output/subjective/entities.parquet",
+        )
+        self.l2_data["data_output_base_dir"] = os.path.join(os.getcwd(), "resources/L2/data")
+
+        # Lazy load user information
+        logger.info("Loading user information...")
+        status_bio = get_latest_status_bio()
+        global_bio = get_latest_global_bio()
+        self.l2_data["basic_info"] = {
+            "username": LoadService.get_current_upload_name(),
+            "aboutMe": LoadService.get_current_upload_description(),
+            "statusBio": status_bio.content if status_bio else "Currently working on an AI project.",
+            "globalBio": global_bio.content_third_view if global_bio
+                else "The User is a software engineer who loves programming and learning new technologies.",
+            "lang": "English",
+        }
+
+        # Mark data as prepared
+        self.l2_data_prepared = True
+
+        return self.l2_data
     def train(self) -> bool:
         """Start model training"""
         try:
@@ -1181,8 +1260,8 @@ class TrainProcessService:
             # First check if we have the current process PID
             if not hasattr(self, 'current_pid') or not self.current_pid:
                 logger.info("No active process PID found")
-                if self.progress.progress.current_stage:
-                    current_stage_name = self.progress.progress.current_stage
+                if self.progress.progress.data["current_stage"]:
+                    current_stage_name = self.progress.progress.data["current_stage"]
                     current_stage = next((s for s in self.progress.progress.data["stages"] if s["name"] == current_stage_name), None)
                     if current_stage and current_stage["current_step"]:
                         step = ProcessStep(current_stage["current_step"].lower().replace(" ", "_"))
@@ -1254,83 +1333,3 @@ class TrainProcessService:
             dict: Dictionary containing the latest training parameters
         """
         return cls._latest_training_params.copy()
-
-    def _prepare_l2_data(self) -> dict:
-        """Prepare common data needed for L2 generation tasks using lazy loading
-        
-        Returns:
-            Dictionary containing all L2 data:
-            - notes: List of prepared notes
-            - basic_info: Dict containing user information
-            - data_output_base_dir: Path to output directory
-            - topics_path: Path to topics data
-            - entitys_path: Path to entity mapping file
-            - graph_path: Path to graph data
-            - config_path: Path to config file
-        """
-        # If data is already prepared, return cached data directly
-        if self.l2_data_prepared and all(self.l2_data.values()):
-            logger.info("Using cached L2 data")
-            return self.l2_data
-        
-        logger.info("Preparing L2 data...")
-        
-        # Setup directories and paths
-        config = Config.from_env()
-        base_dir = os.path.join(
-            os.getcwd(), config.get("USER_DATA_PIPELINE_DIR") + "/raw_data"
-        )
-        os.makedirs(base_dir, exist_ok=True)
-
-        # get topic
-        topics_path = os.path.join(base_dir, "topics.json")
-        self.l2_data["topics_path"] = topics_path
-        logger.info("Topics data not found, generating it...")
-        chunk_service = ChunkService()
-        topics_data = chunk_service.query_topics_data()
-        save_true_topics(topics_data, topics_path)
-
-        # Initialize storage
-        storage = NotesStorage()
-        logger.info("Notes not found, preparing them...")
-        documents = document_service.list_documents_with_l0()
-        logger.info(f"list_documents_with_l0 len: {len(documents)}")
-        notes_list, _ = extract_notes_from_documents(documents)
-        logger.info(f"extract_notes_from_documents len: {len(notes_list)}")
-        note_service = NoteService()
-        note_service.prepareNotes(notes_list)
-        storage.save_notes(notes_list)
-        self.l2_data["notes"] = storage.load_notes()
-
-        # Get paths
-        self.l2_data["config_path"] = os.path.join(
-            os.getcwd(),
-            "resources/L2/data_pipeline/data_prep/subjective/config/config.json",
-        )
-        self.l2_data["entitys_path"] = os.path.join(
-            os.getcwd(),
-            "resources/L2/data_pipeline/raw_data/id_entity_mapping_subjective_v2.json",
-        )
-        self.l2_data["graph_path"] = os.path.join(
-            os.getcwd(),
-            "resources/L1/graphrag_indexing_output/subjective/entities.parquet",
-        )
-        self.l2_data["data_output_base_dir"] = os.path.join(os.getcwd(), "resources/L2/data")
-
-        # Lazy load user information
-        logger.info("Loading user information...")
-        status_bio = get_latest_status_bio()
-        global_bio = get_latest_global_bio()
-        self.l2_data["basic_info"] = {
-            "username": LoadService.get_current_upload_name(),
-            "aboutMe": LoadService.get_current_upload_description(),
-            "statusBio": status_bio.content if status_bio else "Currently working on an AI project.",
-            "globalBio": global_bio.content_third_view if global_bio 
-                else "The User is a software engineer who loves programming and learning new technologies.",
-            "lang": "English",
-        }
-        
-        # Mark data as prepared
-        self.l2_data_prepared = True
-        
-        return self.l2_data
