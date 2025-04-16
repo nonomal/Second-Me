@@ -126,15 +126,8 @@ export const stopService = () => {
   });
 };
 
-export const getModelName = () => {
-  return Request<CommonResponse<TrainingConfig>>({
-    method: 'get',
-    url: `/api/trainprocess/model_name`
-  });
-};
-
 export const getTrainingParams = () => {
-  return Request<CommonResponse<TrainingParams>>({
+  return Request<CommonResponse<TrainingConfig>>({
     method: 'get',
     url: `/api/trainprocess/training_params`
   });

@@ -6,7 +6,7 @@ import { Listbox, Transition } from '@headlessui/react';
 import { PlayIcon, StopIcon } from '@heroicons/react/24/outline';
 import { EVENT } from '@/utils/event';
 import { InputNumber, Radio, Spin, Tooltip } from 'antd';
-import type { TrainingParams } from '@/service/train';
+import type { TrainingConfig } from '@/service/train';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import OpenAiModelIcon from '../svgs/OpenAiModelIcon';
 import CustomModelIcon from '../svgs/CustomModelIcon';
@@ -18,37 +18,25 @@ interface BaseModelOption {
   label: string;
 }
 
-interface TrainingConfig {
-  modelProvider: string;
-  baseModel: string;
-  modelType: string;
-  epochs: number;
-  learningRate: string;
-  memoryPriority: string;
-  showAdvanced: boolean;
-}
-
 interface ModelConfig {
   provider_type?: string;
   [key: string]: any;
 }
 
 interface TrainingConfigurationProps {
-  config: TrainingConfig;
-  setConfig: React.Dispatch<React.SetStateAction<TrainingConfig>>;
   baseModelOptions: BaseModelOption[];
   modelConfig: ModelConfig | null;
   isTraining: boolean;
-  updateTrainingParams: (params: TrainingParams) => void;
+  updateTrainingParams: (params: TrainingConfig) => void;
   status: string;
   isResume: boolean;
   handleResetProgress: () => void;
-  nowTrainingParams: TrainingParams | null;
+  nowTrainingParams: TrainingConfig | null;
   changeBaseModel: boolean;
   handleTrainingAction: () => Promise<void>;
   trainActionLoading: boolean;
   setSelectedInfo: React.Dispatch<React.SetStateAction<boolean>>;
-  trainingParams: TrainingParams;
+  trainingParams: TrainingConfig;
 }
 
 const synthesisModeOptions = [
@@ -58,8 +46,6 @@ const synthesisModeOptions = [
 ];
 
 const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
-  config,
-  setConfig,
   baseModelOptions,
   modelConfig,
   isTraining,
@@ -228,13 +214,13 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
               </div>
               <Listbox
                 disabled={isTraining || trainActionLoading}
-                onChange={(value) => setConfig({ ...config, baseModel: value })}
-                value={config.baseModel}
+                onChange={(value) => updateTrainingParams({ model_name: value })}
+                value={trainingParams.model_name}
               >
                 <div className="relative mt-1">
                   <Listbox.Button className="relative w-full cursor-pointer rounded-lg bg-white py-2 pl-3 pr-10 text-left border border-gray-300 focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-300">
                     <span className="block truncate">
-                      {baseModelOptions.find((option) => option.value === config.baseModel)
+                      {baseModelOptions.find((option) => option.value === trainingParams.model_name)
                         ?.label || 'Select a model...'}
                     </span>
                     <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
@@ -400,36 +386,6 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
             </div>
           </div>
         </div>
-
-        {config.showAdvanced && (
-          <div className="space-y-4 border-t pt-4 mt-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Base Model</label>
-              <Listbox disabled={true} onChange={() => {}} value="Qwen 7B">
-                <div className="relative mt-1">
-                  <Listbox.Button className="relative w-full cursor-not-allowed rounded-lg bg-gray-50 py-2 pl-3 pr-10 text-left border border-gray-300 focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-300">
-                    <span className="block truncate">Qwen 7B</span>
-                    <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                      <svg
-                        className="h-5 w-5 text-gray-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          d="M7 7l3-3 3 3m0 6l-3 3-3-3"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="1.5"
-                        />
-                      </svg>
-                    </span>
-                  </Listbox.Button>
-                </div>
-              </Listbox>
-            </div>
-          </div>
-        )}
 
         <div className="flex justify-end items-center gap-4 pt-4 border-t mt-4">
           {isTraining && (
