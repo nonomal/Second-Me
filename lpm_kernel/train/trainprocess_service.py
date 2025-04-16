@@ -29,6 +29,7 @@ from lpm_kernel.api.domains.trainprocess.progress_enum import Status
 from lpm_kernel.api.domains.trainprocess.train_progress import TrainProgress
 from lpm_kernel.api.domains.trainprocess.process_step import ProcessStep
 from lpm_kernel.api.domains.trainprocess.progress_holder import TrainProgressHolder
+from lpm_kernel.train.training_params_manager import TrainingParamsManager
 import gc
 import subprocess
 import shlex
@@ -41,15 +42,6 @@ class TrainProcessService:
     
     _instance = None
     _initialized = False
-    
-    # Static variable to store the latest training parameters
-    _latest_training_params = {
-        "model_name": "Qwen2.5-0.5B-Instruct",
-        "learning_rate": 1e-4,
-        "number_of_epochs": 3,
-        "concurrency_threads": 2,
-        "data_synthesis_mode": "low"
-    }
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
@@ -298,7 +290,8 @@ class TrainProcessService:
     def decode_preference_patterns(self)->bool:
         """Decode preference patterns using notes and related data"""
         try:
-            training_params = self.__class__.get_latest_training_params()
+            params_manager = TrainingParamsManager()
+            training_params = params_manager.get_latest_training_params()
             concurrency_threads = training_params.get("concurrency_threads")
             data_synthesis_mode = training_params.get("data_synthesis_mode")
             os.environ["CONCURRENCY_THREADS"] = str(concurrency_threads)
@@ -626,7 +619,8 @@ class TrainProcessService:
             self.is_stopped = False
             
             # Get the latest training parameters from the class
-            training_params = self.__class__.get_latest_training_params()
+            params_manager = TrainingParamsManager()
+            training_params = params_manager.get_latest_training_params()
             learning_rate = training_params.get("learning_rate")
             num_train_epochs = training_params.get("number_of_epochs")
             concurrency_threads = training_params.get("concurrency_threads")
@@ -1173,25 +1167,3 @@ class TrainProcessService:
         except Exception as e:
             logger.error(f"Error stopping training process: {str(e)}")
             return False
-            
-    @classmethod
-    def update_training_params(cls, params):
-        """
-        Update the latest training parameters
-        
-        Args:
-            params: Dictionary containing training parameters
-        """
-        for key, value in params.items():
-            if key in cls._latest_training_params:
-                cls._latest_training_params[key] = value
-                
-    @classmethod
-    def get_latest_training_params(cls):
-        """
-        Get the latest training parameters
-        
-        Returns:
-            dict: Dictionary containing the latest training parameters
-        """
-        return cls._latest_training_params.copy()
