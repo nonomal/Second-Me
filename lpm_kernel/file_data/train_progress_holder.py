@@ -4,7 +4,7 @@ from typing import Optional
 
 from lpm_kernel.api.domains.trainprocess.progress import TrainProgress
 from lpm_kernel.configs.logging import get_train_process_logger
-from lpm_kernel.file_data.trainprocess_service import ProcessStep
+from lpm_kernel.file_data.process_step import ProcessStep
 from ..api.domains.trainprocess.progress import Status
 
 logger = get_train_process_logger()

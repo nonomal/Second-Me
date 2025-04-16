@@ -27,6 +27,7 @@ from lpm_kernel.kernel.l1.l1_manager import generate_l1_from_l0
 import threading
 
 from .train_progress_holder import TrainProgressHolder
+from .process_step import ProcessStep
 from ..api.domains.trainprocess.progress import TrainProgress, Status
 import gc
 import subprocess
@@ -34,48 +35,6 @@ import shlex
 
 from lpm_kernel.configs.logging import get_train_process_logger, TRAIN_LOG_FILE
 logger = get_train_process_logger()
-
-class ProcessStep(Enum):
-    """Training process steps"""
-
-    LIST_DOCUMENTS = "list_documents"
-    GENERATE_DOCUMENT_EMBEDDINGS = "generate_document_embeddings"
-    CHUNK_DOCUMENT = "process_chunks"
-    CHUNK_EMBEDDING = "chunk_embedding"
-    EXTRACT_DIMENSIONAL_TOPICS = "extract_dimensional_topics"
-    MODEL_DOWNLOAD = "model_download"
-    MAP_ENTITY_NETWORK = "map_your_entity_network"
-    DECODE_PREFERENCE_PATTERNS = "decode_preference_patterns"
-    REINFORCE_IDENTITY = "reinforce_identity"
-    AUGMENT_CONTENT_RETENTION = "augment_content_retention"
-    TRAIN = "train"
-    MERGE_WEIGHTS = "merge_weights"
-    CONVERT_MODEL = "convert_model"
-
-    @classmethod
-    def get_ordered_steps(cls) -> List["ProcessStep"]:
-        """Get ordered steps"""
-        return [
-            cls.MODEL_DOWNLOAD,
-            cls.LIST_DOCUMENTS,
-            cls.GENERATE_DOCUMENT_EMBEDDINGS,
-            cls.CHUNK_DOCUMENT,
-            cls.CHUNK_EMBEDDING,
-            cls.EXTRACT_DIMENSIONAL_TOPICS,
-            cls.MAP_ENTITY_NETWORK,
-            cls.DECODE_PREFERENCE_PATTERNS,
-            cls.REINFORCE_IDENTITY,
-            cls.AUGMENT_CONTENT_RETENTION,
-            cls.TRAIN,
-            cls.MERGE_WEIGHTS,
-            cls.CONVERT_MODEL,
-        ]
-        
-    def get_method_name(self) -> str:
-        """Get the corresponding method name for this step"""
-        return self.value
-
-
 
 class TrainProcessService:
     """Training process service (singleton pattern)"""
@@ -525,7 +484,6 @@ class TrainProcessService:
         self.l2_data_prepared = True
         
         return self.l2_data
-
     def train(self) -> bool:
         """Start model training"""
         try:
@@ -1064,9 +1022,10 @@ class TrainProcessService:
         except Exception as e:
             logger.error(f"Error checking training conditions: {str(e)}", exc_info=True)
             if self.progress.progress.current_stage:
-                current_step = self.progress.progress.stages[self.progress.progress.current_stage].current_step
-                if current_step:
-                    step = ProcessStep(current_step)
+                current_stage_name = self.progress.progress.data["current_stage"]
+                current_stage = next((s for s in self.progress.progress.data["stages"] if s["name"] == current_stage_name), None)
+                if current_stage and current_stage["current_step"]:
+                    step = ProcessStep(current_stage["current_step"].lower().replace(" ", "_"))
                     self.progress.mark_step_status(step, Status.FAILED)
 
     def start_process(self) -> bool:
