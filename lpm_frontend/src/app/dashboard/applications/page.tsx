@@ -19,6 +19,13 @@ interface ApplicationCard {
 
 const applications: ApplicationCard[] = [
   {
+    title: 'API & MCP',
+    description:
+      'APIs and MCPs allow you to build custom Second Me apps and extend its functionality.',
+    image: '/images/app_api_mcp.png',
+    route: ROUTER_PATH.APPLICATIONS_API_MCP
+  },
+  {
     title: 'Roleplay Apps',
     description:
       'Give your Second Me different personas to express themselves naturally in various scenarios.',
@@ -40,13 +47,6 @@ const applications: ApplicationCard[] = [
     // description: 'Envision a world where software services are built to serve your digital self. "Second X" is our vision for next-gen apps that support Second Me agents directly. Stay tuned—this feature is not yet available.',
     image: '/images/app_native_applications.png',
     route: ROUTER_PATH.APPLICATIONS_SECOND_X
-  },
-  {
-    title: 'API & MCP',
-    description:
-      'APIs and MCPs allow you to build custom Second Me apps and extend its functionality.',
-    image: '/images/app_api_mcp.png',
-    route: ROUTER_PATH.APPLICATIONS_API_MCP
   },
   {
     title: 'Integrations',
