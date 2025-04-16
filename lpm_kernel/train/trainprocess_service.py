@@ -27,55 +27,13 @@ from lpm_kernel.kernel.l1.l1_manager import generate_l1_from_l0
 import threading
 from lpm_kernel.api.domains.trainprocess.progress_enum import Status
 from lpm_kernel.api.domains.trainprocess.train_progress import TrainProgress
+from lpm_kernel.api.domains.trainprocess.process_step import ProcessStep
 import gc
 import subprocess
 import shlex
 
 from lpm_kernel.configs.logging import get_train_process_logger, TRAIN_LOG_FILE
 logger = get_train_process_logger()
-
-class ProcessStep(Enum):
-    """Training process steps"""
-
-    LIST_DOCUMENTS = "list_documents"
-    GENERATE_DOCUMENT_EMBEDDINGS = "generate_document_embeddings"
-    CHUNK_DOCUMENT = "process_chunks"
-    CHUNK_EMBEDDING = "chunk_embedding"
-    EXTRACT_DIMENSIONAL_TOPICS = "extract_dimensional_topics"
-    GENERATE_BIOGRAPHY = "generate_biography"
-    MODEL_DOWNLOAD = "model_download"
-    MAP_ENTITY_NETWORK = "map_your_entity_network"
-    DECODE_PREFERENCE_PATTERNS = "decode_preference_patterns"
-    REINFORCE_IDENTITY = "reinforce_identity"
-    AUGMENT_CONTENT_RETENTION = "augment_content_retention"
-    TRAIN = "train"
-    MERGE_WEIGHTS = "merge_weights"
-    CONVERT_MODEL = "convert_model"
-
-    @classmethod
-    def get_ordered_steps(cls) -> List["ProcessStep"]:
-        """Get ordered steps"""
-        return [
-            cls.MODEL_DOWNLOAD,
-            cls.LIST_DOCUMENTS,
-            cls.GENERATE_DOCUMENT_EMBEDDINGS,
-            cls.CHUNK_DOCUMENT,
-            cls.CHUNK_EMBEDDING,
-            cls.EXTRACT_DIMENSIONAL_TOPICS,
-            cls.GENERATE_BIOGRAPHY,
-            cls.MAP_ENTITY_NETWORK,
-            cls.DECODE_PREFERENCE_PATTERNS,
-            cls.REINFORCE_IDENTITY,
-            cls.AUGMENT_CONTENT_RETENTION,
-            cls.TRAIN,
-            cls.MERGE_WEIGHTS,
-            cls.CONVERT_MODEL,
-        ]
-        
-    def get_method_name(self) -> str:
-        """Get the corresponding method name for this step"""
-        return self.value
-
 
 class TrainProgressHolder:
     """Progress management class"""
@@ -675,7 +633,6 @@ class TrainProcessService:
         self.l2_data_prepared = True
         
         return self.l2_data
-
     def train(self) -> bool:
         """Start model training"""
         try:
