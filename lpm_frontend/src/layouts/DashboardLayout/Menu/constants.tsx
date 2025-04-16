@@ -10,6 +10,8 @@ import AppsIcon from '@/components/svgs/AppsIcon';
 import RoleplayIcon from '@/components/svgs/RoleplayIcon';
 import NetworkIcon from '@/components/svgs/NetworkIcon';
 import GlobeIcon from '@/components/svgs/GlobeIcon';
+import LightningIcon from '@/components/svgs/LightningIcon';
+import ChatBubbleIcon from '@/components/svgs/ChatBubbleIcon';
 
 export const tabs = [
   {
@@ -52,10 +54,15 @@ export const tabs = [
     ]
   },
   {
-    name: 'Second Me Apps',
+    name: 'Second Me Services',
     path: ROUTER_PATH.APPLICATIONS,
     icon: <AppsIcon className="w-5 h-5" />,
     subTabs: [
+      {
+        name: 'API + MCP',
+        path: ROUTER_PATH.APPLICATIONS_API_MCP,
+        icon: <LightningIcon className="w-4 h-4" />
+      },
       {
         name: 'Roleplay Apps',
         path: ROUTER_PATH.APPLICATIONS_ROLEPLAY,
@@ -70,6 +77,11 @@ export const tabs = [
         name: 'Second X Apps',
         path: ROUTER_PATH.APPLICATIONS_SECOND_X,
         icon: <GlobeIcon className="w-4 h-4" />
+      },
+      {
+        name: 'Integrations',
+        path: ROUTER_PATH.APPLICATIONS_INTEGRATIONS,
+        icon: <ChatBubbleIcon className="w-4 h-4" />
       }
     ]
   }

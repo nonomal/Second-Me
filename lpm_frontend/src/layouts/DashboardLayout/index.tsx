@@ -25,7 +25,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Menu />
 
       {/* Scrollable content area */}
-      <div className="flex-1 h-full">{showTutorial ? null : children}</div>
+      {/* Height minus Menu */}
+      <div className="flex-1 h-[calc(100vh-64px)] overflow-scroll no-scrollbar">
+        {showTutorial ? null : children}
+      </div>
 
       {/* OnboardingTutorial */}
       {showTutorial && (

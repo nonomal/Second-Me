@@ -75,7 +75,7 @@ data: [DONE]
 ### cURL
 
 ```bash
-curl -X POST "https://app.secondme.io/api/chat/dfushy5v" \
+curl -X POST "https://app.secondme.io/api/chat/{instance_id}" \
   -H "Content-Type: application/json" \
   -d '{
     "messages": [
@@ -95,10 +95,12 @@ curl -X POST "https://app.secondme.io/api/chat/dfushy5v" \
 ### Python
 
 ```python
-import requests
+import http.client
 import json
 
-url = "https://app.secondme.io/api/chat/dfushy5v"
+url = "app.secondme.io"
+path = "/api/chat/{instance_id}"           
+
 headers = {"Content-Type": "application/json"}
 data = {
     "messages": [
@@ -114,23 +116,35 @@ data = {
     "stream": True
 }
 
-response = requests.post(url, headers=headers, data=json.dumps(data), stream=True)
+# Prepare the connection
+conn = http.client.HTTPSConnection(url)
 
-for line in response.iter_lines():
+# Send the POST request
+conn.request("POST", path, body=json.dumps(data), headers=headers)
+
+# Get the response
+response = conn.getresponse()
+
+
+# Read the body line by line
+for line in response:
     if line:
-        line = line.decode('utf-8')
-        if line.startswith('data: '):
-            content = line[6:]  # Remove 'data: ' prefix
-            if content == '[DONE]':
-                break
+        decoded_line = line.decode('utf-8').strip()
+        if decoded_line == 'data: [DONE]':
+            break
+        if decoded_line.startswith('data: '):
             try:
-                json_content = json.loads(content)
-                if 'choices' in json_content and len(json_content['choices']) > 0:
-                    delta = json_content['choices'][0].get('delta', {})
-                    if 'content' in delta:
-                        print(delta['content'], end='')
+                json_str = decoded_line[6:]
+                chunk = json.loads(json_str)
+                content = chunk['choices'][0]['delta'].get('content', '')
+                if content:
+                    print(content, end='', flush=True)
             except json.JSONDecodeError:
                 pass
+
+# Close the connection when done
+conn.close()
+
 ```
 
 ## Error Codes
