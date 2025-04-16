@@ -2,14 +2,7 @@ from typing import List, Dict, Optional, Union, Any
 import json
 from dataclasses import dataclass, field
 from enum import Enum
-
-
-class Status(Enum):
-    PENDING = "pending"
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    SUSPENDED = "suspended"
+from lpm_kernel.api.domains.trainprocess.progress_enum import Status
 
 
 class TrainProgress:
@@ -66,6 +59,11 @@ class TrainProgress:
                     "steps": [
                         {
                             "name": "Extract Dimensional Topics",
+                            "completed": False,
+                            "status": "pending"
+                        },
+                        {
+                            "name": "Generate Biography",
                             "completed": False,
                             "status": "pending"
                         },

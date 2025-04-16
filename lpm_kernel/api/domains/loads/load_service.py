@@ -5,7 +5,7 @@ This module provides service functions for managing Load entities.
 """
 
 import logging
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, Tuple
 from lpm_kernel.models.load import Load
 from lpm_kernel.common.repository.database_session import DatabaseSession
 from lpm_kernel.api.domains.loads.dto import LoadDTO
@@ -419,7 +419,7 @@ class LoadService:
         try:
             import os
             # Import training service
-            from lpm_kernel.file_data.trainprocess_service import TrainProcessService
+            from lpm_kernel.train.trainprocess_service import TrainProcessService
             
             # Get all possible training progress file patterns
             base_dir = os.getenv('LOCAL_BASE_DIR', '.')

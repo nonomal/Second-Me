@@ -25,7 +25,8 @@ from lpm_kernel.configs.config import Config
 from lpm_kernel.file_data.chunker import DocumentChunker
 from lpm_kernel.kernel.l1.l1_manager import generate_l1_from_l0
 import threading
-from ..api.domains.trainprocess.progress import TrainProgress, Status
+from lpm_kernel.api.domains.trainprocess.progress_enum import Status
+from lpm_kernel.api.domains.trainprocess.train_progress import TrainProgress
 import gc
 import subprocess
 import shlex
@@ -41,6 +42,7 @@ class ProcessStep(Enum):
     CHUNK_DOCUMENT = "process_chunks"
     CHUNK_EMBEDDING = "chunk_embedding"
     EXTRACT_DIMENSIONAL_TOPICS = "extract_dimensional_topics"
+    GENERATE_BIOGRAPHY = "generate_biography"
     MODEL_DOWNLOAD = "model_download"
     MAP_ENTITY_NETWORK = "map_your_entity_network"
     DECODE_PREFERENCE_PATTERNS = "decode_preference_patterns"
@@ -60,6 +62,7 @@ class ProcessStep(Enum):
             cls.CHUNK_DOCUMENT,
             cls.CHUNK_EMBEDDING,
             cls.EXTRACT_DIMENSIONAL_TOPICS,
+            cls.GENERATE_BIOGRAPHY,
             cls.MAP_ENTITY_NETWORK,
             cls.DECODE_PREFERENCE_PATTERNS,
             cls.REINFORCE_IDENTITY,
@@ -96,6 +99,7 @@ class TrainProgressHolder:
             ProcessStep.CHUNK_EMBEDDING: "activating_the_memory_matrix",
 
             ProcessStep.EXTRACT_DIMENSIONAL_TOPICS: "synthesize_your_life_narrative",
+            ProcessStep.GENERATE_BIOGRAPHY: "synthesize_your_life_narrative",
             ProcessStep.MAP_ENTITY_NETWORK: "synthesize_your_life_narrative",
 
             ProcessStep.DECODE_PREFERENCE_PATTERNS: "prepare_training_data_for_deep_comprehension",
@@ -372,30 +376,47 @@ class TrainProcessService:
             return False
 
     def extract_dimensional_topics(self) -> bool:
-        """Extract dimensional topics (L0 and L1)"""
+        """Extract dimensional topics (L0)"""
         try:
             # Mark step as in progress
             self.progress.mark_step_status(ProcessStep.EXTRACT_DIMENSIONAL_TOPICS, Status.IN_PROGRESS)
-            logger.info("Starting dimensional topics extraction (L0 and L1)...")
+            logger.info("Starting dimensional topics extraction (L0)...")
             
-            # Step 1: Generate L0 - Call document_service to analyze all documents
+            # Generate L0 - Call document_service to analyze all documents
             logger.info("Generating L0 data...")
             analyzed_docs = document_service.analyze_all_documents()
             logger.info(f"Successfully analyzed {len(analyzed_docs)} documents for L0")
             
-            # Step 2: Generate L1 - Direct call to L1 generator service
-            logger.info("Generating L1 data...")
-            generate_l1_from_l0()      
-            logger.info("Successfully generated L1 data")
-            
             # Mark step as completed
             self.progress.mark_step_status(ProcessStep.EXTRACT_DIMENSIONAL_TOPICS, Status.COMPLETED)
-            logger.info("Dimensional topics extraction completed successfully")
+            logger.info("Dimensional topics extraction (L0) completed successfully")
             return True
 
         except Exception as e:
-            logger.error(f"Extract dimensional topics failed: {str(e)}")
+            logger.error(f"Extract dimensional topics (L0) failed: {str(e)}")
             self.progress.mark_step_status(ProcessStep.EXTRACT_DIMENSIONAL_TOPICS, Status.FAILED)
+            return False
+            
+    def generate_biography(self) -> bool:
+        """Generate biography using L1 data"""
+        try:
+            # Mark step as in progress
+            self.progress.mark_step_status(ProcessStep.GENERATE_BIOGRAPHY, Status.IN_PROGRESS)
+            logger.info("Starting biography generation...")
+            
+            # Generate L1 data and biography
+            logger.info("Generating L1 data and biography...")
+            generate_l1_from_l0()
+            logger.info("Successfully generated L1 data and biography")
+            
+            # Mark step as completed
+            self.progress.mark_step_status(ProcessStep.GENERATE_BIOGRAPHY, Status.COMPLETED)
+            logger.info("Biography generation completed successfully")
+            return True
+
+        except Exception as e:
+            logger.error(f"Biography generation failed: {str(e)}")
+            self.progress.mark_step_status(ProcessStep.GENERATE_BIOGRAPHY, Status.FAILED)
             return False
 
     def model_download(self) -> bool:
