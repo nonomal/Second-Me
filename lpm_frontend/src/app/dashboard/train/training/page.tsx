@@ -3,15 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import InfoModal from '@/components/InfoModal';
-import type { TrainingParams } from '@/service/train';
-import {
-  startTrain,
-  stopTrain,
-  retrain,
-  getModelName,
-  getTrainingParams,
-  resetProgress
-} from '@/service/train';
+import type { TrainingConfig } from '@/service/train';
+import { startTrain, stopTrain, retrain, getTrainingParams, resetProgress } from '@/service/train';
 import { useTrainingStore } from '@/store/useTrainingStore';
 import { getMemoryList } from '@/service/memory';
 import { message, Modal } from 'antd';
@@ -42,16 +35,6 @@ const trainInfo: TrainInfo = {
 };
 
 const POLLING_INTERVAL = 3000;
-
-interface TrainingConfig {
-  modelProvider: string;
-  baseModel: string;
-  modelType: string;
-  epochs: number;
-  learningRate: string;
-  memoryPriority: string;
-  showAdvanced: boolean;
-}
 
 interface TrainingDetail {
   message: string;
@@ -85,8 +68,8 @@ export default function TrainingPage() {
 
   const [selectedInfo, setSelectedInfo] = useState<boolean>(false);
   const [isTraining, setIsTraining] = useState(false);
-  const [trainingParams, setTrainingParams] = useState<TrainingParams>({} as TrainingParams);
-  const [nowTrainingParams, setNowTrainingParams] = useState<TrainingParams | null>(null);
+  const [trainingParams, setTrainingParams] = useState<TrainingConfig>({} as TrainingConfig);
+  const [nowTrainingParams, setNowTrainingParams] = useState<TrainingConfig | null>(null);
   const [trainActionLoading, setTrainActionLoading] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -98,22 +81,13 @@ export default function TrainingPage() {
 
   const cleanupEventSourceRef = useRef<(() => void) | undefined>();
 
-  const [config, setConfig] = useState<TrainingConfig>({
-    modelProvider: 'ollama',
-    baseModel: 'Qwen2.5-0.5B-Instruct',
-    modelType: 'General Purpose',
-    epochs: 10,
-    learningRate: 'Conservative (0.0001)',
-    memoryPriority: 'Equal Weighting',
-    showAdvanced: false
-  });
   const [changeBaseModel, setChangeBaseModel] = useState(false);
 
   useEffect(() => {
-    const nowBaseModel = JSON.parse(localStorage.getItem('trainingConfig') || '{}');
+    const localTrainingParams = JSON.parse(localStorage.getItem('trainingParams') || '{}');
 
-    setChangeBaseModel(nowBaseModel?.baseModel !== config.baseModel);
-  }, [config.baseModel]);
+    setChangeBaseModel(localTrainingParams?.model_name !== trainingParams.model_name);
+  }, [trainingParams.model_name]);
 
   useEffect(() => {
     getModelConfig().then((res) => {
@@ -125,30 +99,6 @@ export default function TrainingPage() {
         message.error(res.data.message);
       }
     });
-  }, []);
-
-  useEffect(() => {
-    getModelName().then((res) => {
-      if (res.data.code === 0) {
-        if (res.data.data.model_name) {
-          localStorage.setItem(
-            'trainingConfig',
-            JSON.stringify({
-              ...config,
-              baseModel: res.data.data.model_name
-            })
-          );
-        }
-      }
-    });
-    const previousModel = localStorage.getItem('trainingConfig');
-
-    if (previousModel) {
-      setConfig({
-        ...config,
-        baseModel: JSON.parse(previousModel).baseModel
-      });
-    }
   }, []);
 
   const pollingStopRef = useRef<boolean>(false);
@@ -313,14 +263,18 @@ export default function TrainingPage() {
     getTrainingParams()
       .then((res) => {
         if (res.data.code === 0) {
-          setTrainingParams(res.data.data);
-          setNowTrainingParams(res.data.data);
+          const data = res.data.data;
+
+          setTrainingParams(data);
+          setNowTrainingParams(data);
+
+          localStorage.setItem('trainingParams', JSON.stringify(data));
         } else {
           throw new Error(res.data.message);
         }
       })
       .catch((error) => {
-        message.error(error.message);
+        console.error(error.message);
       });
   }, []);
 
@@ -345,13 +299,11 @@ export default function TrainingPage() {
     // The actual scrolling is now handled by the TrainingLog component
   };
 
-  const updateTrainingParams = (params: TrainingParams) => {
-    setTrainingParams((state: TrainingParams) => ({ ...state, ...params }));
+  const updateTrainingParams = (params: TrainingConfig) => {
+    setTrainingParams((state: TrainingConfig) => ({ ...state, ...params }));
   };
 
   const getDetails = () => {
-    localStorage.setItem('trainingConfig', JSON.stringify(config));
-
     // Use EventSource to get logs
     const eventSource = new EventSource('/api/trainprocess/logs');
 
@@ -433,7 +385,7 @@ export default function TrainingPage() {
     resetProgress()
       .then((res) => {
         if (res.data.code === 0) {
-          setTrainingParams(nowTrainingParams || ({} as TrainingParams));
+          setTrainingParams(nowTrainingParams || ({} as TrainingConfig));
           setNowTrainingParams(null);
           setIsResume(false);
           resetTrainingState();
@@ -458,28 +410,19 @@ export default function TrainingPage() {
     // Reset training status to initial state
     resetTrainingState();
 
-    const apiKey = config.modelProvider === 'ollama' ? 'http://localhost:11434' : '';
-
-    if (!apiKey) {
-      setIsTraining(false);
-      message.error('No API key found for the selected model');
-
-      return;
-    }
-
     try {
       // updateTrainLog();
       setNowTrainingParams(trainingParams);
 
-      console.log('Using startTrain API to train new model:', config.baseModel);
+      console.log('Using startTrain API to train new model:', trainingParams.model_name);
       const res = await startTrain({
         ...(isResume && !changeBaseModel ? {} : trainingParams),
-        model_name: config.baseModel
+        model_name: trainingParams.model_name
       });
 
       if (res.data.code === 0) {
         // Save training configuration and start polling
-        localStorage.setItem('trainingConfig', JSON.stringify(config));
+        localStorage.setItem('trainingParams', JSON.stringify(trainingParams));
         setChangeBaseModel(false);
         scrollPageToBottom();
         startGetTrainingProgress();
@@ -510,14 +453,11 @@ export default function TrainingPage() {
     resetTrainingState();
 
     try {
-      // updateTrainLog();
-
-      console.log('Using retrain API to retrain model:', config.baseModel);
-      const res = await retrain({ model_name: config.baseModel, ...trainingParams });
+      const res = await retrain(trainingParams);
 
       if (res.data.code === 0) {
         // Save training configuration and start polling
-        localStorage.setItem('trainingConfig', JSON.stringify(config));
+        localStorage.setItem('trainingParams', JSON.stringify(trainingParams));
         scrollPageToBottom();
         startGetTrainingProgress();
       } else {
@@ -554,14 +494,8 @@ export default function TrainingPage() {
       return;
     }
 
-    // Get previously trained model information from local storage
-    const previousModel = JSON.parse(localStorage.getItem('trainingConfig') || '{}');
-
     // If the same model has already been trained and status is 'trained' or 'running', perform retraining
-    if (
-      previousModel.baseModel === config.baseModel &&
-      (status === 'trained' || status === 'running')
-    ) {
+    if (!changeBaseModel && (status === 'trained' || status === 'running')) {
       await handleRetrainModel();
     } else {
       // Otherwise start new training
@@ -620,14 +554,12 @@ export default function TrainingPage() {
         <TrainingConfiguration
           baseModelOptions={baseModelOptions}
           changeBaseModel={changeBaseModel}
-          config={config}
           handleResetProgress={handleResetProgress}
           handleTrainingAction={handleTrainingAction}
           isResume={isResume}
           isTraining={isTraining}
           modelConfig={modelConfig}
           nowTrainingParams={nowTrainingParams}
-          setConfig={setConfig}
           setSelectedInfo={setSelectedInfo}
           status={status}
           trainActionLoading={trainActionLoading}
