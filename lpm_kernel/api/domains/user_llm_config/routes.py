@@ -40,7 +40,7 @@ def validate_llm_config(data: Dict[Any, Any]) -> Dict[str, str]:
                 errors[field] = f'{field} is required for custom provider'
     else:
         errors['provider_type'] = 'provider_type is required'
-        
+    
     return errors
 
 def process_openai_config(data: Dict[Any, Any]) -> Dict[Any, Any]:

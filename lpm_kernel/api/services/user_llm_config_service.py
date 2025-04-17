@@ -1,10 +1,16 @@
-from typing import Optional
+from typing import Optional, List
 from lpm_kernel.api.repositories.user_llm_config_repository import UserLLMConfigRepository
+from lpm_kernel.api.repositories.thinking_model_repository import ThinkingModelRepository
 from lpm_kernel.api.dto.user_llm_config_dto import (
     UserLLMConfigDTO,
     UpdateUserLLMConfigDTO
 )
+from lpm_kernel.api.dto.thinking_model_dto import (
+    ThinkingModelDTO,
+    UpdateThinkingModelDTO
+)
 from datetime import datetime
+from lpm_kernel.common.logging import logger
 
 
 class UserLLMConfigService:
@@ -12,6 +18,7 @@ class UserLLMConfigService:
 
     def __init__(self):
         self.repository = UserLLMConfigRepository()
+        self.thinking_repository = ThinkingModelRepository()
 
     def get_available_llm(self) -> Optional[UserLLMConfigDTO]:
         """Get available LLM configuration
@@ -76,6 +83,66 @@ class UserLLMConfigService:
             # This is a rare case that should not happen in normal operation
             # Implementation would depend on how we want to handle this case
             # For now, we'll just log a warning
-            from lpm_kernel.common.logging import logger
             logger.warning(f"Found {count} LLM configurations in the database. Only one should exist.")
             # Future implementation could delete extra records
+            
+    # Thinking Model methods
+    def get_thinking_model(self, model_id: int) -> Optional[ThinkingModelDTO]:
+        """Get thinking model by ID
+        
+        Args:
+            model_id: Thinking model ID
+            
+        Returns:
+            Thinking model or None if not found
+        """
+        return self.thinking_repository._get_by_id(model_id)
+    
+    def get_all_thinking_models(self) -> List[ThinkingModelDTO]:
+        """Get all thinking models
+        
+        Returns:
+            List of all thinking models
+        """
+        return self.thinking_repository.get_all()
+
+    def update_thinking_model(
+        self, 
+        model_id: int, 
+        dto: UpdateThinkingModelDTO
+    ) -> ThinkingModelDTO:
+        """Update thinking model or create if not exists
+        
+        Args:
+            model_id: Thinking model ID
+            dto: UpdateThinkingModelDTO object
+            
+        Returns:
+            Updated or created thinking model
+        """
+        return self.thinking_repository.update(model_id, dto)
+    
+    def create_thinking_model(
+        self,
+        dto: ThinkingModelDTO
+    ) -> ThinkingModelDTO:
+        """Create a new thinking model
+        
+        Args:
+            dto: ThinkingModelDTO object
+            
+        Returns:
+            Created thinking model
+        """
+        return self.thinking_repository.create(dto)
+    
+    def delete_thinking_model(self, model_id: int) -> Optional[ThinkingModelDTO]:
+        """Delete thinking model
+        
+        Args:
+            model_id: Thinking model ID
+            
+        Returns:
+            Deleted thinking model or None if not found
+        """
+        return self.thinking_repository.delete(model_id)
