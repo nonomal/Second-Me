@@ -9,6 +9,7 @@ from lpm_kernel.api.dto.thinking_model_dto import (
     ThinkingModelDTO,
     UpdateThinkingModelDTO
 )
+from lpm_kernel.api.dto.combined_llm_config_dto import CombinedLLMConfigDTO
 from datetime import datetime
 from lpm_kernel.common.logging import logger
 
@@ -20,11 +21,14 @@ class UserLLMConfigService:
         self.repository = UserLLMConfigRepository()
         self.thinking_repository = ThinkingModelRepository()
 
-    def get_available_llm(self) -> Optional[UserLLMConfigDTO]:
-        """Get available LLM configuration
-        Since we only have one default configuration now (ID=1), just return it
+    def get_available_llm(self) -> Optional[CombinedLLMConfigDTO]:
+        """Get available LLM configuration with thinking model
+        Returns a combined DTO with fields from both UserLLMConfig and ThinkingModel
         """
-        return self.repository.get_default_config()
+        llm_config = self.repository.get_default_config()
+        thinking_model = self.thinking_repository.get_default_model()
+        
+        return CombinedLLMConfigDTO.from_dtos(llm_config, thinking_model)
     
 
     def update_config(
