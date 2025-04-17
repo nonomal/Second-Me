@@ -1,4 +1,4 @@
-import MarkdownContent from '@/utils/markdown';
+import Markdown from '@/components/Markdown';
 import { useEffect, useState } from 'react';
 import type { ReactElement } from 'react';
 
@@ -13,7 +13,7 @@ const Content = (): ReactElement => {
 
   return (
     <div className="p-4 h-full w-full markdown-wrapper">
-      <MarkdownContent markdownContent={markdownContent} />
+      <Markdown markdownContent={markdownContent} />
     </div>
   );
 };

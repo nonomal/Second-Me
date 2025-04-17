@@ -1,4 +1,4 @@
-import Markdown from 'react-markdown';
+import ReactMD from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { ReactElement } from 'react';
@@ -29,19 +29,19 @@ interface IProps {
   className?: string;
 }
 
-const MarkdownContent = (props: IProps): ReactElement => {
+const Markdown = (props: IProps): ReactElement => {
   const { markdownContent, className } = props;
 
   return (
-    <Markdown
+    <ReactMD
       className={className}
       components={{
         code: CodeBlock
       }}
     >
       {markdownContent}
-    </Markdown>
+    </ReactMD>
   );
 };
 
-export default MarkdownContent;
+export default Markdown;

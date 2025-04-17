@@ -7,8 +7,7 @@ import type { SpaceInfo, SpaceMessage } from '@/service/space';
 import { useSpaceStore } from '@/store/useSpaceStore';
 
 import { useEffect, useRef, useState } from 'react';
-import Content from '@/components/API_MCP/MCPMode/content';
-import MarkdownContent from '@/utils/markdown';
+import Markdown from '@/components/Markdown';
 
 interface MessageGroup {
   type: 'opening' | 'discussion' | 'summary';
@@ -299,7 +298,7 @@ export default function SpaceDetail() {
                               {formatTime(_message.create_time)}
                             </span>
                           </div>
-                          <MarkdownContent
+                          <Markdown
                             className="!mt-2 text-sm text-gray-700 whitespace-pre-line"
                             markdownContent={_message.content}
                           />
