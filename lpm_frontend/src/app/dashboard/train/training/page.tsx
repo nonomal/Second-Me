@@ -346,7 +346,6 @@ export default function TrainingPage() {
     eventSource.onerror = (error) => {
       console.error('EventSource failed:', error);
       eventSource.close();
-      message.error('Failed to get training logs');
     };
 
     return () => {
@@ -411,7 +410,6 @@ export default function TrainingPage() {
     resetTrainingState();
 
     try {
-      // updateTrainLog();
       setNowTrainingParams(trainingParams);
 
       console.log('Using startTrain API to train new model:', trainingParams.model_name);

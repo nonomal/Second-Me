@@ -4,14 +4,15 @@ import type React from 'react';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
 import { PlayIcon, StopIcon } from '@heroicons/react/24/outline';
-import { EVENT } from '@/utils/event';
-import { InputNumber, Radio, Spin, Tooltip } from 'antd';
+import { EVENT } from '../../utils/event';
+import { Checkbox, InputNumber, Radio, Spin, Tooltip } from 'antd';
 import type { TrainingConfig } from '@/service/train';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import OpenAiModelIcon from '../svgs/OpenAiModelIcon';
 import CustomModelIcon from '../svgs/CustomModelIcon';
 import ColumnArrowIcon from '../svgs/ColumnArrowIcon';
 import DoneIcon from '../svgs/DoneIcon';
+import ThinkingModelModal from '../ThinkingModelModal';
 
 interface BaseModelOption {
   value: string;
@@ -61,6 +62,8 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
   setSelectedInfo
 }) => {
   const [disabledChangeParams, setDisabledChangeParams] = useState<boolean>(false);
+  const [openThinkingModel, setOpenThinkingModel] = useState<boolean>(false);
+  const [isCot, setIsCot] = useState<boolean>(false);
 
   const trainButtonText = useMemo(() => {
     return isTraining
@@ -388,6 +391,22 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
         </div>
 
         <div className="flex justify-end items-center gap-4 pt-4 border-t mt-4">
+          <div className="flex mr-auto gap-2 items-center ">
+            <Checkbox
+              checked={isCot}
+              onChange={(e) => {
+                e.stopPropagation();
+
+                setIsCot(e.target.checked);
+              }}
+            />
+            <div
+              className="text-sm font-medium px-4 py-2 bg-white border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+              onClick={() => setOpenThinkingModel(true)}
+            >
+              Thinking Model
+            </div>
+          </div>
           {isTraining && (
             <div className="flex items-center text-amber-600 bg-amber-50 px-3 py-2 rounded-md border border-amber-200">
               <svg
@@ -401,7 +420,7 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                   d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeWidth={2}
+                  strokeWidth="2"
                 />
               </svg>
               <span className="font-medium">Full stop only when the current step is complete</span>
@@ -429,6 +448,8 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
           </button>
         </div>
       </div>
+
+      <ThinkingModelModal onClose={() => setOpenThinkingModel(false)} open={openThinkingModel} />
     </div>
   );
 };

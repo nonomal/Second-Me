@@ -1,5 +1,5 @@
-import { getModelConfig, updateModelConfig } from '@/service/modelConfig';
-import { useModelConfigStore } from '@/store/useModelConfigStore';
+import { getModelConfig, updateModelConfig } from '../../service/modelConfig';
+import { useModelConfigStore } from '../../store/useModelConfigStore';
 import { Input, message, Modal, Radio } from 'antd';
 import Image from 'next/image';
 import { useCallback, useEffect, useState } from 'react';
