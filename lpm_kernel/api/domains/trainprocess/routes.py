@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, Response, request
 from charset_normalizer import from_path
 
 from lpm_kernel.train.trainprocess_service import TrainProcessService
+from lpm_kernel.train.training_params_manager import TrainingParamsManager
 from ...common.responses import APIResponse
 from threading import Thread
 
@@ -90,8 +91,9 @@ def start_process():
             "data_synthesis_mode": data_synthesis_mode
         }
         
+        params_manager = TrainingParamsManager()
         # Update the latest training parameters
-        TrainProcessService.update_training_params(training_params)
+        params_manager.update_training_params(training_params)
         
         # Log training parameters
         logger.info(f"Saved training parameters: {training_params}")
@@ -277,7 +279,8 @@ def get_training_params():
     """
     try:
         # Get the latest training parameters
-        training_params = TrainProcessService.get_latest_training_params()
+        params_manager = TrainingParamsManager()
+        training_params = params_manager.get_latest_training_params()
         
         return jsonify(APIResponse.success(data=training_params))
     except Exception as e:

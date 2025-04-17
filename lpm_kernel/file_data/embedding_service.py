@@ -81,11 +81,11 @@ class EmbeddingService:
                 return embedding
 
             except Exception as e:
-                logger.error(f"Error storing document embedding in ChromaDB: {str(e)}")
+                logger.error(f"Error storing document embedding in ChromaDB: {str(e)}", exc_info=True)
                 return None
 
         except Exception as e:
-            logger.error(f"Error processing document embedding: {str(e)}")
+            logger.error(f"Error processing document embedding: {str(e)}", exc_info=True)
             raise
 
     def generate_chunk_embeddings(self, chunks: List[ChunkDTO]) -> List[ChunkDTO]:

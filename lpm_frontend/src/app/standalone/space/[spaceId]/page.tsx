@@ -7,7 +7,7 @@ import type { SpaceInfo, SpaceMessage } from '@/service/space';
 import { useSpaceStore } from '@/store/useSpaceStore';
 
 import { useEffect, useRef, useState } from 'react';
-import SimpleMD from '@/components/SimpleMD';
+import Markdown from '@/components/Markdown';
 
 interface MessageGroup {
   type: 'opening' | 'discussion' | 'summary';
@@ -298,9 +298,9 @@ export default function SpaceDetail() {
                               {formatTime(_message.create_time)}
                             </span>
                           </div>
-                          <SimpleMD
+                          <Markdown
                             className="!mt-2 text-sm text-gray-700 whitespace-pre-line"
-                            content={_message.content}
+                            markdownContent={_message.content}
                           />
                         </div>
                       </div>
@@ -312,7 +312,7 @@ export default function SpaceDetail() {
               {messageGroups.length === 0 && (
                 <div className="text-center py-10">
                   <p className="text-gray-500">
-                    {spaceData?.status === 3
+                    {spaceData.status === 3
                       ? `Oops, something went wrong.`
                       : `No messages yet. The discussion will appear here once it starts.`}
                   </p>
@@ -321,7 +321,7 @@ export default function SpaceDetail() {
 
               {/* Loading */}
               {![3, 4, undefined].includes(spaceData.status) && (
-                <Spin size="large" className="!ml-[50%] -translate-x-1/2 !mt-10 !mb-6" />
+                <Spin className="!ml-[50%] -translate-x-1/2 !mt-10 !mb-6" size="large" />
               )}
             </div>
           </div>
