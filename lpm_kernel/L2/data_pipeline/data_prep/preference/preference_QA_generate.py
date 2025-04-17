@@ -4,7 +4,6 @@ import json
 import os
 import random
 import re
-from dotenv import load_dotenv
 from tqdm import tqdm
 import openai
 from enum import Enum
@@ -74,19 +73,11 @@ class PreferenceQAGenerator:
             )
         if self.is_cot:
             logger.info("generate pereference data in longcot pattern!!!")
-            self.env_path = os.path.join(os.getcwd(), "lpm_kernel/L2/.env")
-            if os.path.exists(self.env_path):
-                load_dotenv(self.env_path)
-            else:
-                raise FileNotFoundError(f"Config file not found: {self.env_path}")
-            self.model_name = os.getenv("DEEPSEEK_MODEL_NAME", "")
-            self.api_key = os.getenv("DEEPSEEK_API_KEY", "")
-            self.base_url = os.getenv("DEEPSEEK_BASE_URL", "")
+            self.model_name = user_llm_config.thinking_model_name
+            self.api_key = user_llm_config.thinking_api_key
+            self.base_url = user_llm_config.thinking_endpoint
             if self.model_name.startswith("deepseek"):
-                    self.client = openai.OpenAI(
-                    api_key=self.api_key,
-                    base_url=self.base_url,
-                )
+                self.client = openai.OpenAI(api_key=self.api_key, base_url=self.base_url)
             else:
                 logger.error(f"Error model_name, longcot data generating model_name: deepseek series")
                 raise
