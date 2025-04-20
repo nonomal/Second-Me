@@ -3,6 +3,7 @@ from http import HTTPStatus
 from typing import Dict, Any
 
 from lpm_kernel.api.dto.user_llm_config_dto import UpdateUserLLMConfigDTO
+from lpm_kernel.api.dto.thinking_model_dto import UpdateThinkingModelDTO
 from lpm_kernel.api.services.user_llm_config_service import UserLLMConfigService
 from lpm_kernel.api.common.responses import APIResponse
 from lpm_kernel.common.logging import logger
@@ -55,6 +56,29 @@ def process_openai_config(data: Dict[Any, Any]) -> Dict[Any, Any]:
         data['embedding_endpoint'] = OPENAI_ENDPOINT
             
     return data
+
+
+def validate_thinking_model(data: Dict[Any, Any]) -> Dict[str, str]:
+    """Validate thinking model configuration
+    
+    Args:
+        data: Configuration data
+        
+    Returns:
+        Dictionary with error messages if validation fails, empty dict if validation passes
+    """
+    errors = {}
+    
+    # All fields are required for thinking model
+    required_fields = [
+        'thinking_model_name', 'thinking_endpoint', 'thinking_api_key'
+    ]
+    
+    for field in required_fields:
+        if not data.get(field):
+            errors[field] = f'{field} is required for thinking model'
+    
+    return errors
 
 
 @user_llm_config_bp.route("", methods=["GET"])
@@ -113,6 +137,38 @@ def update_config():
         logger.error(f"Failed to update configuration: {str(e)}", exc_info=True)
         return jsonify(
             APIResponse.error(f"Failed to update configuration: {str(e)}")
+        ), HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+@user_llm_config_bp.route("/thinking-model", methods=["PUT"])
+def update_thinking_model():
+    """Update thinking model configuration"""
+    try:
+        # Validate request data
+        request_data = request.json
+        validation_errors = validate_thinking_model(request_data)
+        
+        if validation_errors:
+            error_message = "; ".join([f"{k}: {v}" for k, v in validation_errors.items()])
+            return jsonify(
+                APIResponse.error(f"Validation failed: {error_message}")
+            ), HTTPStatus.BAD_REQUEST
+        
+        # Process request data
+        data = UpdateThinkingModelDTO(**request_data)
+        thinking_model = user_llm_config_service.update_thinking_model(1, data)  # Default model ID is 1
+        
+        return jsonify(
+            APIResponse.success(
+                data=thinking_model.dict(),
+                message="Thinking model updated successfully"
+            )
+        ), HTTPStatus.OK
+    
+    except Exception as e:
+        logger.error(f"Failed to update thinking model: {str(e)}", exc_info=True)
+        return jsonify(
+            APIResponse.error(f"Failed to update thinking model: {str(e)}")
         ), HTTPStatus.INTERNAL_SERVER_ERROR
 
 

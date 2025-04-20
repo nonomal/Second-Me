@@ -54,6 +54,29 @@ class UserLLMConfigService:
         # Update or create the configuration
         return self.repository.update(config_id, dto)
     
+    def update_thinking_model(
+        self, 
+        model_id: int, 
+        dto: UpdateThinkingModelDTO
+    ) -> ThinkingModelDTO:
+        """Update thinking model or create if not exists
+        
+        This method ensures that only one thinking model record exists in the database.
+        If the thinking model with the given ID doesn't exist, it will be created.
+        
+        Args:
+            model_id: Thinking model ID (should be 1)
+            dto: UpdateThinkingModelDTO object
+            
+        Returns:
+            Updated or created thinking model
+        """
+        # Check if we need to clean up extra records
+        self._ensure_single_thinking_model()
+        
+        # Update or create the thinking model
+        return self.thinking_repository.update(model_id, dto)
+    
     def delete_key(self, config_id: int = 1) -> Optional[UserLLMConfigDTO]:
         """Delete API key from the configuration
         
@@ -88,6 +111,19 @@ class UserLLMConfigService:
             # Implementation would depend on how we want to handle this case
             # For now, we'll just log a warning
             logger.warning(f"Found {count} LLM configurations in the database. Only one should exist.")
+            # Future implementation could delete extra records
+            
+    def _ensure_single_thinking_model(self):
+        """Ensure that only one thinking model record exists in the database"""
+        # This is a safety measure to ensure we only have one record
+        # In normal operation, this should never be needed
+        count = self.thinking_repository.count()
+        if count != 1:
+            # If we have more than one record, we need to clean up
+            # This is a rare case that should not happen in normal operation
+            # Implementation would depend on how we want to handle this case
+            # For now, we'll just log a warning
+            logger.warning(f"Found {count} thinking models in the database. Only one should exist.")
             # Future implementation could delete extra records
             
     # Thinking Model methods

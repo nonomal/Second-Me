@@ -22,12 +22,7 @@ class CombinedLLMConfigDTO(BaseModel):
     embedding_api_key: Optional[str] = None
     embedding_model_name: Optional[str] = None
     
-    # Thinking configuration from UserLLMConfig
-    thinking_endpoint: Optional[str] = None
-    thinking_api_key: Optional[str] = None
-    thinking_model_name: Optional[str] = None
-    
-    # ThinkingModel specific fields (if different from UserLLMConfig)
+    # ThinkingModel configuration
     thinking_model_id: Optional[int] = None
     thinking_model_endpoint: Optional[str] = None
     thinking_model_api_key: Optional[str] = None
@@ -53,9 +48,6 @@ class CombinedLLMConfigDTO(BaseModel):
             embedding_endpoint=llm_config.embedding_endpoint,
             embedding_api_key=llm_config.embedding_api_key,
             embedding_model_name=llm_config.embedding_model_name,
-            thinking_endpoint=llm_config.thinking_endpoint,
-            thinking_api_key=llm_config.thinking_api_key,
-            thinking_model_name=llm_config.thinking_model_name,
             created_at=llm_config.created_at,
             updated_at=llm_config.updated_at,
             
