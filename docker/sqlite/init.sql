@@ -188,6 +188,11 @@ CREATE TABLE IF NOT EXISTS user_llm_configs (
     embedding_api_key VARCHAR(200),
     embedding_model_name VARCHAR(200),
     
+    -- Thinking configuration
+    thinking_model_name VARCHAR(200),
+    thinking_endpoint VARCHAR(200),
+    thinking_api_key VARCHAR(200),
+    
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -195,16 +200,6 @@ CREATE TABLE IF NOT EXISTS user_llm_configs (
 
 -- User LLM Configuration table indexes
 CREATE INDEX IF NOT EXISTS idx_user_llm_configs_created_at ON user_llm_configs(created_at);
-
--- Thinking Models Table
-CREATE TABLE IF NOT EXISTS thinking_models (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    thinking_model_name VARCHAR(200) NOT NULL,
-    thinking_endpoint VARCHAR(200) NOT NULL,
-    thinking_api_key VARCHAR(200),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
 
 -- Spaces Table
 CREATE TABLE IF NOT EXISTS spaces (

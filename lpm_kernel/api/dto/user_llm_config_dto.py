@@ -18,6 +18,11 @@ class BaseUserLLMConfigDTO(BaseModel):
     embedding_api_key: Optional[str] = None
     embedding_model_name: Optional[str] = None
     
+    # Thinking configuration
+    thinking_model_name: Optional[str] = None
+    thinking_endpoint: Optional[str] = None
+    thinking_api_key: Optional[str] = None
+    
     def dict(self, *args, **kwargs):
         result = super().dict(*args, **kwargs)
         return result
@@ -43,8 +48,11 @@ class UpdateUserLLMConfigDTO(BaseModel):
     embedding_api_key: Optional[str] = None
     embedding_model_name: Optional[str] = None
     
-
-
+    # Thinking configuration
+    thinking_model_name: Optional[str] = None
+    thinking_endpoint: Optional[str] = None
+    thinking_api_key: Optional[str] = None
+    
     def dict(self, *args, **kwargs):
         result = super().dict(*args, **kwargs)
         return result
@@ -71,6 +79,9 @@ class UserLLMConfigDTO(BaseUserLLMConfigDTO):
             embedding_endpoint=model.embedding_endpoint,
             embedding_api_key=model.embedding_api_key,
             embedding_model_name=model.embedding_model_name,
+            thinking_model_name=model.thinking_model_name,
+            thinking_endpoint=model.thinking_endpoint,
+            thinking_api_key=model.thinking_api_key,
             created_at=model.created_at,
             updated_at=model.updated_at
         )

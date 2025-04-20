@@ -3,7 +3,6 @@ from http import HTTPStatus
 from typing import Dict, Any
 
 from lpm_kernel.api.dto.user_llm_config_dto import UpdateUserLLMConfigDTO
-from lpm_kernel.api.dto.thinking_model_dto import UpdateThinkingModelDTO
 from lpm_kernel.api.services.user_llm_config_service import UserLLMConfigService
 from lpm_kernel.api.common.responses import APIResponse
 from lpm_kernel.common.logging import logger
@@ -44,6 +43,27 @@ def validate_llm_config(data: Dict[Any, Any]) -> Dict[str, str]:
     
     return errors
 
+
+def validate_thinking_model(data: Dict[Any, Any]) -> Dict[str, str]:
+    """Validate thinking model configuration
+    
+    Args:
+        data: Configuration data
+        
+    Returns:
+        Dictionary with error messages if validation fails, empty dict if validation passes
+    """
+    errors = {}
+    
+    # Validate required fields
+    if not data.get('thinking_model_name'):
+        errors['thinking_model_name'] = 'Thinking model name is required'
+    
+    if not data.get('thinking_endpoint'):
+        errors['thinking_endpoint'] = 'Thinking endpoint is required'
+    
+    return errors
+
 def process_openai_config(data: Dict[Any, Any]) -> Dict[Any, Any]:
     """Process OpenAI configuration, using simplified config if provider type is OpenAI"""
     if data.get('provider_type') == 'openai' and data.get('key'):
@@ -58,27 +78,7 @@ def process_openai_config(data: Dict[Any, Any]) -> Dict[Any, Any]:
     return data
 
 
-def validate_thinking_model(data: Dict[Any, Any]) -> Dict[str, str]:
-    """Validate thinking model configuration
-    
-    Args:
-        data: Configuration data
-        
-    Returns:
-        Dictionary with error messages if validation fails, empty dict if validation passes
-    """
-    errors = {}
-    
-    # All fields are required for thinking model
-    required_fields = [
-        'thinking_model_name', 'thinking_endpoint', 'thinking_api_key'
-    ]
-    
-    for field in required_fields:
-        if not data.get(field):
-            errors[field] = f'{field} is required for thinking model'
-    
-    return errors
+
 
 
 @user_llm_config_bp.route("", methods=["GET"])
@@ -140,7 +140,10 @@ def update_config():
         ), HTTPStatus.INTERNAL_SERVER_ERROR
 
 
-@user_llm_config_bp.route("/thinking-model", methods=["PUT"])
+
+
+
+@user_llm_config_bp.route("/thinking", methods=["PUT"])
 def update_thinking_model():
     """Update thinking model configuration"""
     try:
@@ -154,21 +157,30 @@ def update_thinking_model():
                 APIResponse.error(f"Validation failed: {error_message}")
             ), HTTPStatus.BAD_REQUEST
         
-        # Process request data
-        data = UpdateThinkingModelDTO(**request_data)
-        thinking_model = user_llm_config_service.update_thinking_model(1, data)  # Default model ID is 1
+        # Create a DTO with only thinking model fields
+        thinking_data = {}
+        if 'thinking_model_name' in request_data:
+            thinking_data['thinking_model_name'] = request_data['thinking_model_name']
+        if 'thinking_endpoint' in request_data:
+            thinking_data['thinking_endpoint'] = request_data['thinking_endpoint']
+        if 'thinking_api_key' in request_data:
+            thinking_data['thinking_api_key'] = request_data['thinking_api_key']
+        
+        # Update the configuration
+        data = UpdateUserLLMConfigDTO(**thinking_data)
+        config = user_llm_config_service.update_config(1, data)  # Default configuration ID is 1
         
         return jsonify(
             APIResponse.success(
-                data=thinking_model.dict(),
-                message="Thinking model updated successfully"
+                data=config.dict(),
+                message="Thinking model configuration updated successfully"
             )
         ), HTTPStatus.OK
     
     except Exception as e:
-        logger.error(f"Failed to update thinking model: {str(e)}", exc_info=True)
+        logger.error(f"Failed to update thinking model configuration: {str(e)}", exc_info=True)
         return jsonify(
-            APIResponse.error(f"Failed to update thinking model: {str(e)}")
+            APIResponse.error(f"Failed to update thinking model configuration: {str(e)}")
         ), HTTPStatus.INTERNAL_SERVER_ERROR
 
 

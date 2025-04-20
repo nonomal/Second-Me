@@ -15,35 +15,7 @@ def create_app():
     try:
         DatabaseSession.initialize()
         logger.info("Database connection initialized successfully")
-        
-        # Run database migrations
-        try:
-            # Get database path and ensure directory exists
-            db_path = os.getenv("SQLITE_DB_PATH", os.path.join(os.getenv("BASE_DIR", "data"), "sqlite", "lpm.db"))
-            db_dir = os.path.dirname(db_path)
-            
-            # Ensure database directory exists
-            if not os.path.exists(db_dir):
-                logger.info(f"Creating database directory: {db_dir}")
-                os.makedirs(db_dir, exist_ok=True)
-                
-            migrations_dir = os.path.join(os.path.dirname(__file__), "database", "migrations")
-            logger.info(f"Running migrations from: {migrations_dir} on database: {db_path}")
-            
-            # Apply any pending migrations
-            manager = MigrationManager(db_path)
-            applied = manager.apply_migrations(migrations_dir)
-            
-            if applied:
-                logger.info(f"Successfully applied {len(applied)} database migrations: {', '.join(applied)}")
-            else:
-                logger.info("No new database migrations to apply")
-                
-        except Exception as migration_error:
-            logger.error(f"Failed to run database migrations: {str(migration_error)}", exc_info=True)
-            # Continue app startup even if migrations fail
-            # This allows the app to start with existing schema
-            
+    
     except Exception as e:
         logger.error(f"Failed to initialize database connection: {str(e)}")
         raise
