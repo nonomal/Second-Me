@@ -8,7 +8,6 @@ It should be executed whenever the database schema needs to be updated.
 
 import os
 import sys
-import logging
 from pathlib import Path
 
 # Add project root to path
@@ -18,12 +17,7 @@ sys.path.insert(0, project_root)
 from lpm_kernel.configs.config import Config
 from lpm_kernel.database.migration_manager import MigrationManager
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+from lpm_kernel.common.logging import logger
 
 def get_db_path():
     """Get the database path from environment or use default"""
@@ -35,11 +29,11 @@ def run_migrations():
     """Run all pending database migrations"""
     db_path = get_db_path()
     
-    logger.info(f"Using database at: {db_path}")
+    # logger.info(f"Using database at: {db_path}")
     
     # Check if database file exists
     if not os.path.exists(db_path):
-        logger.error(f"Database file not found at {db_path}")
+        # logger.error(f"Database file not found at {db_path}")
         return False
     
     try:
@@ -50,10 +44,10 @@ def run_migrations():
         # Apply migrations
         applied = manager.apply_migrations(migrations_dir)
         
-        if applied:
-            logger.info(f"Successfully applied {len(applied)} migrations")
-        else:
-            logger.info("No new migrations to apply")
+        # if applied:
+        #     logger.info(f"Successfully applied {len(applied)} migrations")
+        # else:
+        #     logger.info("No new migrations to apply")
         
         return True
         
@@ -69,11 +63,11 @@ def create_migration(description):
     manager = MigrationManager(db_path)
     filepath = manager.create_migration(description, migrations_dir)
     
-    logger.info(f"Created new migration at: {filepath}")
+    # logger.info(f"Created new migration at: {filepath}")
     return filepath
 
 if __name__ == "__main__":
-    logger.info("Starting database migration")
+    # logger.info("Starting database migration")
     
     if len(sys.argv) > 1 and sys.argv[1] == "create":
         if len(sys.argv) > 2:
@@ -87,7 +81,7 @@ if __name__ == "__main__":
         success = run_migrations()
         
         if success:
-            logger.info("Migration completed successfully")
+            # logger.info("Migration completed successfully")
             sys.exit(0)
         else:
             logger.error("Migration failed")

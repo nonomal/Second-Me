@@ -4,16 +4,11 @@ Database Migration Manager
 This module provides functionality to manage database migrations in a systematic way.
 It ensures that migrations are applied in order and only once.
 """
-
 import os
-import sys
 import importlib.util
 import sqlite3
-import logging
 from datetime import datetime
-from pathlib import Path
-from lpm_kernel.configs.logging import get_train_process_logger, TRAIN_LOG_FILE
-logger = get_train_process_logger()
+from lpm_kernel.common.logging import logger
 class MigrationManager:
     """Manages database migrations for SQLite database"""
     
@@ -73,14 +68,14 @@ class MigrationManager:
         """
         if migrations_dir is None:
             migrations_dir = os.path.join(os.path.dirname(__file__), "migrations")
-            logger.info(f"Using default migrations directory: {migrations_dir}")
+            # logger.info(f"Using default migrations directory: {migrations_dir}")
         
         # Ensure migrations directory exists
         os.makedirs(migrations_dir, exist_ok=True)
         
         # Get already applied migrations
         applied = self.get_applied_migrations()
-        logger.info(f"Found {len(applied)} previously applied migrations")
+        # logger.info(f"Found {len(applied)} previously applied migrations")
         
         # Get all migration files and sort them
         migration_files = []
@@ -90,13 +85,13 @@ class MigrationManager:
                     # Extract version from filename (format: V20250420221300__description.py)
                     version = f.split('__')[0].replace('V', '')
                     migration_files.append((version, f))
-                    logger.info(f"Found migration file: {f}")
+                    # logger.info(f"Found migration file: {f}")
                 except Exception as e:
                     logger.warning(f"Skipping invalid migration filename: {f}, error: {e}")
         
         # Sort by version
         migration_files.sort(key=lambda x: x[0])
-        logger.info(f"Found {len(migration_files)} migration files: {', '.join([f[1] for f in migration_files])}")
+        # logger.info(f"Found {len(migration_files)} migration files: {', '.join([f[1] for f in migration_files])}")
         
         applied_in_session = []
         
@@ -106,7 +101,7 @@ class MigrationManager:
                 logger.debug(f"Skipping already applied migration: {migration_file}")
                 continue
             
-            logger.info(f"Applying migration: {migration_file}")
+            # logger.info(f"Applying migration: {migration_file}")
             
             # Load the migration module
             module_path = os.path.join(migrations_dir, migration_file)
@@ -137,7 +132,7 @@ class MigrationManager:
                     
                     # Commit the transaction
                     conn.commit()
-                    logger.info(f"Successfully applied migration: {migration_file}")
+                    # logger.info(f"Successfully applied migration: {migration_file}")
                     applied_in_session.append(version)
                     
                 except Exception as e:
@@ -153,10 +148,10 @@ class MigrationManager:
                 logger.error(f"Failed to load migration {migration_file}: {str(e)}")
                 raise
         
-        if not applied_in_session:
-            logger.info("No new migrations to apply")
-        else:
-            logger.info(f"Applied {len(applied_in_session)} new migrations")
+        # if not applied_in_session:
+        #     # logger.info("No new migrations to apply")
+        # else:
+        #     logger.info(f"Applied {len(applied_in_session)} new migrations")
         
         return applied_in_session
     
@@ -173,7 +168,7 @@ class MigrationManager:
         """
         if migrations_dir is None:
             migrations_dir = os.path.join(os.path.dirname(__file__), "migrations")
-            logger.info(f"Using default migrations directory: {migrations_dir}")
+            # logger.info(f"Using default migrations directory: {migrations_dir}")
         
         # Check if migration is applied
         applied = self.get_applied_migrations()
@@ -192,7 +187,7 @@ class MigrationManager:
             logger.error(f"Migration file for version {version} not found")
             return False
         
-        logger.info(f"Downgrading migration: {migration_file}")
+        # logger.info(f"Downgrading migration: {migration_file}")
         
         # Load the migration module
         module_path = os.path.join(migrations_dir, migration_file)
@@ -225,7 +220,7 @@ class MigrationManager:
                 
                 # Commit the transaction
                 conn.commit()
-                logger.info(f"Successfully downgraded migration: {migration_file}")
+                # logger.info(f"Successfully downgraded migration: {migration_file}")
                 return True
                 
             except Exception as e:
@@ -254,14 +249,14 @@ class MigrationManager:
         """
         if migrations_dir is None:
             migrations_dir = os.path.join(os.path.dirname(__file__), "migrations")
-            logger.info(f"Using default migrations directory: {migrations_dir}")
+            # logger.info(f"Using default migrations directory: {migrations_dir}")
         
         # Get applied migrations
         applied = self.get_applied_migrations()
-        logger.info(f"Found {len(applied)} applied migrations")
+        # logger.info(f"Found {len(applied)} applied migrations")
         
         if not applied:
-            logger.info("No migrations to downgrade")
+            # logger.info("No migrations to downgrade")
             return []
         
         # Determine which migrations to downgrade
@@ -295,10 +290,10 @@ class MigrationManager:
                 logger.error(f"Error during downgrade of {version}: {str(e)}")
                 break
         
-        if not downgraded:
-            logger.info("No migrations were downgraded")
-        else:
-            logger.info(f"Downgraded {len(downgraded)} migrations: {', '.join(downgraded)}")
+        # if not downgraded:
+        #     logger.info("No migrations were downgraded")
+        # else:
+        #     logger.info(f"Downgraded {len(downgraded)} migrations: {', '.join(downgraded)}")
         
         return downgraded
         
@@ -375,5 +370,5 @@ def downgrade(conn):
     # No need to commit, the migration manager handles transactions
 ''')
         
-        logger.info(f"Created new migration: {filename}")
+        # logger.info(f"Created new migration: {filename}")
         return filepath
