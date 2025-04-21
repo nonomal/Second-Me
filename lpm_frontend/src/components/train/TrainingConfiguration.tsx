@@ -392,7 +392,11 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
 
             <div className="flex mr-auto gap-2 items-center ">
               <Checkbox
-                checked={trainingParams.is_cot}
+                checked={
+                  disabledChangeParams && nowTrainingParams && !changeBaseModel
+                    ? nowTrainingParams.is_cot
+                    : trainingParams.is_cot
+                }
                 disabled={disabledChangeParams}
                 onChange={(e) => {
                   e.stopPropagation();

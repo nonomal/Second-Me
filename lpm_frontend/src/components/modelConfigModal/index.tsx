@@ -35,8 +35,10 @@ const ModelConfigModal = (props: IProps) => {
   const [modelType, setModelType] = useState<string>('');
 
   useEffect(() => {
-    fetchModelConfig();
-  }, []);
+    if (open) {
+      fetchModelConfig();
+    }
+  }, [open]);
 
   useEffect(() => {
     setModelType(localProviderType);

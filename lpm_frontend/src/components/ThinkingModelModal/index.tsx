@@ -20,8 +20,10 @@ const ThinkingModelModal = (props: IProps) => {
   const thinkingModelConfig = useModelConfigStore((store) => store.thinkingModelConfig);
 
   useEffect(() => {
-    fetchModelConfig();
-  }, []);
+    if (open) {
+      fetchModelConfig();
+    }
+  }, [open]);
 
   useEffect(() => {
     setThinkingModelParams(thinkingModelConfig);

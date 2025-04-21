@@ -173,7 +173,7 @@ export default function PlaygroundChat() {
     };
 
     // Update message list, adding user message and empty assistant message
-    let newMessages = [...messages, userMessage, assistantMessage];
+    let newMessages = [...messages, userMessage];
 
     const systemMessage: Message = {
       id: generateMessageId(),
@@ -186,21 +186,22 @@ export default function PlaygroundChat() {
     };
 
     if (!newMessages.find((item) => item.role === 'system')) {
-      newMessages = [systemMessage, ...newMessages]
+      newMessages = [systemMessage, ...newMessages];
     } else {
       newMessages = newMessages.map((msg) => {
         if (msg.role === 'system') {
           return { ...msg, content: originPrompt };
         }
+
         return msg;
       });
     }
 
-    setMessages(newMessages);
+    setMessages([...newMessages, assistantMessage]);
 
     // Save messages to session
     if (activeSessionId) {
-      chatStorage.saveSessionMessages(activeSessionId, newMessages);
+      chatStorage.saveSessionMessages(activeSessionId, [...newMessages, assistantMessage]);
 
       // If it's the first message in a new session, update session title
       if (messages.length === 0) {
@@ -306,8 +307,8 @@ export default function PlaygroundChat() {
                       index === messages.length - 1 &&
                       message.role === 'assistant'
                     }
-                    role={message.role}
                     message={message.content}
+                    role={message.role}
                     timestamp={message.timestamp}
                   />
                 ))}

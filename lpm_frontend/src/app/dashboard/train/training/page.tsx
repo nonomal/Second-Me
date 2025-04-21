@@ -10,7 +10,6 @@ import { getMemoryList } from '@/service/memory';
 import { message, Modal } from 'antd';
 import { useModelConfigStore } from '@/store/useModelConfigStore';
 import CelebrationEffect from '@/components/Celebration';
-import { getModelConfig } from '@/service/modelConfig';
 import TrainingLog from '@/components/train/TrainingLog';
 import TrainingProgress from '@/components/train/TrainingProgress';
 import TrainingConfiguration from '@/components/train/TrainingConfiguration';
@@ -60,28 +59,40 @@ const baseModelOptions = [
   }
 ];
 
+// Title and explanation section
+const pageTitle = 'Training Process';
+const pageDescription =
+  'Transform your memories into a personalized AI model that thinks and communicates like you.';
+
 export default function TrainingPage() {
-  // Title and explanation section
-  const pageTitle = 'Training Process';
-  const pageDescription =
-    'Transform your memories into a personalized AI model that thinks and communicates like you.';
+  const checkTrainStatus = useTrainingStore((state) => state.checkTrainStatus);
+  const resetTrainingState = useTrainingStore((state) => state.resetTrainingState);
+  const trainingError = useTrainingStore((state) => state.error);
+  const setStatus = useTrainingStore((state) => state.setStatus);
+  const fetchModelConfig = useModelConfigStore((state) => state.fetchModelConfig);
+  const modelConfig = useModelConfigStore((store) => store.modelConfig);
+  const status = useTrainingStore((state) => state.status);
+  const trainingProgress = useTrainingStore((state) => state.trainingProgress);
+
+  const router = useRouter();
 
   const [selectedInfo, setSelectedInfo] = useState<boolean>(false);
   const [isTraining, setIsTraining] = useState(false);
   const [trainingParams, setTrainingParams] = useState<TrainingConfig>({} as TrainingConfig);
   const [nowTrainingParams, setNowTrainingParams] = useState<TrainingConfig | null>(null);
   const [trainActionLoading, setTrainActionLoading] = useState(false);
-
-  const containerRef = useRef<HTMLDivElement>(null);
-  const firstLoadRef = useRef<boolean>(true);
   const [showCelebration, setShowCelebration] = useState(false);
   const [showMemoryModal, setShowMemoryModal] = useState(false);
-  const modelConfig = useModelConfigStore((store) => store.modelConfig);
-  const updateModelConfig = useModelConfigStore((store) => store.updateModelConfig);
+  const [changeBaseModel, setChangeBaseModel] = useState(false);
 
   const cleanupEventSourceRef = useRef<(() => void) | undefined>();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const firstLoadRef = useRef<boolean>(true);
+  const pollingStopRef = useRef<boolean>(false);
 
-  const [changeBaseModel, setChangeBaseModel] = useState(false);
+  const [isResume, setIsResume] = useState(
+    trainingProgress.status === 'suspended' || trainingProgress.status === 'failed'
+  );
 
   useEffect(() => {
     const localTrainingParams = JSON.parse(localStorage.getItem('trainingParams') || '{}');
@@ -90,29 +101,8 @@ export default function TrainingPage() {
   }, [trainingParams.model_name]);
 
   useEffect(() => {
-    getModelConfig().then((res) => {
-      if (res.data.code == 0) {
-        const data = res.data.data || {};
-
-        updateModelConfig(data);
-      } else {
-        message.error(res.data.message);
-      }
-    });
+    fetchModelConfig();
   }, []);
-
-  const pollingStopRef = useRef<boolean>(false);
-  const router = useRouter();
-
-  const status = useTrainingStore((state) => state.status);
-  const trainingProgress = useTrainingStore((state) => state.trainingProgress);
-  const [isResume, setIsResume] = useState(
-    trainingProgress.status === 'suspended' || trainingProgress.status === 'failed'
-  );
-  const checkTrainStatus = useTrainingStore((state) => state.checkTrainStatus);
-  const resetTrainingState = useTrainingStore((state) => state.resetTrainingState);
-  const trainingError = useTrainingStore((state) => state.error);
-  const setStatus = useTrainingStore((state) => state.setStatus);
 
   // Start polling training progress
   const startPolling = () => {
@@ -171,13 +161,6 @@ export default function TrainingPage() {
     }
   }, [status, trainingError]);
 
-  // Monitor training status changes, scroll to bottom when status becomes 'training'
-  useEffect(() => {
-    if (status === 'training') {
-      scrollToBottom();
-    }
-  }, [status]);
-
   // Check training status once when component loads
   useEffect(() => {
     // Check if user has at least 3 memories
@@ -201,14 +184,6 @@ export default function TrainingPage() {
 
       // Only proceed with training status check if memory check passes
       checkTrainStatus();
-
-      // Check if we were in the middle of retraining
-      const isRetraining = localStorage.getItem('isRetraining') === 'true';
-
-      if (isRetraining) {
-        // If we were retraining, set status to training
-        startGetTrainingProgress();
-      }
     };
 
     checkMemoryCount();
@@ -225,7 +200,6 @@ export default function TrainingPage() {
 
       if (firstLoadRef.current) {
         scrollPageToBottom();
-        scrollToBottom();
 
         // On first load, start polling and get training progress.
         startGetTrainingProgress();
@@ -295,11 +269,6 @@ export default function TrainingPage() {
     });
     // Set that it's no longer the first load
     firstLoadRef.current = false;
-  };
-
-  const scrollToBottom = () => {
-    // This function is kept for backward compatibility
-    // The actual scrolling is now handled by the TrainingLog component
   };
 
   const updateTrainingParams = (params: TrainingConfig) => {

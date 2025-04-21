@@ -15,7 +15,7 @@ const TrainingLog: React.FC<TrainingLogProps> = ({ trainingDetails }: TrainingLo
   // Smooth scroll console to bottom
   const smoothScrollConsole = () => {
     if (consoleEndRef.current && !isUserScrolling) {
-      const consoleContainer = consoleEndRef.current.closest('.overflow-y-auto');
+      const consoleContainer = consoleEndRef.current;
 
       if (consoleContainer instanceof HTMLElement) {
         consoleContainer.scrollTo({
@@ -44,7 +44,7 @@ const TrainingLog: React.FC<TrainingLogProps> = ({ trainingDetails }: TrainingLo
 
     // Find the console container and attach the scroll listener
     if (consoleEndRef.current) {
-      const consoleContainer = consoleEndRef.current.closest('.overflow-y-auto');
+      const consoleContainer = consoleEndRef.current;
 
       if (consoleContainer instanceof HTMLElement) {
         consoleContainer.addEventListener('scroll', handleUserScroll);
@@ -70,7 +70,10 @@ const TrainingLog: React.FC<TrainingLogProps> = ({ trainingDetails }: TrainingLo
   return (
     <div className="mt-4">
       <h4 className="text-sm font-medium text-gray-700 mb-2">Training Log</h4>
-      <div className="bg-gray-900 rounded-lg p-4 h-[600px] overflow-y-auto font-mono text-xs">
+      <div
+        ref={consoleEndRef}
+        className="bg-gray-900 rounded-lg p-4 h-[600px] overflow-y-auto font-mono text-xs"
+      >
         <div className="space-y-1">
           {trainingDetails.length > 0 ? (
             trainingDetails.map((detail, index) => (
@@ -83,7 +86,6 @@ const TrainingLog: React.FC<TrainingLogProps> = ({ trainingDetails }: TrainingLo
               No training logs available. Start training to see logs here.
             </div>
           )}
-          <div ref={consoleEndRef} />
         </div>
       </div>
     </div>
