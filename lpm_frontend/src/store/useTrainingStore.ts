@@ -90,13 +90,13 @@ export const useTrainingStore = create<ModelState>((set) => ({
   setTrainingProgress: (progress) => set({ trainingProgress: progress }),
   resetTrainingState: () => set({ trainingProgress: defaultTrainingProgress }),
   checkTrainStatus: async () => {
-    const config = JSON.parse(localStorage.getItem('trainingConfig') || '{}');
+    const config = JSON.parse(localStorage.getItem('trainingParams') || '{}');
 
     set({ error: false });
 
     try {
       const res = await getTrainProgress({
-        model_name: config.baseModel || 'Qwen2.5-0.5B-Instruct'
+        model_name: config.model_name || 'Qwen2.5-0.5B-Instruct'
       });
 
       if (res.data.code === 0) {
