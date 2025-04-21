@@ -226,6 +226,9 @@ export default function TrainingPage() {
       if (firstLoadRef.current) {
         scrollPageToBottom();
         scrollToBottom();
+
+        // On first load, start polling and get training progress.
+        startGetTrainingProgress();
       }
     }
     // If training is completed or failed, stop polling

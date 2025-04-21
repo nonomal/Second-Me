@@ -1,7 +1,9 @@
 import { Request } from '../utils/request';
 import type { CommonResponse, EmptyResponse } from '../types/responseModal';
 
-export interface IModelConfig {
+export type IModelConfig = IBaseModelParams & IThinkingModelParams;
+
+export interface IBaseModelParams {
   id: number;
   provider_type: string;
   key: string;
@@ -15,6 +17,12 @@ export interface IModelConfig {
   updated_at: string;
 }
 
+export interface IThinkingModelParams {
+  thinking_model_name: string;
+  thinking_api_key: string;
+  thinking_endpoint: string;
+}
+
 export const getModelConfig = () => {
   return Request<CommonResponse<IModelConfig>>({
     method: 'get',
@@ -26,6 +34,14 @@ export const updateModelConfig = (data: IModelConfig) => {
   return Request<CommonResponse<IModelConfig>>({
     method: 'put',
     url: `/api/user-llm-configs`,
+    data
+  });
+};
+
+export const updateThinkingConfig = (data: IThinkingModelParams) => {
+  return Request<CommonResponse<IThinkingModelParams>>({
+    method: 'put',
+    url: `/api/user-llm-configs/thinking`,
     data
   });
 };

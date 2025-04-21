@@ -1,5 +1,8 @@
+import type { IThinkingModelParams } from '@/service/modelConfig';
+import { updateThinkingConfig } from '@/service/modelConfig';
+import { useModelConfigStore } from '@/store/useModelConfigStore';
 import { Input, Modal } from 'antd';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface IProps {
   open: boolean;
@@ -8,14 +11,46 @@ interface IProps {
 
 const ThinkingModelModal = (props: IProps) => {
   const { open, onClose: handleCancel } = props;
-  const [thinkParams, setThinkParams] = useState({
-    model_name: '',
-    api_key: '',
-    api_endpoint: ''
-  });
+
+  const fetchModelConfig = useModelConfigStore((store) => store.fetchModelConfig);
+  const [thinkingModelParams, setThinkingModelParams] = useState<IThinkingModelParams>(
+    {} as IThinkingModelParams
+  );
+  const updateThinkingModelConfig = useModelConfigStore((store) => store.updateThinkingModelConfig);
+  const thinkingModelConfig = useModelConfigStore((store) => store.thinkingModelConfig);
+
+  useEffect(() => {
+    fetchModelConfig();
+  }, []);
+
+  useEffect(() => {
+    setThinkingModelParams(thinkingModelConfig);
+  }, [thinkingModelConfig]);
+
+  const handleUpdate = () => {
+    updateThinkingConfig(thinkingModelParams)
+      .then((res) => {
+        if (res.data.code == 0) {
+          updateThinkingModelConfig(thinkingModelParams);
+          handleCancel();
+        } else {
+          throw new Error(res.data.message);
+        }
+      })
+      .catch((error) => {
+        console.error(error.message || 'Failed to update model config');
+      });
+  };
 
   return (
-    <Modal centered onCancel={handleCancel} open={open}>
+    <Modal
+      centered
+      onCancel={handleCancel}
+      onOk={() => {
+        handleUpdate();
+      }}
+      open={open}
+    >
       <div className="flex flex-col gap-2 mb-4">
         <div className="text-xl leading-6 font-semibold text-gray-900">Thinking model</div>
         <div className="text-sm font-medium text-gray-700">Currently only supports DeepSeek</div>
@@ -27,8 +62,13 @@ const ThinkingModelModal = (props: IProps) => {
             <Input
               autoComplete="off"
               className="w-full"
-              onChange={(e) => setThinkParams({ ...thinkParams, model_name: e.target.value })}
-              value={thinkParams.model_name}
+              onChange={(e) =>
+                setThinkingModelParams({
+                  ...thinkingModelParams,
+                  thinking_model_name: e.target.value
+                })
+              }
+              value={thinkingModelParams.thinking_model_name}
             />
           </div>
 
@@ -39,8 +79,13 @@ const ThinkingModelModal = (props: IProps) => {
               <Input.Password
                 autoComplete="off"
                 className="w-full"
-                onChange={(e) => setThinkParams({ ...thinkParams, api_key: e.target.value })}
-                value={thinkParams.api_key}
+                onChange={(e) =>
+                  setThinkingModelParams({
+                    ...thinkingModelParams,
+                    thinking_api_key: e.target.value
+                  })
+                }
+                value={thinkingModelParams.thinking_api_key}
               />
             </form>
           </div>
@@ -51,8 +96,13 @@ const ThinkingModelModal = (props: IProps) => {
           <Input
             autoComplete="off"
             className="w-full"
-            onChange={(e) => setThinkParams({ ...thinkParams, api_endpoint: e.target.value })}
-            value={thinkParams.api_endpoint}
+            onChange={(e) =>
+              setThinkingModelParams({
+                ...thinkingModelParams,
+                thinking_endpoint: e.target.value
+              })
+            }
+            value={thinkingModelParams.thinking_endpoint}
           />
         </div>
       </div>

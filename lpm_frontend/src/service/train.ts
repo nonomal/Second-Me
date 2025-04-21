@@ -56,6 +56,10 @@ export interface TrainProgress {
   status: StageStatus;
 }
 
+export interface TrainAdvanceParams {
+  is_cot?: boolean;
+}
+
 export interface TrainingParams {
   concurrency_threads?: number;
   data_synthesis_mode?: string;
@@ -63,9 +67,11 @@ export interface TrainingParams {
   number_of_epochs?: number;
 }
 
-export interface TrainingConfig extends TrainingParams {
+export interface TrainBaseParams {
   model_name: string;
 }
+
+export type TrainingConfig = TrainingParams & TrainAdvanceParams & TrainBaseParams;
 
 export const startTrain = (config: TrainingConfig) => {
   return Request<CommonResponse<StartTrainResponse>>({
