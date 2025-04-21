@@ -78,5 +78,6 @@ python lpm_kernel/L2/train.py \
   --lora_target_modules "all-linear" \
   --use_4bit_quantization False \
   --use_nested_quant False \
-  --bnb_4bit_compute_dtype "bfloat16"
+  --bnb_4bit_compute_dtype "bfloat16"\
+  --is_cot $IS_COT
 
