@@ -63,9 +63,10 @@ def start_process():
         number_of_epochs = data.get("number_of_epochs", None)
         concurrency_threads = data.get("concurrency_threads", None)
         data_synthesis_mode = data.get("data_synthesis_mode", None)
+        is_cot = data.get("is_cot", None)
         
         # Log the received parameters
-        logger.info(f"Training parameters: model_name={model_name}, learning_rate={learning_rate}, number_of_epochs={number_of_epochs}, concurrency_threads={concurrency_threads}, data_synthesis_mode={data_synthesis_mode}")
+        logger.info(f"Training parameters: model_name={model_name}, learning_rate={learning_rate}, number_of_epochs={number_of_epochs}, concurrency_threads={concurrency_threads}, data_synthesis_mode={data_synthesis_mode}, is_cot={is_cot}")
 
         # Create service instance with model name and additional parameters
         train_service = TrainProcessService(
@@ -88,7 +89,8 @@ def start_process():
             "learning_rate": learning_rate,
             "number_of_epochs": number_of_epochs,
             "concurrency_threads": concurrency_threads,
-            "data_synthesis_mode": data_synthesis_mode
+            "data_synthesis_mode": data_synthesis_mode,
+            "is_cot": is_cot
         }
         
         params_manager = TrainingParamsManager()
@@ -110,7 +112,8 @@ def start_process():
                     "learning_rate": learning_rate,
                     "number_of_epochs": number_of_epochs,
                     "concurrency_threads": concurrency_threads,
-                    "data_synthesis_mode": data_synthesis_mode
+                    "data_synthesis_mode": data_synthesis_mode,
+                    "is_cot": is_cot
                 }
             )
         )

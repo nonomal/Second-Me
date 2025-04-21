@@ -48,7 +48,7 @@ class TrainProcessService:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, current_model_name: str = None, is_cot: bool = False):
+    def __init__(self, current_model_name: str = None):
         if not self._initialized:
             # Generate a unique progress file name based on model name
             self.progress = TrainProgressHolder(current_model_name)
@@ -76,7 +76,10 @@ class TrainProcessService:
             self.model_name = current_model_name
             # Create new progress instance with updated progress file name
             self.progress = TrainProgressHolder(current_model_name)
-        self.is_cot = is_cot
+            
+        # Get is_cot from TrainingParamsManager
+        training_params = TrainingParamsManager.get_latest_training_params()
+        self.is_cot = training_params.get("is_cot", False)
 
     def list_documents(self):
         """List all documents"""
@@ -625,6 +628,7 @@ class TrainProcessService:
             num_train_epochs = training_params.get("number_of_epochs")
             concurrency_threads = training_params.get("concurrency_threads")
             data_synthesis_mode = training_params.get("data_synthesis_mode")
+            is_cot = training_params.get("is_cot", False)
             
             # Log training parameters
             logger.info("Training parameters from latest settings:")
@@ -640,7 +644,8 @@ class TrainProcessService:
                 "--lr", str(learning_rate),
                 "--epochs", str(num_train_epochs),
                 "--threads", str(concurrency_threads),
-                "--mode", str(data_synthesis_mode)
+                "--mode", str(data_synthesis_mode),
+                "--is_cot", str(is_cot)
             ]
             
             # Ensure log directory exists
