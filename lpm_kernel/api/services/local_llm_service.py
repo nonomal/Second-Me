@@ -4,6 +4,8 @@ import logging
 import psutil
 import time
 import subprocess
+import threading
+import queue
 from typing import Iterator, Any, Optional, Generator, Dict
 from datetime import datetime
 from flask import Response
@@ -244,60 +246,94 @@ class LocalLLMService:
 
     def handle_stream_response(self, response_iter: Iterator[Any]) -> Response:
         """Handle streaming response from the LLM server"""
-        def generate():
-            chunk = None  # Initialize chunk variable
+        # 创建一个队列，用于线程间通信
+        message_queue = queue.Queue()
+        # 创建事件标志，用于通知模型处理已完成
+        completion_event = threading.Event()
+        # 创建变量，用于跟踪首次收到响应后是否需要心跳
+        first_response_received = False
+        
+        def heartbeat_thread():
+            """发送心跳的线程函数"""
             start_time = time.time()
-            chunk_count = 0
-            last_chunk_time = start_time
+            heartbeat_interval = 10  # 10秒发送一次心跳
+            heartbeat_count = 0
             
-            logger.info(f"[STREAM_DEBUG] Starting stream response at {start_time}")
+            logger.info("[STREAM_DEBUG] Heartbeat thread started")
             
             try:
+                # 发送初始心跳
+                message_queue.put((b": initial heartbeat\n\n", "[INITIAL_HEARTBEAT]"))
+                last_heartbeat_time = time.time()
+                
+                while not completion_event.is_set():
+                    current_time = time.time()
+                    
+                    # 检查是否需要发送心跳
+                    if current_time - last_heartbeat_time >= heartbeat_interval:
+                        heartbeat_count += 1
+                        elapsed = current_time - start_time
+                        logger.info(f"[STREAM_DEBUG] Sending heartbeat #{heartbeat_count} at {elapsed:.2f}s")
+                        message_queue.put((f": heartbeat #{heartbeat_count}\n\n".encode('utf-8'), "[HEARTBEAT]"))
+                        last_heartbeat_time = current_time
+                    
+                    # 短暂睡眠，避免CPU空转
+                    time.sleep(0.1)
+                
+                logger.info(f"[STREAM_DEBUG] Heartbeat thread stopping after {heartbeat_count} heartbeats")
+            except Exception as e:
+                logger.error(f"[STREAM_DEBUG] Error in heartbeat thread: {str(e)}", exc_info=True)
+                message_queue.put((f"data: {{\"error\": \"Heartbeat error: {str(e)}\"}}\n\n".encode('utf-8'), "[ERROR]"))
+        
+        def model_response_thread():
+            """处理模型响应的线程函数"""
+            chunk = None
+            start_time = time.time()
+            chunk_count = 0
+            
+            try:
+                logger.info("[STREAM_DEBUG] Model response thread started")
+                
+                # 处理模型响应
                 for chunk in response_iter:
                     current_time = time.time()
                     elapsed_time = current_time - start_time
-                    chunk_interval = current_time - last_chunk_time
                     chunk_count += 1
                     
-                    logger.info(f"[STREAM_DEBUG] Received chunk #{chunk_count} after {elapsed_time:.2f}s (interval: {chunk_interval:.2f}s)")
-                    last_chunk_time = current_time
+                    logger.info(f"[STREAM_DEBUG] Received chunk #{chunk_count} after {elapsed_time:.2f}s")
                     
                     if chunk is None:
-                        logger.warning("Received None chunk in stream, skipping")
+                        logger.warning("[STREAM_DEBUG] Received None chunk, skipping")
                         continue
-                        
-                    # Check if this is the done marker for custom format
+                    
+                    # 检查是否是结束标记
                     if chunk == "[DONE]":
                         logger.info(f"[STREAM_DEBUG] Received [DONE] marker after {elapsed_time:.2f}s")
-                        yield b"data: [DONE]\n\n"
-                        return  # Use return to terminate the generator
+                        message_queue.put((b"data: [DONE]\n\n", "[DONE]"))
+                        break
                     
-                    # Handle OpenAI error format directly
+                    # 处理错误响应
                     if isinstance(chunk, dict) and "error" in chunk:
-                        logger.warning(f"[STREAM_DEBUG] Received error response after {elapsed_time:.2f}s: {chunk}")
+                        logger.warning(f"[STREAM_DEBUG] Received error response: {chunk}")
                         data_str = json.dumps(chunk)
-                        yield f"data: {data_str}\n\n".encode('utf-8')
-                        # After sending error, send [DONE] marker to close the stream properly
-                        yield b"data: [DONE]\n\n"
-                        return
+                        message_queue.put((f"data: {data_str}\n\n".encode('utf-8'), "[ERROR]"))
+                        message_queue.put((b"data: [DONE]\n\n", "[DONE]"))
+                        break
                     
+                    # 处理正常响应
                     response_data = self._parse_response_chunk(chunk)
                     if response_data:
                         data_str = json.dumps(response_data)
                         content = response_data.get("choices", [{}])[0].get("delta", {}).get("content", "")
                         content_length = len(content) if content else 0
                         logger.info(f"[STREAM_DEBUG] Sending chunk #{chunk_count}, content length: {content_length}, elapsed: {elapsed_time:.2f}s")
-                        yield f"data: {data_str}\n\n".encode('utf-8')
+                        message_queue.put((f"data: {data_str}\n\n".encode('utf-8'), "[CONTENT]"))
                     else:
-                        logger.warning(f"[STREAM_DEBUG] Parsed response data is None, skipping chunk #{chunk_count}")
+                        logger.warning(f"[STREAM_DEBUG] Parsed response data is None for chunk #{chunk_count}")
                 
-                # Reached end of iterator normally
-                current_time = time.time()
-                elapsed_time = current_time - start_time
-                
-                # Handle the case where the iterator is empty, ensure a thinking message is sent before completion
+                # 处理没有收到响应的情况
                 if chunk_count == 0:
-                    logger.info("[STREAM_DEBUG] No chunks received yet, sending thinking message")
+                    logger.info("[STREAM_DEBUG] No chunks received, sending empty message")
                     thinking_message = {
                         "id": str(uuid.uuid4()),
                         "object": "chat.completion.chunk",
@@ -315,33 +351,76 @@ class LocalLLMService:
                         ]
                     }
                     data_str = json.dumps(thinking_message)
-                    yield f"data: {data_str}\n\n".encode('utf-8')
-                    
+                    message_queue.put((f"data: {data_str}\n\n".encode('utf-8'), "[THINKING]"))
+                
+                # 模型处理完成，发送结束标记
+                if chunk != "[DONE]":
+                    logger.info(f"[STREAM_DEBUG] Sending final [DONE] marker after {elapsed_time:.2f}s")
+                    message_queue.put((b"data: [DONE]\n\n", "[DONE]"))
+                
             except Exception as e:
-                current_time = time.time()
-                elapsed_time = current_time - start_time
-                logger.error(f"[STREAM_DEBUG] Stream error after {elapsed_time:.2f}s with {chunk_count} chunks: {str(e)}", exc_info=True)
-                
-                # Check if it's a BrokenPipeError specifically
-                if isinstance(e, BrokenPipeError):
-                    logger.error(f"[STREAM_DEBUG] BrokenPipeError detected, likely client disconnect at {elapsed_time:.2f}s")
-                
-                error_msg = json.dumps({'error': str(e)})
-                try:
-                    yield f"data: {error_msg}\n\n".encode('utf-8')
-                except Exception as yield_error:
-                    logger.error(f"[STREAM_DEBUG] Failed to yield error message: {str(yield_error)}")
+                logger.error(f"[STREAM_DEBUG] Error processing model response: {str(e)}", exc_info=True)
+                message_queue.put((f"data: {{\"error\": \"{str(e)}\"}}\n\n".encode('utf-8'), "[ERROR]"))
+                message_queue.put((b"data: [DONE]\n\n", "[DONE]"))
             finally:
-                current_time = time.time()
-                total_time = current_time - start_time
-                logger.info(f"[STREAM_DEBUG] Stream completed after {total_time:.2f}s with {chunk_count} chunks")
-                
-                if chunk != "[DONE]":  # Only send if [DONE] marker was not received
-                    logger.info(f"[STREAM_DEBUG] Sending final [DONE] marker at {total_time:.2f}s")
+                # 设置完成事件，通知心跳线程停止
+                completion_event.set()
+                logger.info(f"[STREAM_DEBUG] Model response thread completed with {chunk_count} chunks")
+        
+        def generate():
+            """生成响应的主生成器函数"""
+            # 启动心跳线程
+            heart_thread = threading.Thread(target=heartbeat_thread, daemon=True)
+            heart_thread.start()
+            
+            # 启动模型响应处理线程
+            model_thread = threading.Thread(target=model_response_thread, daemon=True)
+            model_thread.start()
+            
+            try:
+                # 从队列获取消息并返回给客户端
+                while True:
+                    try:
+                        # 使用短超时获取消息，避免阻塞
+                        message, message_type = message_queue.get(timeout=0.1)
+                        logger.debug(f"[STREAM_DEBUG] Yielding message type: {message_type}")
+                        yield message
+                        
+                        # 如果收到结束标记，退出循环
+                        if message_type == "[DONE]":
+                            logger.info("[STREAM_DEBUG] Received [DONE] marker, ending generator")
+                            break
+                    except queue.Empty:
+                        # 队列为空，继续尝试获取
+                        # 检查模型线程是否已完成但没有发送[DONE]
+                        if completion_event.is_set() and not model_thread.is_alive():
+                            logger.warning("[STREAM_DEBUG] Model thread completed without [DONE], ending generator")
+                            yield b"data: [DONE]\n\n"
+                            break
+                        pass
+            except GeneratorExit:
+                # 客户端关闭连接
+                logger.info("[STREAM_DEBUG] Client closed connection (GeneratorExit)")
+                completion_event.set()
+            except Exception as e:
+                logger.error(f"[STREAM_DEBUG] Error in generator: {str(e)}", exc_info=True)
+                try:
+                    yield f"data: {{\"error\": \"Generator error: {str(e)}\"}}\n\n".encode('utf-8')
                     yield b"data: [DONE]\n\n"
-                
-        # Use standard Flask SSE configuration with ping interval
-        # This is the official SSE keep-alive mechanism
+                except:
+                    pass
+                completion_event.set()
+            finally:
+                # 确保设置完成事件
+                completion_event.set()
+                # 等待线程完成
+                if heart_thread.is_alive():
+                    heart_thread.join(timeout=1.0)
+                if model_thread.is_alive():
+                    model_thread.join(timeout=1.0)
+                logger.info("[STREAM_DEBUG] Generator completed")
+        
+        # 返回响应
         return Response(
             generate(),
             mimetype='text/event-stream',
@@ -350,14 +429,7 @@ class LocalLLMService:
                 'X-Accel-Buffering': 'no',
                 'Connection': 'keep-alive',
                 'Transfer-Encoding': 'chunked'
-            },
-            direct_passthrough=True,   # Important for streaming
-            # Enable Flask keep-alive ping
-            status=200,
-            # Enable standard SSE keep-alive with ping every 15 seconds
-            # This is implemented at the WSGI/server level, not the application level
-            use_conditional_get=False,
-            retry_after=15  # Send ping every 15 seconds to keep connection alive
+            }
         )
 
 
