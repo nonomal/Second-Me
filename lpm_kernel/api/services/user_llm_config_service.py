@@ -5,7 +5,6 @@ from lpm_kernel.api.dto.user_llm_config_dto import (
     UpdateUserLLMConfigDTO
 )
 from datetime import datetime
-from lpm_kernel.common.logging import logger
 
 
 class UserLLMConfigService:
@@ -43,9 +42,7 @@ class UserLLMConfigService:
         
         # Update or create the configuration
         return self.repository.update(config_id, dto)
-    
 
-    
     def delete_key(self, config_id: int = 1) -> Optional[UserLLMConfigDTO]:
         """Delete API key from the configuration
         
@@ -79,7 +76,6 @@ class UserLLMConfigService:
             # This is a rare case that should not happen in normal operation
             # Implementation would depend on how we want to handle this case
             # For now, we'll just log a warning
+            from lpm_kernel.common.logging import logger
             logger.warning(f"Found {count} LLM configurations in the database. Only one should exist.")
             # Future implementation could delete extra records
-            
-
