@@ -12,19 +12,85 @@ logger = get_train_process_logger()
 
 class EmbeddingService:
     def __init__(self):
+        from lpm_kernel.file_data.chroma_utils import detect_embedding_model_dimension
+        from lpm_kernel.api.services.user_llm_config_service import UserLLMConfigService
+        
         chroma_path = os.getenv("CHROMA_PERSIST_DIRECTORY", "./data/chroma_db")
         self.client = chromadb.PersistentClient(path=chroma_path)
         self.llm_client = LLMClient()
+        
+        # Get embedding model dimension from user config
+        try:
+            user_llm_config_service = UserLLMConfigService()
+            user_llm_config = user_llm_config_service.get_available_llm()
+            
+            if user_llm_config and user_llm_config.embedding_model_name:
+                # Detect dimension based on model name
+                self.dimension = detect_embedding_model_dimension(user_llm_config.embedding_model_name)
+                logger.info(f"Detected embedding dimension: {self.dimension} for model: {user_llm_config.embedding_model_name}")
+            else:
+                # Default to OpenAI dimension if no config found
+                self.dimension = 1536
+                logger.info(f"No embedding model configured, using default dimension: {self.dimension}")
+        except Exception as e:
+            # Default to OpenAI dimension if error occurs
+            self.dimension = 1536
+            logger.error(f"Error detecting embedding dimension, using default: {self.dimension}. Error: {str(e)}", exc_info=True)
 
-        # document level collection
-        self.document_collection = self.client.get_or_create_collection(
-            name="documents", metadata={"hnsw:space": "cosine", "dimension": 1536}
-        )
+        # Check for dimension mismatches in all collections first
+        collections_to_init = ["documents", "document_chunks"]
+        dimension_mismatch_detected = False
+        
+        # First pass: check all collections for dimension mismatches
+        for collection_name in collections_to_init:
+            try:
+                collection = self.client.get_collection(name=collection_name)
+                if collection.metadata.get("dimension") != self.dimension:
+                    logger.warning(f"Dimension mismatch in '{collection_name}' collection: {collection.metadata.get('dimension')} vs {self.dimension}")
+                    dimension_mismatch_detected = True
+            except ValueError:
+                # Collection doesn't exist yet, will be created later
+                pass
+        
+        # Handle dimension mismatch if detected in any collection
+        if dimension_mismatch_detected:
+            self._handle_dimension_mismatch()
+        
+        # Second pass: create or get collections with the correct dimension
+        try:
+            self.document_collection = self.client.get_collection(name="documents")
+            # Verify dimension after possible reinitialization
+            doc_dimension = self.document_collection.metadata.get("dimension")
+            if doc_dimension != self.dimension:
+                logger.error(f"Collection 'documents' still has incorrect dimension after reinitialization: {doc_dimension} vs {self.dimension}")
+                # Try to reinitialize again if dimension is still incorrect
+                raise RuntimeError(f"Failed to set correct dimension for 'documents' collection: {doc_dimension} vs {self.dimension}")
+        except ValueError:
+            # Collection doesn't exist, create it with the correct dimension
+            try:
+                self.document_collection = self.client.create_collection(
+                    name="documents", metadata={"hnsw:space": "cosine", "dimension": self.dimension}
+                )
+                logger.info(f"Created 'documents' collection with dimension {self.dimension}")
+            except Exception as e:
+                logger.error(f"Failed to create 'documents' collection: {str(e)}", exc_info=True)
+                raise RuntimeError(f"Failed to create 'documents' collection: {str(e)}")
 
-        # chunk level collection
-        self.chunk_collection = self.client.get_or_create_collection(
-            name="document_chunks", metadata={"hnsw:space": "cosine", "dimension": 1536}
-        )
+        try:
+            self.chunk_collection = self.client.get_collection(name="document_chunks")
+            # Verify dimension after possible reinitialization
+            chunk_dimension = self.chunk_collection.metadata.get("dimension")
+            if chunk_dimension != self.dimension:
+                logger.error(f"Collection 'document_chunks' still has incorrect dimension after reinitialization: {chunk_dimension} vs {self.dimension}")
+                # Try to reinitialize again if dimension is still incorrect
+                raise RuntimeError(f"Failed to set correct dimension for 'document_chunks' collection: {chunk_dimension} vs {self.dimension}")
+        except ValueError:
+            # Collection doesn't exist, create it with the correct dimension
+            try:
+                self.chunk_collection = self.client.create_collection(
+                    name="document_chunks", metadata={"hnsw:space": "cosine", "dimension": self.dimension}
+                )
+            logger.info(f"Created 'document_chunks' collection with dimension {self.dimension}")
 
     def generate_document_embedding(self, document: DocumentDTO) -> List[float]:
         """Process document level embedding and store in ChromaDB"""
@@ -233,6 +299,45 @@ class EmbeddingService:
             )
             raise
 
+    def _handle_dimension_mismatch(self):
+        """
+        Handle dimension mismatch between current embedding model and ChromaDB collections
+        This method will reinitialize ChromaDB collections with the new dimension
+        """
+        from lpm_kernel.file_data.chroma_utils import reinitialize_chroma_collections
+        
+        logger.warning(f"Detected dimension mismatch in ChromaDB collections. Reinitializing with dimension {self.dimension}")
+        # Log the operation for better debugging
+        logger.info(f"Calling reinitialize_chroma_collections with dimension {self.dimension}")
+        
+        try:
+            success = reinitialize_chroma_collections(self.dimension)
+            
+            if success:
+                logger.info(f"Successfully reinitialized ChromaDB collections with dimension {self.dimension}")
+                # Refresh collection references
+                try:
+                    self.document_collection = self.client.get_collection(name="documents")
+                    self.chunk_collection = self.client.get_collection(name="document_chunks")
+                    
+                    # Double-check dimensions after refresh
+                    doc_dimension = self.document_collection.metadata.get("dimension")
+                    chunk_dimension = self.chunk_collection.metadata.get("dimension")
+                    
+                    if doc_dimension != self.dimension or chunk_dimension != self.dimension:
+                        logger.error(f"Dimension mismatch after refresh: documents={doc_dimension}, chunks={chunk_dimension}, expected={self.dimension}")
+                        raise RuntimeError(f"Failed to handle dimension mismatch: collections have incorrect dimensions after reinitialization")
+                        
+                except Exception as e:
+                    logger.error(f"Error refreshing collection references: {str(e)}", exc_info=True)
+                    raise RuntimeError(f"Failed to refresh ChromaDB collections after reinitialization: {str(e)}")
+            else:
+                logger.error("Failed to reinitialize ChromaDB collections")
+                raise RuntimeError("Failed to handle dimension mismatch in ChromaDB collections")
+        except Exception as e:
+            logger.error(f"Error during dimension mismatch handling: {str(e)}", exc_info=True)
+            raise RuntimeError(f"Failed to handle dimension mismatch in ChromaDB collections: {str(e)}")
+    
     def search_similar_chunks(
         self, query: str, limit: int = 5
     ) -> List[Tuple[ChunkDTO, float]]:
