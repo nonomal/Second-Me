@@ -35,7 +35,7 @@ class TopicsGenerator:
             "top_p": 0,
             "frequency_penalty": 0,
             "presence_penalty": 0,
-            "timeout": 5,
+            "timeout": 30,
             "response_format": {"type": "json_object"},
         }
         self.user_llm_config_service = UserLLMConfigService()
