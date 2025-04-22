@@ -130,9 +130,10 @@ def generate_l1_from_l0() -> L1GenerationResult:
 
         # 3.3 Generate features for each cluster and merge them
         shades = generate_shades(clusters, l1_generator, notes_list)
+        shades_merge_infos = convert_from_shades_to_merge_info(shades)
 
         logger.info(f"Generated {len(shades)} shades")
-        merged_shades = l1_generator.merge_shades(shades)
+        merged_shades = l1_generator.merge_shades(shades_merge_infos)
         logger.info(f"Merged shades success: {merged_shades.success}")
         logger.info(
             f"Number of merged shades: {len(merged_shades.merge_shade_list) if merged_shades.success else 0}"
@@ -186,6 +187,16 @@ def generate_shades(clusters, l1_generator, notes_list):
     return shades
 
     
+def convert_from_shades_to_merge_info(shades: List[ShadeInfo]) -> List[ShadeMergeInfo]:
+    return [ShadeMergeInfo(
+        id=shade.id,
+        name=shade.name,
+        aspect=shade.aspect,
+        description=shade.description,
+        content=shade.content,
+        desc_third_view=shade.desc_third_view,
+        content_third_view=shade.content_third_view
+    ) for shade in shades]  
 
 
 
