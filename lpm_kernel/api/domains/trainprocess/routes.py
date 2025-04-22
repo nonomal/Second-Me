@@ -244,6 +244,38 @@ def stop_training():
         logger.error(f"Error stopping training process: {str(e)}", exc_info=True)
         return jsonify(APIResponse.error(message=f"Error stopping training process: {str(e)}"))
 
+@trainprocess_bp.route("/step_output_content", methods=["GET"])
+def get_step_output_content():
+    """
+    Get content of output file for a specific training step
+    
+    Request parameters:
+        step_name: Name of the step to get content for, e.g. 'extract_dimensional_topics'
+    
+    Returns:
+        Response: JSON response
+        {
+            "code": 0,
+            "message": "Success",
+            "data": {...}  // Content of the output file, or null if not found
+        }
+    """
+    try:
+        # Get TrainProcessService instance
+        train_service = TrainProcessService()
+        
+        # Get step name from query parameters
+        step_name = request.args.get('step_name')
+        if not step_name:
+            return jsonify(APIResponse.error(message="Missing required parameter: step_name", code=400))
+        
+        # Get step output content
+        output_content = train_service.get_step_output_content(step_name)
+        
+        return jsonify(APIResponse.success(data=output_content))
+    except Exception as e:
+        logger.error(f"Failed to get step output content: {str(e)}", exc_info=True)
+        return jsonify(APIResponse.error(message=f"Failed to get step output content: {str(e)}"))
 
 @trainprocess_bp.route("/training_params", methods=["GET"])
 def get_training_params():
