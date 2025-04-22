@@ -246,22 +246,34 @@ class LocalLLMService:
         """Handle streaming response from the LLM server"""
         def generate():
             chunk = None  # Initialize chunk variable
+            start_time = time.time()
+            chunk_count = 0
+            last_chunk_time = start_time
+            logger.info(f"[STREAM_DEBUG] Starting stream response at {start_time}")
+            
             try:
                 for chunk in response_iter:
+                    current_time = time.time()
+                    elapsed_time = current_time - start_time
+                    chunk_interval = current_time - last_chunk_time
+                    chunk_count += 1
+                    
+                    logger.info(f"[STREAM_DEBUG] Received chunk #{chunk_count} after {elapsed_time:.2f}s (interval: {chunk_interval:.2f}s)")
+                    last_chunk_time = current_time
+                    
                     if chunk is None:
                         logger.warning("Received None chunk in stream, skipping")
                         continue
                         
-                    # logger.info(f"Received raw chunk: {chunk}")
                     # Check if this is the done marker for custom format
                     if chunk == "[DONE]":
-                        logger.info("Received [DONE] marker")
+                        logger.info(f"[STREAM_DEBUG] Received [DONE] marker after {elapsed_time:.2f}s")
                         yield b"data: [DONE]\n\n"
                         return  # Use return instead of break to ensure [DONE] in finally won't be executed
                     
                     # Handle OpenAI error format directly
                     if isinstance(chunk, dict) and "error" in chunk:
-                        logger.warning(f"Received error response: {chunk}")
+                        logger.warning(f"[STREAM_DEBUG] Received error response after {elapsed_time:.2f}s: {chunk}")
                         data_str = json.dumps(chunk)
                         yield f"data: {data_str}\n\n".encode('utf-8')
                         # After sending error, send [DONE] marker to close the stream properly
@@ -271,21 +283,36 @@ class LocalLLMService:
                     response_data = self._parse_response_chunk(chunk)
                     if response_data:
                         data_str = json.dumps(response_data)
-                        # logger.info(f"Sending response data: {data_str}")
+                        content = response_data.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                        content_length = len(content) if content else 0
+                        logger.info(f"[STREAM_DEBUG] Sending chunk #{chunk_count}, content length: {content_length}, elapsed: {elapsed_time:.2f}s")
                         yield f"data: {data_str}\n\n".encode('utf-8')
                     else:
-                        logger.warning("Parsed response data is None, skipping chunk")
+                        logger.warning(f"[STREAM_DEBUG] Parsed response data is None, skipping chunk #{chunk_count}")
                     
             except Exception as e:
+                current_time = time.time()
+                elapsed_time = current_time - start_time
+                logger.error(f"[STREAM_DEBUG] Stream error after {elapsed_time:.2f}s with {chunk_count} chunks: {str(e)}", exc_info=True)
+                
+                # Check if it's a BrokenPipeError specifically
+                if isinstance(e, BrokenPipeError):
+                    logger.error(f"[STREAM_DEBUG] BrokenPipeError detected, likely client disconnect at {elapsed_time:.2f}s")
+                
                 error_msg = json.dumps({'error': str(e)})
-                logger.error(f"Failed to process stream response: {str(e)}", exc_info=True)
-                yield f"data: {error_msg}\n\n".encode('utf-8')
+                try:
+                    yield f"data: {error_msg}\n\n".encode('utf-8')
+                except Exception as yield_error:
+                    logger.error(f"[STREAM_DEBUG] Failed to yield error message: {str(yield_error)}")
             finally:
+                current_time = time.time()
+                total_time = current_time - start_time
+                logger.info(f"[STREAM_DEBUG] Stream completed after {total_time:.2f}s with {chunk_count} chunks")
+                
                 if chunk != "[DONE]":  # Only send if [DONE] marker was not received
-                    logger.info("Sending final [DONE] marker")
+                    logger.info(f"[STREAM_DEBUG] Sending final [DONE] marker at {total_time:.2f}s")
                     yield b"data: [DONE]\n\n"
-                logger.info("Stream response completed successfully")
-
+                
         return Response(
             generate(),
             mimetype='text/event-stream',
