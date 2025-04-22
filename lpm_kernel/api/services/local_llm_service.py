@@ -249,6 +249,9 @@ class LocalLLMService:
             start_time = time.time()
             chunk_count = 0
             last_chunk_time = start_time
+            last_heartbeat_time = start_time
+            heartbeat_interval = 10  # Interval for sending heartbeat (seconds)
+            
             logger.info(f"[STREAM_DEBUG] Starting stream response at {start_time}")
             
             try:
@@ -256,6 +259,13 @@ class LocalLLMService:
                     current_time = time.time()
                     elapsed_time = current_time - start_time
                     chunk_interval = current_time - last_chunk_time
+                    
+                    # Check if heartbeat needs to be sent
+                    if current_time - last_heartbeat_time >= heartbeat_interval:
+                        logger.info(f"[STREAM_DEBUG] Sending heartbeat after {current_time - last_heartbeat_time:.2f}s inactivity")
+                        yield b": heartbeat\n\n"  # SSE comment line as heartbeat, frontend will ignore this line
+                        last_heartbeat_time = current_time
+                    
                     chunk_count += 1
                     
                     logger.info(f"[STREAM_DEBUG] Received chunk #{chunk_count} after {elapsed_time:.2f}s (interval: {chunk_interval:.2f}s)")
@@ -287,8 +297,32 @@ class LocalLLMService:
                         content_length = len(content) if content else 0
                         logger.info(f"[STREAM_DEBUG] Sending chunk #{chunk_count}, content length: {content_length}, elapsed: {elapsed_time:.2f}s")
                         yield f"data: {data_str}\n\n".encode('utf-8')
+                        last_heartbeat_time = current_time  # Reset heartbeat time
                     else:
                         logger.warning(f"[STREAM_DEBUG] Parsed response data is None, skipping chunk #{chunk_count}")
+                
+                # Handle the case where the iterator is empty, ensure a thinking message is sent before completion
+                current_time = time.time()
+                if chunk_count == 0 and current_time - start_time > heartbeat_interval:
+                    logger.info("[STREAM_DEBUG] No chunks received yet, sending thinking message")
+                    thinking_message = {
+                        "id": str(uuid.uuid4()),
+                        "object": "chat.completion.chunk",
+                        "created": int(datetime.now().timestamp()),
+                        "model": "models/lpm",
+                        "system_fingerprint": None,
+                        "choices": [
+                            {
+                                "index": 0,
+                                "delta": {
+                                    "content": ""  # Empty content won't affect frontend display
+                                },
+                                "finish_reason": None
+                            }
+                        ]
+                    }
+                    data_str = json.dumps(thinking_message)
+                    yield f"data: {data_str}\n\n".encode('utf-8')
                     
             except Exception as e:
                 current_time = time.time()
