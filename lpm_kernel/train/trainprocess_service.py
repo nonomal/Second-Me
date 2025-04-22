@@ -76,10 +76,6 @@ class TrainProcessService:
             self.model_name = current_model_name
             # Create new progress instance with updated progress file name
             self.progress = TrainProgressHolder(current_model_name)
-            
-        # Get is_cot from TrainingParamsManager
-        training_params = TrainingParamsManager.get_latest_training_params()
-        self.is_cot = training_params.get("is_cot", False)
 
     def list_documents(self):
         """List all documents"""
@@ -307,7 +303,8 @@ class TrainProcessService:
             self._prepare_l2_data()
 
             # Use data from l2_data dictionary
-            L2Generator(is_cot=self.is_cot).gen_preference_data(                
+            training_params = TrainingParamsManager.get_latest_training_params()
+            L2Generator(is_cot=training_params.get("is_cot", False)).gen_preference_data(                
                     self.l2_data["notes"],
                     self.l2_data["basic_info"],
                     self.l2_data["data_output_base_dir"],
@@ -335,9 +332,11 @@ class TrainProcessService:
             # Get or prepare L2 data
             self._prepare_l2_data()
 
+            # Get training parameters
+            training_params = TrainingParamsManager.get_latest_training_params()
             # Use data from l2_data dictionary
             l2_generator = L2Generator(
-                data_path=os.path.join(os.getcwd(), "resources"), is_cot=self.is_cot
+                data_path=os.path.join(os.getcwd(), "resources"), is_cot=training_params.get("is_cot", False)
                 )  
             l2_generator.gen_selfqa_data(
                     self.l2_data["notes"],
@@ -385,8 +384,10 @@ class TrainProcessService:
             # Get or prepare L2 data
             self._prepare_l2_data()
 
+            # Get training parameters
+            training_params = TrainingParamsManager.get_latest_training_params()
             # Use data from l2_data dictionary
-            l2_generator = L2Generator(data_path=os.path.join(os.getcwd(), "resources"), is_cot=self.is_cot)
+            l2_generator = L2Generator(data_path=os.path.join(os.getcwd(), "resources"), is_cot=training_params.get("is_cot", False))
             l2_generator.gen_diversity_data(
                 self.l2_data["notes"],
                 self.l2_data["basic_info"],
