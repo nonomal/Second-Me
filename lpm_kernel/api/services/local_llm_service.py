@@ -254,32 +254,47 @@ class LocalLLMService:
             
             logger.info(f"[STREAM_DEBUG] Starting stream response at {start_time}")
             
+            # Using iterator to support both heartbeat and content flow
+            chunk_iterator = iter(response_iter)
+            
             try:
-                for chunk in response_iter:
+                while True:
                     current_time = time.time()
                     elapsed_time = current_time - start_time
-                    chunk_interval = current_time - last_chunk_time
                     
-                    # Check if heartbeat needs to be sent
+                    # First check if heartbeat needs to be sent
                     if current_time - last_heartbeat_time >= heartbeat_interval:
                         logger.info(f"[STREAM_DEBUG] Sending heartbeat after {current_time - last_heartbeat_time:.2f}s inactivity")
                         yield b": heartbeat\n\n"  # SSE comment line as heartbeat, frontend will ignore this line
                         last_heartbeat_time = current_time
+
+                    # Try to get a chunk from iterator with timeout protection
+                    try:
+                        # This is a non-blocking check for the next chunk
+                        chunk = next(chunk_iterator, None)
+                        # If we reach here, we have a new chunk to process
+                    except StopIteration:
+                        # Iterator is exhausted, send final message
+                        logger.info(f"[STREAM_DEBUG] Iterator exhausted after {elapsed_time:.2f}s")
+                        break
                     
+                    # If no chunk is available, send heartbeat and continue
+                    if chunk is None:
+                        # Short sleep to prevent CPU spinning
+                        time.sleep(0.01)
+                        continue
+                    
+                    # Process the received chunk
                     chunk_count += 1
-                    
+                    chunk_interval = current_time - last_chunk_time
                     logger.info(f"[STREAM_DEBUG] Received chunk #{chunk_count} after {elapsed_time:.2f}s (interval: {chunk_interval:.2f}s)")
                     last_chunk_time = current_time
-                    
-                    if chunk is None:
-                        logger.warning("Received None chunk in stream, skipping")
-                        continue
                         
                     # Check if this is the done marker for custom format
                     if chunk == "[DONE]":
                         logger.info(f"[STREAM_DEBUG] Received [DONE] marker after {elapsed_time:.2f}s")
                         yield b"data: [DONE]\n\n"
-                        return  # Use return instead of break to ensure [DONE] in finally won't be executed
+                        return  # Use return to terminate the generator
                     
                     # Handle OpenAI error format directly
                     if isinstance(chunk, dict) and "error" in chunk:
@@ -301,9 +316,12 @@ class LocalLLMService:
                     else:
                         logger.warning(f"[STREAM_DEBUG] Parsed response data is None, skipping chunk #{chunk_count}")
                 
-                # Handle the case where the iterator is empty, ensure a thinking message is sent before completion
+                # Reached end of iterator normally
                 current_time = time.time()
-                if chunk_count == 0 and current_time - start_time > heartbeat_interval:
+                elapsed_time = current_time - start_time
+                
+                # Handle the case where the iterator is empty, ensure a thinking message is sent before completion
+                if chunk_count == 0:
                     logger.info("[STREAM_DEBUG] No chunks received yet, sending thinking message")
                     thinking_message = {
                         "id": str(uuid.uuid4()),
