@@ -129,26 +129,7 @@ def generate_l1_from_l0() -> L1GenerationResult:
         logger.info(f"chunk_topics content: {chunk_topics}")
 
         # 3.3 Generate features for each cluster and merge them
-        shades = []
-        if clusters and "clusterList" in clusters:
-            for cluster in clusters.get("clusterList", []):
-                cluster_memory_ids = [
-                    str(m.get("memoryId")) for m in cluster.get("memoryList", [])
-                ]
-                logger.info(
-                    f"Processing cluster with {len(cluster_memory_ids)} memories"
-                )
-
-                cluster_notes = [
-                    note for note in notes_list if str(note.id) in cluster_memory_ids
-                ]
-                if cluster_notes:
-                    shade = l1_generator.gen_shade_for_cluster([], cluster_notes, [])
-                    if shade:
-                        shades.append(shade)
-                        logger.info(
-                            f"Generated shade for cluster: {shade.name if hasattr(shade, 'name') else 'Unknown'}"
-                        )
+        shades = generate_shades(clusters, l1_generator, notes_list)
 
         logger.info(f"Generated {len(shades)} shades")
         merged_shades = l1_generator.merge_shades(shades)
@@ -179,6 +160,33 @@ def generate_l1_from_l0() -> L1GenerationResult:
     except Exception as e:
         logger.error(f"Error in L1 generation: {str(e)}", exc_info=True)
         raise
+
+
+def generate_shades(clusters, l1_generator, notes_list):
+    shades = []
+    if clusters and "clusterList" in clusters:
+        for cluster in clusters.get("clusterList", []):
+            cluster_memory_ids = [
+                str(m.get("memoryId")) for m in cluster.get("memoryList", [])
+            ]
+            logger.info(
+                f"Processing cluster with {len(cluster_memory_ids)} memories"
+            )
+
+            cluster_notes = [
+                note for note in notes_list if str(note.id) in cluster_memory_ids
+            ]
+            if cluster_notes:
+                shade = l1_generator.gen_shade_for_cluster([], cluster_notes, [])
+                if shade:
+                    shades.append(shade)
+                    logger.info(
+                        f"Generated shade for cluster: {shade.name if hasattr(shade, 'name') else 'Unknown'}"
+                    )
+    return shades
+
+    
+
 
 
 def store_status_bio(status_bio: Bio) -> None:

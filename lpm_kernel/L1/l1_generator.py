@@ -1,7 +1,7 @@
 from copy import deepcopy
 from datetime import datetime
 from enum import Enum
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import logging
 import os
 
@@ -379,7 +379,7 @@ class L1Generator:
         old_memory_list: List[Note],
         new_memory_list: List[Note],
         shade_info_list: List[ShadeInfo],
-    ):
+    )-> Optional[ShadeInfo]:
         """Generates shade for a cluster.
         
         Args:
