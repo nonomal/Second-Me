@@ -1183,7 +1183,13 @@ class TrainProcessService:
             if file_path.endswith(".json"):
                 try:
                     with open(file_path, 'r', encoding='utf-8') as f:
-                        return json.load(f)
+                        content = json.load(f)
+                    
+                    # Add file_type field to be consistent with parquet files
+                    return {
+                        "file_type": "json",
+                        "content": content
+                    }
                 except Exception as e:
                     logger.error(f"Error reading JSON file {file_path}: {str(e)}")
                     return None
