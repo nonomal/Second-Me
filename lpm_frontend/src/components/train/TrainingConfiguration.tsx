@@ -14,6 +14,7 @@ import ColumnArrowIcon from '../svgs/ColumnArrowIcon';
 import DoneIcon from '../svgs/DoneIcon';
 import ThinkingModelModal from '../ThinkingModelModal';
 import { useModelConfigStore } from '@/store/useModelConfigStore';
+import classNames from 'classnames';
 
 interface BaseModelOption {
   value: string;
@@ -64,6 +65,7 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
 }) => {
   const [disabledChangeParams, setDisabledChangeParams] = useState<boolean>(false);
   const [openThinkingModel, setOpenThinkingModel] = useState<boolean>(false);
+  const [showThinkingWarning, setShowThinkingWarning] = useState<boolean>(false);
   const thinkingModelConfig = useModelConfigStore((state) => state.thinkingModelConfig);
 
   const thinkingConfigComplete = useMemo(() => {
@@ -407,16 +409,30 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                     ? nowTrainingParams.is_cot
                     : trainingParams.is_cot
                 }
-                disabled={disabledChangeParams || !thinkingConfigComplete}
+                disabled={disabledChangeParams}
                 onChange={(e) => {
                   e.stopPropagation();
+
+                  if (!thinkingConfigComplete) {
+                    setShowThinkingWarning(true);
+                    setTimeout(() => setShowThinkingWarning(false), 2000);
+
+                    return;
+                  }
 
                   updateTrainingParams({ ...trainingParams, is_cot: e.target.checked });
                 }}
               />
               <div
-                className="text-sm font-medium px-4 py-2 bg-white border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
-                onClick={() => setOpenThinkingModel(true)}
+                className={classNames(
+                  `text-sm font-medium px-4 py-2 bg-white border rounded-md cursor-pointer transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]`,
+                  showThinkingWarning
+                    ? 'border-red-500 text-red-600 bg-red-50 shadow-[0_0_0_2px_rgba(220,38,38,0.4)] animate-pulse'
+                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                )}
+                onClick={() => {
+                  setOpenThinkingModel(true);
+                }}
               >
                 Thinking Model
               </div>
