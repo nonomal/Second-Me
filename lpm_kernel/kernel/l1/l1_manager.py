@@ -3,7 +3,7 @@ from typing import List, Optional
 
 import numpy as np
 
-from lpm_kernel.L1.bio import Note, Chunk, Bio
+from lpm_kernel.L1.bio import Note, Chunk, Bio, ShadeInfo, ShadeMergeInfo
 from lpm_kernel.L1.l1_generator import L1Generator
 from lpm_kernel.common.repository.database_session import DatabaseSession
 from lpm_kernel.file_data.document_service import document_service
