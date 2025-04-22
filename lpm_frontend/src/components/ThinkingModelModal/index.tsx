@@ -1,7 +1,7 @@
 import type { IThinkingModelParams } from '@/service/modelConfig';
 import { updateThinkingConfig } from '@/service/modelConfig';
 import { useModelConfigStore } from '@/store/useModelConfigStore';
-import { Input, Modal } from 'antd';
+import { Input, message, Modal } from 'antd';
 import { useEffect, useState } from 'react';
 
 interface IProps {
@@ -30,6 +30,17 @@ const ThinkingModelModal = (props: IProps) => {
   }, [thinkingModelConfig]);
 
   const handleUpdate = () => {
+    const thinkingConfigComplete =
+      !!thinkingModelParams.thinking_model_name &&
+      !!thinkingModelParams.thinking_api_key &&
+      !!thinkingModelParams.thinking_endpoint;
+
+    if (!thinkingConfigComplete) {
+      message.error('Please fill in all thinking model configuration fields');
+
+      return;
+    }
+
     updateThinkingConfig(thinkingModelParams)
       .then((res) => {
         if (res.data.code == 0) {

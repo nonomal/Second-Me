@@ -13,6 +13,7 @@ import CustomModelIcon from '../svgs/CustomModelIcon';
 import ColumnArrowIcon from '../svgs/ColumnArrowIcon';
 import DoneIcon from '../svgs/DoneIcon';
 import ThinkingModelModal from '../ThinkingModelModal';
+import { useModelConfigStore } from '@/store/useModelConfigStore';
 
 interface BaseModelOption {
   value: string;
@@ -63,6 +64,15 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
 }) => {
   const [disabledChangeParams, setDisabledChangeParams] = useState<boolean>(false);
   const [openThinkingModel, setOpenThinkingModel] = useState<boolean>(false);
+  const thinkingModelConfig = useModelConfigStore((state) => state.thinkingModelConfig);
+
+  const thinkingConfigComplete = useMemo(() => {
+    return (
+      !!thinkingModelConfig.thinking_model_name &&
+      !!thinkingModelConfig.thinking_api_key &&
+      !!thinkingModelConfig.thinking_endpoint
+    );
+  }, [thinkingModelConfig]);
 
   const trainButtonText = useMemo(() => {
     return isTraining
@@ -397,7 +407,7 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                     ? nowTrainingParams.is_cot
                     : trainingParams.is_cot
                 }
-                disabled={disabledChangeParams}
+                disabled={disabledChangeParams || !thinkingConfigComplete}
                 onChange={(e) => {
                   e.stopPropagation();
 
