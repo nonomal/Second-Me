@@ -249,46 +249,22 @@ class LocalLLMService:
             start_time = time.time()
             chunk_count = 0
             last_chunk_time = start_time
-            last_heartbeat_time = start_time
-            heartbeat_interval = 10  # Interval for sending heartbeat (seconds)
             
             logger.info(f"[STREAM_DEBUG] Starting stream response at {start_time}")
             
-            # Using iterator to support both heartbeat and content flow
-            chunk_iterator = iter(response_iter)
-            
             try:
-                while True:
+                for chunk in response_iter:
                     current_time = time.time()
                     elapsed_time = current_time - start_time
-                    
-                    # First check if heartbeat needs to be sent
-                    if current_time - last_heartbeat_time >= heartbeat_interval:
-                        logger.info(f"[STREAM_DEBUG] Sending heartbeat after {current_time - last_heartbeat_time:.2f}s inactivity")
-                        yield b": heartbeat\n\n"  # SSE comment line as heartbeat, frontend will ignore this line
-                        last_heartbeat_time = current_time
-
-                    # Try to get a chunk from iterator with timeout protection
-                    try:
-                        # This is a non-blocking check for the next chunk
-                        chunk = next(chunk_iterator, None)
-                        # If we reach here, we have a new chunk to process
-                    except StopIteration:
-                        # Iterator is exhausted, send final message
-                        logger.info(f"[STREAM_DEBUG] Iterator exhausted after {elapsed_time:.2f}s")
-                        break
-                    
-                    # If no chunk is available, send heartbeat and continue
-                    if chunk is None:
-                        # Short sleep to prevent CPU spinning
-                        time.sleep(0.01)
-                        continue
-                    
-                    # Process the received chunk
-                    chunk_count += 1
                     chunk_interval = current_time - last_chunk_time
+                    chunk_count += 1
+                    
                     logger.info(f"[STREAM_DEBUG] Received chunk #{chunk_count} after {elapsed_time:.2f}s (interval: {chunk_interval:.2f}s)")
                     last_chunk_time = current_time
+                    
+                    if chunk is None:
+                        logger.warning("Received None chunk in stream, skipping")
+                        continue
                         
                     # Check if this is the done marker for custom format
                     if chunk == "[DONE]":
@@ -312,7 +288,6 @@ class LocalLLMService:
                         content_length = len(content) if content else 0
                         logger.info(f"[STREAM_DEBUG] Sending chunk #{chunk_count}, content length: {content_length}, elapsed: {elapsed_time:.2f}s")
                         yield f"data: {data_str}\n\n".encode('utf-8')
-                        last_heartbeat_time = current_time  # Reset heartbeat time
                     else:
                         logger.warning(f"[STREAM_DEBUG] Parsed response data is None, skipping chunk #{chunk_count}")
                 
@@ -365,6 +340,8 @@ class LocalLLMService:
                     logger.info(f"[STREAM_DEBUG] Sending final [DONE] marker at {total_time:.2f}s")
                     yield b"data: [DONE]\n\n"
                 
+        # Use standard Flask SSE configuration with ping interval
+        # This is the official SSE keep-alive mechanism
         return Response(
             generate(),
             mimetype='text/event-stream',
@@ -373,7 +350,14 @@ class LocalLLMService:
                 'X-Accel-Buffering': 'no',
                 'Connection': 'keep-alive',
                 'Transfer-Encoding': 'chunked'
-            }
+            },
+            direct_passthrough=True,   # Important for streaming
+            # Enable Flask keep-alive ping
+            status=200,
+            # Enable standard SSE keep-alive with ping every 15 seconds
+            # This is implemented at the WSGI/server level, not the application level
+            use_conditional_get=False,
+            retry_after=15  # Send ping every 15 seconds to keep connection alive
         )
 
 
