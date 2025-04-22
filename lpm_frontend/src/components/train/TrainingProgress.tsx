@@ -1,4 +1,7 @@
 import type { TrainProgress } from '@/service/train';
+import TrainExposureModel from '../trainExposureModel';
+import { useState } from 'react';
+import classNames from 'classnames';
 
 interface TrainingProgressProps {
   trainingProgress: TrainProgress;
@@ -16,6 +19,8 @@ const descriptionMap = [
 const TrainingProgress = (props: TrainingProgressProps) => {
   const { trainingProgress, status } = props;
 
+  const [stepName, setStepName] = useState('');
+
   const formatUnderscoreToName = (_str: string) => {
     const str = _str || '';
 
@@ -24,6 +29,13 @@ const TrainingProgress = (props: TrainingProgressProps) => {
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
   };
+
+  const formatToUnderscore = (str: string): string => {
+    if (!str) return '';
+
+    return str.toLowerCase().replace(/\s+/g, '_');
+  };
+
   const trainingStages = trainingProgress.stages.map((stage, index) => {
     return { ...stage, description: descriptionMap[index] };
   });
@@ -220,12 +232,21 @@ const TrainingProgress = (props: TrainingProgressProps) => {
                               )}
                             </div>
                             <span
-                              className={`text-xs ${
+                              className={classNames(
+                                'text-xs',
                                 stage.current_step &&
-                                formatUnderscoreToName(stage.current_step) == step.name
+                                  formatUnderscoreToName(stage.current_step) == step.name
                                   ? 'text-blue-600 font-medium'
-                                  : 'text-gray-600'
-                              }`}
+                                  : 'text-gray-600',
+                                step.completed ? 'hover:text-green-600 cursor-pointer' : ''
+                              )}
+                              onClick={() => {
+                                if (!step.completed) {
+                                  return;
+                                }
+
+                                setStepName(formatToUnderscore(step.name));
+                              }}
                             >
                               {step.name}
                             </span>
@@ -242,6 +263,8 @@ const TrainingProgress = (props: TrainingProgressProps) => {
           </div>
         </div>
       </div>
+
+      <TrainExposureModel handleClose={() => setStepName('')} stepName={stepName} />
     </div>
   );
 };

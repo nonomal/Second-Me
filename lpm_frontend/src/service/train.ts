@@ -35,6 +35,11 @@ interface TrainStage {
   current_step: string | null;
 }
 
+interface TrainStepOutput {
+  content: any;
+  file_type: string;
+}
+
 export type StageName =
   | 'downloading_the_base_model'
   | 'activating_the_memory_matrix'
@@ -153,5 +158,12 @@ export const checkCudaAvailability = () => {
   >({
     method: 'get',
     url: '/api/kernel2/cuda/available'
+  });
+};
+
+export const getStepOutputContent = (stepName: string) => {
+  return Request<CommonResponse<TrainStepOutput>>({
+    method: 'get',
+    url: `/api/trainprocess/step_output_content?step_name=${stepName}`
   });
 };
