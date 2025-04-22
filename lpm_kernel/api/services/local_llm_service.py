@@ -246,30 +246,30 @@ class LocalLLMService:
 
     def handle_stream_response(self, response_iter: Iterator[Any]) -> Response:
         """Handle streaming response from the LLM server"""
-        # 创建一个队列，用于线程间通信
+        # Create a queue for thread communication
         message_queue = queue.Queue()
-        # 创建事件标志，用于通知模型处理已完成
+        # Create an event flag to notify when model processing is complete
         completion_event = threading.Event()
-        # 创建变量，用于跟踪首次收到响应后是否需要心跳
+        # Create a variable to track if heartbeat is needed after first response
         first_response_received = False
         
         def heartbeat_thread():
-            """发送心跳的线程函数"""
+            """Thread function for sending heartbeats"""
             start_time = time.time()
-            heartbeat_interval = 10  # 10秒发送一次心跳
+            heartbeat_interval = 10  # Send heartbeat every 10 seconds
             heartbeat_count = 0
             
             logger.info("[STREAM_DEBUG] Heartbeat thread started")
             
             try:
-                # 发送初始心跳
+                # Send initial heartbeat
                 message_queue.put((b": initial heartbeat\n\n", "[INITIAL_HEARTBEAT]"))
                 last_heartbeat_time = time.time()
                 
                 while not completion_event.is_set():
                     current_time = time.time()
                     
-                    # 检查是否需要发送心跳
+                    # Check if we need to send a heartbeat
                     if current_time - last_heartbeat_time >= heartbeat_interval:
                         heartbeat_count += 1
                         elapsed = current_time - start_time
@@ -277,7 +277,7 @@ class LocalLLMService:
                         message_queue.put((f": heartbeat #{heartbeat_count}\n\n".encode('utf-8'), "[HEARTBEAT]"))
                         last_heartbeat_time = current_time
                     
-                    # 短暂睡眠，避免CPU空转
+                    # Short sleep to prevent CPU spinning
                     time.sleep(0.1)
                 
                 logger.info(f"[STREAM_DEBUG] Heartbeat thread stopping after {heartbeat_count} heartbeats")
@@ -286,7 +286,7 @@ class LocalLLMService:
                 message_queue.put((f"data: {{\"error\": \"Heartbeat error: {str(e)}\"}}\n\n".encode('utf-8'), "[ERROR]"))
         
         def model_response_thread():
-            """处理模型响应的线程函数"""
+            """Thread function for processing model responses"""
             chunk = None
             start_time = time.time()
             chunk_count = 0
@@ -294,7 +294,7 @@ class LocalLLMService:
             try:
                 logger.info("[STREAM_DEBUG] Model response thread started")
                 
-                # 处理模型响应
+                # Process model responses
                 for chunk in response_iter:
                     current_time = time.time()
                     elapsed_time = current_time - start_time
@@ -306,13 +306,13 @@ class LocalLLMService:
                         logger.warning("[STREAM_DEBUG] Received None chunk, skipping")
                         continue
                     
-                    # 检查是否是结束标记
+                    # Check if it's an end marker
                     if chunk == "[DONE]":
                         logger.info(f"[STREAM_DEBUG] Received [DONE] marker after {elapsed_time:.2f}s")
                         message_queue.put((b"data: [DONE]\n\n", "[DONE]"))
                         break
                     
-                    # 处理错误响应
+                    # Handle error responses
                     if isinstance(chunk, dict) and "error" in chunk:
                         logger.warning(f"[STREAM_DEBUG] Received error response: {chunk}")
                         data_str = json.dumps(chunk)
@@ -320,7 +320,7 @@ class LocalLLMService:
                         message_queue.put((b"data: [DONE]\n\n", "[DONE]"))
                         break
                     
-                    # 处理正常响应
+                    # Handle normal responses
                     response_data = self._parse_response_chunk(chunk)
                     if response_data:
                         data_str = json.dumps(response_data)
@@ -331,7 +331,7 @@ class LocalLLMService:
                     else:
                         logger.warning(f"[STREAM_DEBUG] Parsed response data is None for chunk #{chunk_count}")
                 
-                # 处理没有收到响应的情况
+                # Handle the case where no responses were received
                 if chunk_count == 0:
                     logger.info("[STREAM_DEBUG] No chunks received, sending empty message")
                     thinking_message = {
@@ -353,7 +353,7 @@ class LocalLLMService:
                     data_str = json.dumps(thinking_message)
                     message_queue.put((f"data: {data_str}\n\n".encode('utf-8'), "[THINKING]"))
                 
-                # 模型处理完成，发送结束标记
+                # Model processing is complete, send end marker
                 if chunk != "[DONE]":
                     logger.info(f"[STREAM_DEBUG] Sending final [DONE] marker after {elapsed_time:.2f}s")
                     message_queue.put((b"data: [DONE]\n\n", "[DONE]"))
@@ -363,43 +363,43 @@ class LocalLLMService:
                 message_queue.put((f"data: {{\"error\": \"{str(e)}\"}}\n\n".encode('utf-8'), "[ERROR]"))
                 message_queue.put((b"data: [DONE]\n\n", "[DONE]"))
             finally:
-                # 设置完成事件，通知心跳线程停止
+                # Set completion event to notify heartbeat thread to stop
                 completion_event.set()
                 logger.info(f"[STREAM_DEBUG] Model response thread completed with {chunk_count} chunks")
         
         def generate():
-            """生成响应的主生成器函数"""
-            # 启动心跳线程
+            """Main generator function for generating responses"""
+            # Start heartbeat thread
             heart_thread = threading.Thread(target=heartbeat_thread, daemon=True)
             heart_thread.start()
             
-            # 启动模型响应处理线程
+            # Start model response processing thread
             model_thread = threading.Thread(target=model_response_thread, daemon=True)
             model_thread.start()
             
             try:
-                # 从队列获取消息并返回给客户端
+                # Get messages from queue and return to client
                 while True:
                     try:
-                        # 使用短超时获取消息，避免阻塞
+                        # Use short timeout to get message, prevent blocking
                         message, message_type = message_queue.get(timeout=0.1)
                         logger.debug(f"[STREAM_DEBUG] Yielding message type: {message_type}")
                         yield message
                         
-                        # 如果收到结束标记，退出循环
+                        # If end marker is received, exit loop
                         if message_type == "[DONE]":
                             logger.info("[STREAM_DEBUG] Received [DONE] marker, ending generator")
                             break
                     except queue.Empty:
-                        # 队列为空，继续尝试获取
-                        # 检查模型线程是否已完成但没有发送[DONE]
+                        # Queue is empty, continue trying to get message
+                        # Check if model thread has completed but didn't send [DONE]
                         if completion_event.is_set() and not model_thread.is_alive():
                             logger.warning("[STREAM_DEBUG] Model thread completed without [DONE], ending generator")
                             yield b"data: [DONE]\n\n"
                             break
                         pass
             except GeneratorExit:
-                # 客户端关闭连接
+                # Client closed connection
                 logger.info("[STREAM_DEBUG] Client closed connection (GeneratorExit)")
                 completion_event.set()
             except Exception as e:
@@ -411,16 +411,16 @@ class LocalLLMService:
                     pass
                 completion_event.set()
             finally:
-                # 确保设置完成事件
+                # Ensure completion event is set
                 completion_event.set()
-                # 等待线程完成
+                # Wait for threads to complete
                 if heart_thread.is_alive():
                     heart_thread.join(timeout=1.0)
                 if model_thread.is_alive():
                     model_thread.join(timeout=1.0)
                 logger.info("[STREAM_DEBUG] Generator completed")
         
-        # 返回响应
+        # Return response
         return Response(
             generate(),
             mimetype='text/event-stream',
