@@ -192,12 +192,13 @@ def convert_from_shades_to_merge_info(shades: List[ShadeInfo]) -> List[ShadeMerg
         id=shade.id,
         name=shade.name,
         aspect=shade.aspect,
-        description=shade.description,
-        content=shade.content,
+        icon=shade.icon,
         desc_third_view=shade.desc_third_view,
-        content_third_view=shade.content_third_view
-    ) for shade in shades]  
-
+        content_third_view=shade.content_third_view,
+        desc_second_view=shade.desc_second_view,
+        content_second_view=shade.content_second_view,
+        cluster_info=None
+    ) for shade in shades]
 
 
 def store_status_bio(status_bio: Bio) -> None:
