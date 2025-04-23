@@ -1186,10 +1186,10 @@ class TrainProcessService:
                         content = json.load(f)
                     
                     # Add file_type field to be consistent with parquet files
-                    return {
+                    return json.dumps({
                         "file_type": "json",
                         "content": content
-                    }
+                    })
                 except Exception as e:
                     logger.error(f"Error reading JSON file {file_path}: {str(e)}")
                     return None
@@ -1220,13 +1220,13 @@ class TrainProcessService:
                     records = json.loads(json_str)
                     
                     # Add file metadata and full content
-                    return {
+                    return json.dumps({
                         "file_type": "parquet",
                         "rows": len(df),
                         "columns": list(df.columns),
                         "size_bytes": os.path.getsize(file_path),
                         "content": records
-                    }
+                    }, cls=NumpyEncoder)
                 except Exception as e:
                     logger.error(f"Error reading parquet file {file_path}: {str(e)}")
                     return None
