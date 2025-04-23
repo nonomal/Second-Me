@@ -4,11 +4,11 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import CreateSecondMe from '@/app/home/components/Create';
 import dynamic from 'next/dynamic';
-import { getUploadCount } from '@/service/info';
+import type { ILoadInfo } from '@/service/info';
+import { getCurrentInfo, getUploadCount } from '@/service/info';
 import { ROUTER_PATH } from '@/utils/router';
 import Footer from './components/Footer';
 import SocialMedia from './components/SocialMedia';
-import { useLoadInfoStore } from '@/store/useLoadInfoStore';
 import { message } from 'antd';
 
 const NetworkSphere = dynamic(() => import('@/components/NetworkSphere'), {
@@ -23,8 +23,21 @@ export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
   const [contentVisible, setContentVisible] = useState(false);
 
-  const loadInfo = useLoadInfoStore((state) => state.loadInfo);
-  const firstLoaded = useLoadInfoStore((state) => state.firstLoaded);
+  const [loading, setLoading] = useState(true);
+  const [loadInfo, setLoadInfo] = useState<ILoadInfo | null>(null);
+
+  useEffect(() => {
+    getCurrentInfo()
+      .then((res) => {
+        if (res.data.code === 0) {
+          setLoadInfo(res.data.data);
+          localStorage.setItem('upload', JSON.stringify(res.data.data));
+        }
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
 
   useEffect(() => {
     setIsMounted(true);
@@ -115,7 +128,7 @@ export default function Home() {
           </div>
         </div>
 
-        {firstLoaded && (
+        {!loading && (
           <div
             className={`transition-opacity duration-700 ease-in-out delay-[300ms] ${contentVisible ? 'opacity-100' : 'opacity-0'}`}
           >
