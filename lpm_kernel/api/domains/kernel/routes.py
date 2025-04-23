@@ -38,7 +38,7 @@ kernel_bp = Blueprint("kernel", __name__, url_prefix="/api/kernel")
 l1_generator = L1Generator()
 
 
-def _store_version(
+def __store_version(
         session, new_version_number: int, description: str = None
 ) -> L1Version:
     """Store L1 version information"""
@@ -52,7 +52,7 @@ def _store_version(
     return version
 
 
-def _store_bio(session, new_version: int, bio_data: Bio) -> None:
+def __store_bio(session, new_version: int, bio_data: Bio) -> None:
     """Store Bio data"""
     if not bio_data:
         logger.warning("No bio data found")
@@ -69,7 +69,7 @@ def _store_bio(session, new_version: int, bio_data: Bio) -> None:
     session.add(bio_record)
 
 
-def _store_shades(session, new_version: int, shades_list: list) -> None:
+def __store_shades(session, new_version: int, shades_list: list) -> None:
     """Store Shades data"""
     if not shades_list:
         logger.warning("No shades data found")
@@ -90,7 +90,7 @@ def _store_shades(session, new_version: int, shades_list: list) -> None:
         session.add(shade_data)
 
 
-def _store_clusters(session, new_version: int, cluster_list: list) -> None:
+def __store_clusters(session, new_version: int, cluster_list: list) -> None:
     """Store Clusters data"""
     if not cluster_list:
         logger.warning("No clusters data found")
@@ -107,7 +107,7 @@ def _store_clusters(session, new_version: int, cluster_list: list) -> None:
         session.add(cluster_data)
 
 
-def _store_chunk_topics(session, new_version: int, chunk_topics_dict: dict) -> None:
+def __store_chunk_topics(session, new_version: int, chunk_topics_dict: dict) -> None:
     """Store Chunk Topics data"""
     if not isinstance(chunk_topics_dict, dict):
         logger.warning(f"Invalid chunk_topics format: {type(chunk_topics_dict)}")
@@ -140,21 +140,21 @@ def store_l1_data(session, l1_data: L1GenerationResult) -> int:
         logger.info(f"Creating new version: {new_version_number}")
 
         # 2. Create new version record
-        version = _store_version(session, new_version_number)
+        version = __store_version(session, new_version_number)
 
         # 3. Store Bio data
-        _store_bio(session, new_version_number, l1_data.bio)
+        __store_bio(session, new_version_number, l1_data.bio)
 
         # 4. Store Shades data
         if hasattr(l1_data.bio, "shades_list"):
-            _store_shades(session, new_version_number, l1_data.bio.shades_list)
+            __store_shades(session, new_version_number, l1_data.bio.shades_list)
 
         # 5. Store Clusters data
         cluster_list = l1_data.clusters.get("clusterList", [])
-        _store_clusters(session, new_version_number, cluster_list)
+        __store_clusters(session, new_version_number, cluster_list)
 
         # 6. Store Chunk Topics data
-        _store_chunk_topics(session, new_version_number, l1_data.chunk_topics)
+        __store_chunk_topics(session, new_version_number, l1_data.chunk_topics)
 
         # 7. Commit transaction
         session.commit()
