@@ -160,6 +160,7 @@ docker-build:
 
 docker-up:
 	$(DOCKER_COMPOSE_CMD) up -d
+	bash -c 'source scripts/docker_backend_check.sh'
 
 docker-down:
 	$(DOCKER_COMPOSE_CMD) down
