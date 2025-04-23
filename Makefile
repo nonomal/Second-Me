@@ -160,6 +160,7 @@ docker-build:
 
 docker-up:
 	$(DOCKER_COMPOSE_CMD) up -d
+	bash -c 'source scripts/docker_backend_check.sh'
 
 docker-down:
 	$(DOCKER_COMPOSE_CMD) down
@@ -175,6 +176,7 @@ docker-restart-backend:
 	$(DOCKER_COMPOSE_CMD) rm -f backend
 	$(DOCKER_COMPOSE_CMD) build backend || { echo "$(COLOR_RED)❌ Backend build failed! Aborting operation...$(COLOR_RESET)"; exit 1; }
 	$(DOCKER_COMPOSE_CMD) up -d backend
+	bash -c 'source scripts/docker_backend_check.sh'
 
 docker-restart-frontend:
 	$(DOCKER_COMPOSE_CMD) stop frontend
@@ -187,6 +189,7 @@ docker-restart-all:
 	$(DOCKER_COMPOSE_CMD) rm -f
 	$(DOCKER_COMPOSE_CMD) build || { echo "$(COLOR_RED)❌ Build failed! Aborting operation...$(COLOR_RESET)"; exit 1; }
 	$(DOCKER_COMPOSE_CMD) up -d
+	bash -c 'source scripts/docker_backend_check.sh'
 
 install:
 	poetry install
