@@ -223,7 +223,6 @@ class TrainProcessService:
             logger.info("Successfully generated L1 data and biography")
 
             # Store L1 data
-            # self._store_l1_data(l1_data)
             with DatabaseSession.session() as session:
                 store_l1_data(session, l1_data)
 
