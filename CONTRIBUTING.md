@@ -18,23 +18,54 @@ The Second Me community welcomes various forms of contributions, including code,
   
 ## Here is a checklist to prepare and submit your PR (pull request).
 * Create your own GitHub branch by forking Second Me
-* Checkout [README]() for how to deploy Second Me.
+* Checkout [README](README.md) for how to deploy Second Me.
 * Push changes to your personal fork.
 * Create a PR with a detailed description, if commit messages do not express themselves.
 * Submit PR for review and address all feedbacks.
 * Wait for merging (done by committers).
 
-## Development Workflow for External Contributors
+## Branch Management Strategy
 
-As an external contributor, you'll need to follow the fork-based workflow. This ensures a safe and organized way to contribute to the project.
+We follow a structured branching strategy to manage releases and contributions from both internal and external contributors.
 
-### 1. Fork the Repository
+### Branch Structure
+
+```
+master (stable version)
+    ^
+    |
+release/vX.Y.Z (release preparation branch)
+    ^
+    |
+develop (development integration branch)
+    ^
+    |
+feature/* (feature branches) / hotfix/* (hotfix branches)
+```
+
+## Development Workflow
+
+```
+                 hotfix/fix-bug
+                /       \
+master ---------+---------+-----+--- ... --> Stable Version
+                \               /
+                 \             /
+release/v1.0 -----+-----------+--- ... --> Release Version
+                     \         /
+                      \       /
+develop --------------+-----+---+--- ... --> Development Integration
+                     /       /
+                    /       /
+feature/new-feature +----------- ... --> Feature Development (from master)
+```
+
+### Step 1: Fork and Clone (External Contributors Only)
+If you're an external contributor, you need to fork the repository first:
+
 1. Visit https://github.com/Mindverse/Second-Me
 2. Click the "Fork" button in the top-right corner
-3. Select your GitHub account as the destination
-
-### 2. Clone Your Fork
-After forking, clone your fork to your local machine:
+3. Clone your fork to your local machine:
 ```bash
 cd working_dir
 # Replace USERNAME with your GitHub username
@@ -42,51 +73,39 @@ git clone git@github.com:USERNAME/Second-Me.git
 cd Second-Me
 ```
 
-### 3. Configure Upstream Remote
-To keep your fork up to date with the main repository:
+4. Configure upstream remote:
 ```bash
 # Add the upstream repository
 git remote add upstream git@github.com:Mindverse/Second-Me.git
 
 # Verify your remotes
 git remote -v
-# You should see:
-# origin    git@github.com:USERNAME/Second-Me.git (fetch)
-# origin    git@github.com:USERNAME/Second-Me.git (push)
-# upstream  git@github.com:Mindverse/Second-Me.git (fetch)
-# upstream  git@github.com:Mindverse/Second-Me.git (push)
 ```
 
-### 4. Keep Your Fork Updated
-Before creating a new feature branch, ensure your fork's main branch is up to date:
+### Step 2: Create a Feature Branch
+All contributors should create feature branches from the `master` branch:
+
 ```bash
-# Switch to main branch
-git checkout main
+# First, ensure you have the latest changes
+git fetch origin  # or upstream if you're working with a fork
 
-# Fetch upstream changes
-git fetch upstream
+# Checkout the master branch
+git checkout master
 
-# Rebase your main branch on top of upstream main
-git rebase upstream/main
+git pull
 
-# Optional: Update your fork on GitHub
-git push origin main
-```
-
-### 5. Create a Feature Branch
-Always create a new branch for your changes:
-```bash
-# Create and switch to a new branch
+# Create your feature branch from master
 git checkout -b feature/your-feature-name
 ```
 
-### 6. Make Your Changes
-Make your desired changes in the feature branch. Make sure to:
+### Step 3: Develop Your Feature
+- Make changes in your feature branch
+- Commit regularly with descriptive messages
 - Follow the project's coding style
 - Add tests if applicable
 - Update documentation as needed
 
-### 7. Commit Your Changes
+### Step 4: Commit Your Changes
 ```bash
 # Add your changes
 git add <filename>
@@ -96,49 +115,82 @@ git add <filename>
 git commit -m "feat: add new feature X"
 ```
 
-### 8. Update Your Feature Branch
+### Step 5: Update Your Branch Before Submitting
 Before submitting your PR, update your feature branch with the latest changes:
+
 ```bash
-# Fetch upstream changes
-git fetch upstream
+# Fetch latest changes
+git fetch origin  # or upstream if you're working with a fork
 
 # Rebase your feature branch
 git checkout feature/your-feature-name
-git rebase upstream/main
+git rebase origin/master  # or upstream/master for forked repos
 ```
 
-### 9. Push to Your Fork
+If you're an external contributor, you may need to push to your fork:
 ```bash
-# Push your feature branch to your fork
 git push origin feature/your-feature-name
 ```
 
-### 10. Create a Pull Request
-1. Visit your fork at `https://github.com/USERNAME/Second-Me`
+### Step 6: Create a Pull Request
+1. Visit the repository (or your fork)
 2. Click "Compare & Pull Request"
 3. Select:
    - Base repository: `Mindverse/Second-Me`
-   - Base branch: `main`
-   - Head repository: `USERNAME/Second-Me`
+   - Base branch: `develop` (all features and fixes go to develop first)
+   - Head repository: Your repository
    - Compare branch: `feature/your-feature-name`
 4. Fill in the PR template with:
    - Clear description of your changes
    - Any related issues
    - Testing steps if applicable
+   - Target version if applicable
 
-### 11. Review Process
-1. Maintainers will review your PR
-2. Address any feedback by:
-   - Making requested changes
-   - Pushing new commits to your feature branch
-   - The PR will automatically update
-3. Once approved, maintainers will merge your PR
+### Step 7: Address Review Feedback
+- Maintainers will review your PR
+- Address any feedback by making requested changes
+- Push new commits to your feature branch
+- Your PR will be updated automatically
 
-### 12. CI Checks
-- Automated checks will run on your PR
+### Step 8: PR Approval and Merge
 - All checks must pass before merging
-- If checks fail, click "Details" to see why
-- Fix any issues and push updates to your branch
+- Once approved, maintainers will merge your PR to the appropriate branch
+- Your contribution will be included in the next release cycle
+
+## Release Management
+
+The following describes how releases are managed by project maintainers:
+
+```
+                               PR Merge Flow
+                               |
+master -------------------------+------ ... --> Stable Version
+                               |
+                               |
+release/vX.Y.Z ---------------+------- ... --> Release Version
+                             / |
+                            /  |
+develop --------------------+--+------ ... --> Development Integration
+     ^                         
+     |                          
+feature branches --------------+
+```
+
+### Creating a Release
+1. When `develop` branch contains all features planned for a release, a `release/vX.Y.Z` branch is created
+2. Only bug fixes and release preparation commits are added to the release branch
+3. After thorough testing, the release branch is merged to `master`
+4. The release is tagged in `master` with the version number
+
+### PR Merge Strategy
+- All feature PRs are initially merged to the `develop` branch
+- Critical bug fixes may be merged directly to the current `release` branch
+- Maintainers are responsible for ensuring PRs are merged to the appropriate branch
+
+### Hotfixes
+1. For critical bugs in production, create a `hotfix/fix-description` branch from `master`
+2. Fix the issue and create a PR targeting `master`
+3. After approval, merge to both `master` and `develop` (and current `release` branch if exists)
 
 ## Tips for Successful Contributions
 - Create focused, single-purpose PRs
