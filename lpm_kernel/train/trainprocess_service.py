@@ -30,7 +30,6 @@ from lpm_kernel.api.domains.trainprocess.train_progress import TrainProgress
 from lpm_kernel.api.domains.trainprocess.process_step import ProcessStep
 from lpm_kernel.api.domains.trainprocess.progress_holder import TrainProgressHolder
 from lpm_kernel.train.training_params_manager import TrainingParamsManager
-from lpm_kernel.models.l1 import L1Version
 from lpm_kernel.common.repository.database_session import DatabaseSession
 from lpm_kernel.api.domains.kernel.routes import store_l1_data
 import gc
