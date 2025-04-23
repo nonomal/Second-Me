@@ -43,7 +43,7 @@ export default function RegisterUploadModal({ open, onClose }: RegisterUploadMod
   const [registerLoading, setRegisterLoading] = useState<boolean>(false);
 
   const isRegistered = useMemo(() => {
-    return loadInfo?.status === 'online';
+    return loadInfo?.status !== 'unregistered';
   }, [loadInfo]);
   const registerStatus = useMemo(() => {
     return loadInfo?.status;
@@ -400,7 +400,7 @@ export default function RegisterUploadModal({ open, onClose }: RegisterUploadMod
                       {' '}
                       {/* Added left margin */}
                       <Switch
-                        checked={registerStatus !== 'unregistered'}
+                        checked={isRegistered}
                         className="scale-125"
                         loading={registerLoading}
                         onChange={(checked) => {
