@@ -104,10 +104,11 @@ curl -X POST \
 ### Python Request Example
 
 ```python
-import requests
 import json
+import http.client
 
-url = "http://localhost:8002/api/kernel2/chat"
+url = "localhost:8002"
+path = "/api/kernel2/chat"
 headers = {
     "Content-Type": "application/json",
     "Accept": "text/event-stream"
@@ -120,20 +121,28 @@ data = {
     "stream": True
 }
 
-response = requests.post(url, headers=headers, json=data, stream=True)
-for line in response.iter_lines():
+conn = http.client.HTTPConnection(url)
+
+conn.request("POST", path, body=json.dumps(data), headers=headers)
+
+response = conn.getresponse()
+
+for line in response:
     if line:
-        if line.strip() == b'data: [DONE]':
+        decoded_line = line.decode('utf-8').strip()
+        if decoded_line == 'data: [DONE]':
             break
-        if line.startswith(b'data: '):
-            json_str = line[6:].decode('utf-8')
+        if decoded_line.startswith('data: '):
             try:
+                json_str = decoded_line[6:]
                 chunk = json.loads(json_str)
                 content = chunk['choices'][0]['delta'].get('content', '')
                 if content:
                     print(content, end='', flush=True)
             except json.JSONDecodeError:
                 pass
+
+conn.close()
 ```
 
 ## Error Handling

@@ -17,6 +17,8 @@ export enum ROUTER_PATH {
   APPLICATIONS_TASK = '/dashboard/applications/task-apps',
   APPLICATIONS_SECOND_X = '/dashboard/applications/second-x',
   APPLICATIONS_NETWORK = '/dashboard/applications/network-apps',
+  APPLICATIONS_INTEGRATIONS = '/dashboard/applications/integrations',
+  APPLICATIONS_API_MCP = '/dashboard/applications/api-mcp',
 
   STANDALONE = '/standalone',
   STANDALONE_ROLE = '/standalone/role/:role_id',

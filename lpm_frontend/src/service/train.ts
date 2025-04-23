@@ -56,6 +56,13 @@ export interface TrainProgress {
   status: StageStatus;
 }
 
+export interface TrainingParams {
+  concurrency_threads?: number;
+  data_synthesis_mode?: string;
+  learning_rate?: number;
+  number_of_epochs?: number;
+}
+
 export interface TrainingConfig extends TrainingParams {
   model_name: string;
 }
@@ -72,6 +79,13 @@ export const getTrainProgress = (config: TrainingConfig) => {
   return Request<CommonResponse<TrainProgress>>({
     method: 'get',
     url: `/api/trainprocess/progress/${config.model_name}`
+  });
+};
+
+export const resetProgress = () => {
+  return Request<CommonResponse<EmptyResponse>>({
+    method: 'post',
+    url: `/api/trainprocess/progress/reset`
   });
 };
 
@@ -112,15 +126,8 @@ export const stopService = () => {
   });
 };
 
-export const getModelName = () => {
-  return Request<CommonResponse<TrainingConfig>>({
-    method: 'get',
-    url: `/api/trainprocess/model_name`
-  });
-};
-
 export const getTrainingParams = () => {
-  return Request<CommonResponse<TrainingParams>>({
+  return Request<CommonResponse<TrainingConfig>>({
     method: 'get',
     url: `/api/trainprocess/training_params`
   });

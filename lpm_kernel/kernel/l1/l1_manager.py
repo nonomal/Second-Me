@@ -3,7 +3,7 @@ from typing import List, Optional
 
 import numpy as np
 
-from lpm_kernel.L1.bio import Note, Chunk, Bio
+from lpm_kernel.L1.bio import Note, Chunk, Bio, ShadeInfo, ShadeMergeInfo
 from lpm_kernel.L1.l1_generator import L1Generator
 from lpm_kernel.common.repository.database_session import DatabaseSession
 from lpm_kernel.file_data.document_service import document_service
@@ -129,29 +129,11 @@ def generate_l1_from_l0() -> L1GenerationResult:
         logger.info(f"chunk_topics content: {chunk_topics}")
 
         # 3.3 Generate features for each cluster and merge them
-        shades = []
-        if clusters and "clusterList" in clusters:
-            for cluster in clusters.get("clusterList", []):
-                cluster_memory_ids = [
-                    str(m.get("memoryId")) for m in cluster.get("memoryList", [])
-                ]
-                logger.info(
-                    f"Processing cluster with {len(cluster_memory_ids)} memories"
-                )
-
-                cluster_notes = [
-                    note for note in notes_list if str(note.id) in cluster_memory_ids
-                ]
-                if cluster_notes:
-                    shade = l1_generator.gen_shade_for_cluster([], cluster_notes, [])
-                    if shade:
-                        shades.append(shade)
-                        logger.info(
-                            f"Generated shade for cluster: {shade.name if hasattr(shade, 'name') else 'Unknown'}"
-                        )
+        shades = generate_shades(clusters, l1_generator, notes_list)
+        shades_merge_infos = convert_from_shades_to_merge_info(shades)
 
         logger.info(f"Generated {len(shades)} shades")
-        merged_shades = l1_generator.merge_shades(shades)
+        merged_shades = l1_generator.merge_shades(shades_merge_infos)
         logger.info(f"Merged shades success: {merged_shades.success}")
         logger.info(
             f"Number of merged shades: {len(merged_shades.merge_shade_list) if merged_shades.success else 0}"
@@ -179,6 +161,44 @@ def generate_l1_from_l0() -> L1GenerationResult:
     except Exception as e:
         logger.error(f"Error in L1 generation: {str(e)}", exc_info=True)
         raise
+
+
+def generate_shades(clusters, l1_generator, notes_list):
+    shades = []
+    if clusters and "clusterList" in clusters:
+        for cluster in clusters.get("clusterList", []):
+            cluster_memory_ids = [
+                str(m.get("memoryId")) for m in cluster.get("memoryList", [])
+            ]
+            logger.info(
+                f"Processing cluster with {len(cluster_memory_ids)} memories"
+            )
+
+            cluster_notes = [
+                note for note in notes_list if str(note.id) in cluster_memory_ids
+            ]
+            if cluster_notes:
+                shade = l1_generator.gen_shade_for_cluster([], cluster_notes, [])
+                if shade:
+                    shades.append(shade)
+                    logger.info(
+                        f"Generated shade for cluster: {shade.name if hasattr(shade, 'name') else 'Unknown'}"
+                    )
+    return shades
+
+    
+def convert_from_shades_to_merge_info(shades: List[ShadeInfo]) -> List[ShadeMergeInfo]:
+    return [ShadeMergeInfo(
+        id=shade.id,
+        name=shade.name,
+        aspect=shade.aspect,
+        icon=shade.icon,
+        desc_third_view=shade.desc_third_view,
+        content_third_view=shade.content_third_view,
+        desc_second_view=shade.desc_second_view,
+        content_second_view=shade.content_second_view,
+        cluster_info=None
+    ) for shade in shades]
 
 
 def store_status_bio(status_bio: Bio) -> None:

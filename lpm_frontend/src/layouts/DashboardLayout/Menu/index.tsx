@@ -32,6 +32,10 @@ const Menu = () => {
   const [deleteConfirmLoading, setDeleteConfirmLoading] = useState(false);
   const [showModelConfig, setShowModelConfig] = useState(false);
 
+  const isRegistered = useMemo(() => {
+    return loadInfo?.status === 'online';
+  }, [loadInfo]);
+
   const name = useMemo(() => {
     return loadInfo?.name || 'Second Me';
   }, [loadInfo]);
@@ -164,7 +168,7 @@ const Menu = () => {
                 {/* Main tab item */}
                 <div className="flex items-center">
                   <Link
-                    className={`group flex flex-1 items-center gap-2 px-3 py-2 text-sm rounded-lg transition-all duration-200 ${
+                    className={`group flex flex-1 items-center justify-between gap-2 px-3 py-2 text-sm rounded-lg transition-all duration-200 ${
                       pathname.startsWith(tab.path)
                         ? 'bg-blue-50 text-blue-600 font-medium'
                         : 'text-gray-600 hover:bg-blue-50/50 hover:text-blue-600'
@@ -177,45 +181,55 @@ const Menu = () => {
                       }
                     }}
                   >
-                    <span
-                      className={`transition-colors duration-200 ${
-                        pathname.startsWith(tab.path)
-                          ? 'text-blue-600'
-                          : 'text-gray-400 group-hover:text-blue-500'
-                      }`}
-                    >
-                      {tab.icon}
-                    </span>
-                    <span
-                      className={classNames(
-                        'font-medium transition-opacity line-clamp-1',
-                        isSidebarCollapsed ? 'opacity-0' : 'opacity-100'
-                      )}
-                    >
-                      {tab.name}
-                    </span>
-                  </Link>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`transition-colors duration-200 ${
+                          pathname.startsWith(tab.path)
+                            ? 'text-blue-600'
+                            : 'text-gray-400 group-hover:text-blue-500'
+                        }`}
+                      >
+                        {tab.icon}
+                      </span>
+                      <span
+                        className={classNames(
+                          'font-medium transition-opacity line-clamp-1',
+                          isSidebarCollapsed ? 'opacity-0' : 'opacity-100'
+                        )}
+                      >
+                        {tab.name}
+                      </span>
+                    </div>
 
-                  {/* Dropdown arrow for items with submenus */}
-                  {!isSidebarCollapsed && tab.subTabs && (
-                    <button className="p-1 rounded-md hover:bg-blue-50/50 mr-1">
-                      <ArrowIcon className={pathname.startsWith(tab.path) ? 'rotate-90' : ''} />
-                    </button>
-                  )}
+                    {/* Dropdown arrow for items with submenus */}
+                    {!isSidebarCollapsed && tab.subTabs && (
+                      <button className="p-1 rounded-md hover:bg-blue-50/50 mr-1">
+                        <ArrowIcon className={pathname.startsWith(tab.path) ? 'rotate-90' : ''} />
+                      </button>
+                    )}
+                  </Link>
                 </div>
 
                 {/* Sub Tabs with improved styling */}
-                {!isSidebarCollapsed && tab.subTabs && pathname.startsWith(tab.path) && (
+                {!isSidebarCollapsed && !!tab.subTabs.length && pathname.startsWith(tab.path) && (
                   <div className="ml-4 space-y-1 mt-1 border-l-2 border-blue-100 pl-2">
                     {tab.subTabs.map((subTab) => (
-                      <Link
+                      <div
                         key={subTab.path}
-                        className={`group flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-all duration-200 ${
+                        className={`group cursor-pointer flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-all duration-200 ${
                           pathname === subTab.path
                             ? 'bg-blue-50 text-blue-600 font-medium'
                             : 'text-gray-500 hover:bg-blue-50/50 hover:text-blue-600'
                         }`}
-                        href={subTab.path}
+                        onClick={() => {
+                          if (tab.path === ROUTER_PATH.APPLICATIONS && !isRegistered) {
+                            dispatchEvent(new Event(EVENT.SHOW_REGISTER_MODAL));
+
+                            return;
+                          }
+
+                          router.push(subTab.path);
+                        }}
                       >
                         {subTab.icon && (
                           <span
@@ -229,7 +243,7 @@ const Menu = () => {
                           </span>
                         )}
                         <span>{subTab.name}</span>
-                      </Link>
+                      </div>
                     ))}
                   </div>
                 )}

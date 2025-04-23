@@ -5,7 +5,8 @@ import requests
 import numpy as np
 from lpm_kernel.configs.logging import get_train_process_logger
 logger = get_train_process_logger()
-
+import lpm_kernel.common.strategy.classification as classification
+from sentence_transformers import SentenceTransformer
 
 class LLMClient:
     """LLM client utility class"""
@@ -54,29 +55,13 @@ class LLMClient:
 
         user_llm_config = self.user_llm_config_service.get_available_llm()
         if not user_llm_config:
+
             raise Exception("No LLM configuration found")
         # Prepare request data
-        headers = {
-            "Authorization": f"Bearer {user_llm_config.embedding_api_key}",
-            "Content-Type": "application/json",
-        }
 
-        data = {"input": chunked_texts, "model": user_llm_config.embedding_model_name}
-
-        logger.info(f"Getting embedding for {data}, total chunks: {len(chunked_texts)}")
         try:
             # Send request to embedding endpoint
-            response = requests.post(
-                f"{user_llm_config.embedding_endpoint}/embeddings", headers=headers, json=data
-            )
-
-            # Check response status
-            response.raise_for_status()
-            result = response.json()
-
-            # Extract embedding vectors
-            embeddings = [item["embedding"] for item in result["data"]]
-            embeddings_array = np.array(embeddings)
+            embeddings_array = classification.strategy_classification(user_llm_config, chunked_texts)
 
             # If we split any texts, we need to merge their embeddings back
             if sum(text_chunk_counts) > len(texts):
