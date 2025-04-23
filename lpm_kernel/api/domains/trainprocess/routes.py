@@ -271,6 +271,7 @@ def get_step_output_content():
         
         # Get step output content
         output_content = train_service.get_step_output_content(step_name)
+        logger.info(f"Step output content: {type(output_content)}")
         
         return jsonify(APIResponse.success(data=output_content))
     except Exception as e:
