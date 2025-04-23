@@ -30,10 +30,11 @@ from lpm_kernel.api.domains.trainprocess.train_progress import TrainProgress
 from lpm_kernel.api.domains.trainprocess.process_step import ProcessStep
 from lpm_kernel.api.domains.trainprocess.progress_holder import TrainProgressHolder
 from lpm_kernel.train.training_params_manager import TrainingParamsManager
+from lpm_kernel.models.l1 import L1Version
+from lpm_kernel.common.repository.database_session import DatabaseSession
+from lpm_kernel.api.domains.kernel.routes import _store_version, _store_bio, _store_shades, _store_clusters, _store_chunk_topics
 import gc
 import subprocess
-import shlex
-
 from lpm_kernel.configs.logging import get_train_process_logger, TRAIN_LOG_FILE
 logger = get_train_process_logger()
 
@@ -216,12 +217,15 @@ class TrainProcessService:
             # Mark step as in progress
             self.progress.mark_step_status(ProcessStep.GENERATE_BIOGRAPHY, Status.IN_PROGRESS)
             logger.info("Starting biography generation...")
-            
+
             # Generate L1 data and biography
             logger.info("Generating L1 data and biography...")
-            generate_l1_from_l0()
+            l1_data = generate_l1_from_l0()
             logger.info("Successfully generated L1 data and biography")
-            
+
+            # Store L1 data
+            self._store_l1_data(l1_data)
+
             # Mark step as completed
             self.progress.mark_step_status(ProcessStep.GENERATE_BIOGRAPHY, Status.COMPLETED)
             logger.info("Biography generation completed successfully")
@@ -231,6 +235,40 @@ class TrainProcessService:
             logger.error(f"Biography generation failed: {str(e)}")
             self.progress.mark_step_status(ProcessStep.GENERATE_BIOGRAPHY, Status.FAILED)
             return False
+
+    def _store_l1_data(self, l1_data):
+        """Store L1 data based on L0 data"""
+        try:
+            with DatabaseSession.session() as session:
+                # 1. Get current latest version
+                latest_version = session.query(L1Version).order_by(L1Version.version.desc()).first()
+                new_version_number = (latest_version.version + 1) if latest_version else 1
+                logger.info(f"Creating new version: {new_version_number}")
+
+                # 2. Create new version record
+                _store_version(session, new_version_number)
+
+                # 3. Store Bio data
+                _store_bio(session, new_version_number, l1_data.bio)
+
+                # 4. Store Shades data
+                if hasattr(l1_data.bio, "shades_list"):
+                    _store_shades(session, new_version_number, l1_data.bio.shades_list)
+
+                # 5. Store Clusters data
+                cluster_list = l1_data.clusters.get("clusterList", [])
+                _store_clusters(session, new_version_number, cluster_list)
+
+                # 6. Store Chunk Topics data
+                _store_chunk_topics(session, new_version_number, l1_data.chunk_topics)
+
+                # 7. Commit transaction
+                session.commit()
+                logger.info(f"Successfully stored L1 data version {new_version_number}")
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Error creating L1 version: {str(e)}")
+            raise
 
     def model_download(self) -> bool:
         """Download model"""
