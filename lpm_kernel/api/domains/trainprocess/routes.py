@@ -270,9 +270,7 @@ def get_step_output_content():
             return jsonify(APIResponse.error(message="Missing required parameter: step_name", code=400))
         
         # Get step output content
-        output_content = train_service.get_step_output_content(step_name)
-        logger.info(f"Step output content: {type(output_content)}")
-        
+        output_content = train_service.get_step_output_content(step_name)        
         return jsonify(APIResponse.success(data=output_content))
     except Exception as e:
         logger.error(f"Failed to get step output content: {str(e)}", exc_info=True)
