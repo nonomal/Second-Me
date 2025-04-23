@@ -39,7 +39,7 @@ def register_upload():
             ))
         
         instance_password = result.get("instance_password")
-        LoadService.update_instance_id(instance_id_new, instance_password)
+        LoadService.update_instance_credentials(instance_id_new, instance_password)
 
         return jsonify(APIResponse.success(
             data=result

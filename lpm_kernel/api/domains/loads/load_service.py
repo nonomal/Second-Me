@@ -168,7 +168,7 @@ class LoadService:
             
             # Update fields in database
             with DatabaseSession.session() as session:
-                load = session.query(Load).get(current_load["id"])
+                load = session.query(Load).get(current_load.id)
                 if not load:
                     logger.warning("Load record not found in database")
                     return False, "Load record not found in database", 404
