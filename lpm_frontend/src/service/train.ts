@@ -36,7 +36,8 @@ interface TrainStage {
 }
 
 interface TrainStepOutput {
-  content: any;
+  columns?: string[];
+  content: object[];
   file_type: string;
 }
 
