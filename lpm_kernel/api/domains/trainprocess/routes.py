@@ -69,9 +69,7 @@ def start_process():
         logger.info(f"Training parameters: model_name={model_name}, learning_rate={learning_rate}, number_of_epochs={number_of_epochs}, concurrency_threads={concurrency_threads}, data_synthesis_mode={data_synthesis_mode}, is_cot={is_cot}")
 
         # Create service instance with model name and additional parameters
-        train_service = TrainProcessService(
-            current_model_name=model_name
-        )
+        train_service = TrainProcessService(current_model_name=model_name)
         
         # Check if there are any in_progress statuses that need to be reset
         if train_service.progress.progress.data["status"] == "in_progress":
@@ -194,7 +192,7 @@ def reset_progress():
         }
     """
     try:
-        train_service = TrainProcessService()
+        train_service = TrainProcessService.get_instance()
         train_service.progress.reset_progress()
 
         return jsonify(APIResponse.success(message="Progress reset successfully"))
@@ -208,7 +206,7 @@ def stop_training():
     """Stop training process and wait until status is suspended"""
     try:
         # Get the TrainProcessService instance
-        train_service = TrainProcessService()  # Need to get instance based on your implementation
+        train_service = TrainProcessService.get_instance()  # Need to get instance based on your implementation
         
         # Stop the process
         train_service.stop_process()
@@ -233,32 +231,6 @@ def stop_training():
     except Exception as e:
         logger.error(f"Error stopping training process: {str(e)}", exc_info=True)
         return jsonify(APIResponse.error(message=f"Error stopping training process: {str(e)}"))
-
-
-@trainprocess_bp.route("/model_name", methods=["GET"])
-def get_model_name():
-    """
-    Get the model name currently used by the training service
-    
-    Returns:
-        Response: JSON response
-        {
-            "code": 0 for success, non-zero for failure,
-            "message": "Error message",
-            "data": {
-                "model_name": "Model name"
-            }
-        }
-    """
-    try:
-        # Get TrainProcessService instance
-        train_service = TrainProcessService()
-        model_name = train_service.model_name
-        
-        return jsonify(APIResponse.success(data={"model_name": model_name}))
-    except Exception as e:
-        logger.error(f"Failed to get model name: {str(e)}", exc_info=True)
-        return jsonify(APIResponse.error(message=f"Failed to get model name: {str(e)}"))
 
 
 @trainprocess_bp.route("/training_params", methods=["GET"])
@@ -319,9 +291,7 @@ def retrain():
             return jsonify(APIResponse.error(message="missing necessary parameter: model_name", code=400))
         
         # Create training service instance
-        train_service = TrainProcessService(
-            current_model_name=model_name
-        )
+        train_service = TrainProcessService(current_model_name=model_name)
         
         # Check if there are any in_progress statuses that need to be reset
         if train_service.progress.progress.data["status"] == "in_progress":

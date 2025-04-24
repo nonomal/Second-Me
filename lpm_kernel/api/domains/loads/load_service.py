@@ -437,12 +437,12 @@ class LoadService:
                         # Extract model name
                         model_name = file.replace('trainprocess_progress_', '').replace('.json', '')
                         # Create a new service instance for each model and reset progress
-                        train_service = TrainProcessService(model_name=model_name)
+                        train_service = TrainProcessService(current_model_name=model_name)
                         train_service.progress.reset_progress()
                         logger.info(f"Reset training progress for model: {model_name}")
             
             # Reset default training progress
-            default_train_service = TrainProcessService()
+            default_train_service = TrainProcessService.get_instance()
             default_train_service.progress.reset_progress()
             logger.info("Reset default training progress")
             

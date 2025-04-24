@@ -48,7 +48,10 @@ class TrainProcessService:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, current_model_name: str = None):
+    def __init__(self, current_model_name: str):
+        if current_model_name is None:
+            raise ValueError("current_model_name cannot be None")
+            
         if not self._initialized:
             # Generate a unique progress file name based on model name
             self.progress = TrainProgressHolder(current_model_name)
@@ -72,10 +75,32 @@ class TrainProcessService:
             self.l2_data_prepared = False
         
         # Update model name and progress instance if model name changes
-        if current_model_name is not None and current_model_name != self.model_name:
+        if current_model_name != self.model_name:
             self.model_name = current_model_name
             # Create new progress instance with updated progress file name
             self.progress = TrainProgressHolder(current_model_name)
+    
+    @classmethod
+    def get_instance(cls, current_model_name: str = None):
+        """Get the current instance of TrainProcessService
+        
+        Args:
+            current_model_name: Optional model name to update the instance with
+            
+        Returns:
+            TrainProcessService: The singleton instance
+        """
+        if cls._instance is None:
+            if current_model_name is None:
+                raise ValueError("current_model_name must be provided when creating a new instance")
+            return cls(current_model_name)
+        
+        if current_model_name is not None:
+            # Update the existing instance with new model name
+            cls._instance.model_name = current_model_name
+            cls._instance.progress = TrainProgressHolder(current_model_name)
+            
+        return cls._instance
 
     def list_documents(self):
         """List all documents"""
