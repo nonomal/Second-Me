@@ -1067,6 +1067,7 @@ class TrainProcessService:
                 if current_step:
                     step = ProcessStep(current_step)
                     self.progress.mark_step_status(step, Status.FAILED)
+            return False
 
     def start_process(self) -> bool:
         """Start training process"""
@@ -1118,8 +1119,9 @@ class TrainProcessService:
 
             return True
         except Exception as e:
-            logger.error(f"Exception occurred: {str(e)}")
-            self.progress.mark_step_status(step, Status.FAILED)
+            logger.error(f"Exception occurred: {str(e)}", exc_info=True)
+            if self.current_step:
+                self.progress.mark_step_status(self.current_step, Status.FAILED)
             return False
 
     def reset_progress(self):
@@ -1129,10 +1131,9 @@ class TrainProcessService:
         """
         try:
             self.progress.reset_progress()
-            self.progress._save_progress()
             logger.info("Progress saved successfully")
         except Exception as e:
-            logger.error(f"Failed to save progress: {str(e)}")
+            logger.error(f"Failed to save progress: {str(e)}", exc_info=True)
             
     def stop_process(self):
         """Stop training process
@@ -1197,8 +1198,8 @@ class TrainProcessService:
                     logger.warning(f"Process with PID {self.current_pid} no longer exists")
                     return True
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess) as e:
-                logger.error(f"Failed to terminate process: {str(e)}")
+                logger.error(f"Failed to terminate process: {str(e)}", exc_info=True)
                 
         except Exception as e:
-            logger.error(f"Error stopping training process: {str(e)}")
+            logger.error(f"Error stopping training process: {str(e)}", exc_info=True)
             return False
