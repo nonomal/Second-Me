@@ -28,10 +28,13 @@ from lpm_kernel.L2.utils import (
     create_and_prepare_model,
     formatting_prompts_func,
     create_chat_data,
+    release_ollama_models_early,
 )
 from lpm_kernel.configs.logging import LOGGING_CONFIG
 import logging.config
 from lpm_kernel.configs.logging import get_train_process_logger
+from lpm_kernel.L2.memory_manager import get_memory_manager
+
 logger = get_train_process_logger()
 
 
@@ -44,6 +47,25 @@ class LogTqdm(tqdm):
 
 # Replace the default tqdm
 sys.modules["tqdm"].tqdm = LogTqdm
+
+# Debug callback for logging training progress
+class DebugCallback(transformers.TrainerCallback):
+    def __init__(self):
+        self.total_time = 0
+        self.last_time = time.time()
+        
+    def on_step_end(self, args, state, control, **kwargs):
+        if state.global_step % 10 == 0:
+            current_time = time.time()
+            step_time = current_time - self.last_time
+            self.total_time += step_time
+            self.last_time = current_time
+            
+            # Log step time and training progress
+            logger.info(f"Step {state.global_step}: {step_time:.2f}s - Total training time: {self.total_time:.2f}s")
+            
+    def on_epoch_end(self, args, state, control, **kwargs):
+        logger.info(f"Epoch {state.epoch} completed")
 
 
 @dataclass
@@ -112,6 +134,10 @@ class ModelArguments:
         default=False,
         metadata={"help": "Enables UnSloth for training."},
     )
+    use_cuda: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Enables CUDA GPU acceleration for training and inference when available."},
+    )
 
 
 @dataclass
@@ -162,86 +188,162 @@ def main(model_args, data_args, training_args):
     for handler in logging.getLogger().handlers:
         handler.flush()
 
-    logger.info("start 1")
-    set_seed(training_args.seed)
-    logger.info("start 2")
-    # model
-    model, peft_config, tokenizer = create_and_prepare_model(
-        model_args, data_args, training_args
-    )
-    logger.info("start 3")
-    # gradient ckpt
-    model.config.use_cache = not training_args.gradient_checkpointing
-    training_args.gradient_checkpointing = (
-        training_args.gradient_checkpointing and not model_args.use_unsloth
-    )
-    logger.info("start 4")
-    if training_args.gradient_checkpointing:
-        training_args.gradient_checkpointing_kwargs = {
-            "use_reentrant": model_args.use_reentrant
-        }
-
-    # Configure system resources for optimal performance
-    def configure_system_resources(num_cores=None):
-        """
-        Configure system resources to optimize training performance
-        
-        Args:
-            num_cores: Number of CPU cores to use, if None, automatically detect
-        """
-        # Automatically detect available cores, if not specified
-        if num_cores is None:
-            num_cores = min(os.cpu_count(), 6)  # Limit to 6 cores, match Docker configuration
-        
-        logger.info(f"Configuring system to use {num_cores} CPU cores")
-        
-        # Set environment variables
-        os.environ["OMP_NUM_THREADS"] = str(num_cores)
-        os.environ["MKL_NUM_THREADS"] = str(num_cores)
-        os.environ["NUMEXPR_NUM_THREADS"] = str(num_cores)
-        
-        # Set PyTorch thread count
-        torch.set_num_threads(num_cores)
-        
-        # If supported, set PyTorch multi-thread optimization
-        if hasattr(torch, "set_num_interop_threads"):
-            torch.set_num_interop_threads(num_cores)
-        
-        # Enable memory-optimized garbage collection
-        # import gc
-        # gc.enable()
-        
-        # # Monitor memory usage and clean up periodically
-        # def schedule_gc():
-        #     gc.collect()
-        #     torch.cuda.empty_cache() if torch.cuda.is_available() else None
-        #     return schedule_gc
-        
-        # If CUDA is available, set CUDA device
-        if torch.cuda.is_available():
-            torch.cuda.set_device(0)
-            logger.info(f"CUDA is available. Using device: {torch.cuda.get_device_name(0)}")
-            # Display CUDA memory information
-            logger.info(f"CUDA memory allocated: {torch.cuda.memory_allocated(0) / 1024**2:.2f} MB")
-            logger.info(f"CUDA memory reserved: {torch.cuda.memory_reserved(0) / 1024**2:.2f} MB")
+    # Get memory manager for optimization
+    memory_manager = get_memory_manager()
+    memory_manager.cleanup_memory(force=True)
     
-    # Call function to configure system resources
-    configure_system_resources()
+    # Release Ollama models if they exist to free up VRAM
+    if torch.cuda.is_available() and model_args.use_cuda:
+        release_ollama_models_early()
+    
+    logger.info("Initializing training with memory optimizations")
+    set_seed(training_args.seed)
+    
+    # Apply PyTorch memory optimizations to training arguments
+    logger.info("Applying memory optimizations to training configuration")
+    training_args = memory_manager.optimize_training_args(training_args)
+
+    # --- Accelerate optimizer state offloading logic ---
+    # Enable optimizer state offload to CPU if VRAM is low and not using DeepSpeed
+    vram_total = memory_manager.get_memory_info().get("vram_total_gb", 0)
+    use_accelerate_offload = False
+    if torch.cuda.is_available() and model_args.use_cuda and vram_total > 0 and vram_total < 16:
+        # Only set if not already using DeepSpeed
+        if not hasattr(training_args, "deepspeed") or training_args.deepspeed is None:
+            logger.info("Enabling Hugging Face Accelerate optimizer state offload to CPU for low VRAM GPUs")
+            accelerate_config = {
+                "compute_environment": "LOCAL_MACHINE",
+                "deepspeed_config": None,
+                "distributed_type": "NO",
+                "downcast_bf16": False,
+                "fsdp_config": {},
+                "main_training_function": "main",
+                "mixed_precision": "no",
+                "num_machines": 1,
+                "num_processes": 1,
+                "use_cpu": False,
+                "zero3_init_flag": False,
+                "offload_optimizer_device": "cpu",
+                "offload_param_device": "none"
+            }
+            training_args.accelerate_config = accelerate_config
+            use_accelerate_offload = True
+
+    # Model loading with device_map="auto" for automatic offloading
+    logger.info(f"Loading model with automatic memory management from {model_args.model_name_or_path}")
+    
+    # Create model arguments dict with automatic offloading
+    model_kwargs = {
+        # Don't use "auto" device_map initially to avoid meta tensor issues
+        "device_map": None,
+        "trust_remote_code": True
+    }
+    
+    # Configure quantization if requested
+    if model_args.use_4bit_quantization:
+        from transformers import BitsAndBytesConfig
+        compute_dtype = getattr(torch, model_args.bnb_4bit_compute_dtype)
+        quant_storage_dtype = getattr(torch, model_args.bnb_4bit_quant_storage_dtype)
+        
+        model_kwargs["quantization_config"] = BitsAndBytesConfig(
+            load_in_4bit=model_args.use_4bit_quantization,
+            bnb_4bit_quant_type=model_args.bnb_4bit_quant_type,
+            bnb_4bit_compute_dtype=compute_dtype,
+            bnb_4bit_use_double_quant=model_args.use_nested_quant,
+            bnb_4bit_quant_storage=quant_storage_dtype,
+        )
+        # For 4-bit models, we can use device_map="auto"
+        model_kwargs["device_map"] = "auto"
+        logger.info("Using 4-bit quantization for memory efficiency")
+    elif model_args.use_8bit_quantization:
+        from transformers import BitsAndBytesConfig
+        model_kwargs["quantization_config"] = BitsAndBytesConfig(
+            load_in_8bit=model_args.use_8bit_quantization
+        )
+        # For 8-bit models, we can use device_map="auto"
+        model_kwargs["device_map"] = "auto"
+        logger.info("Using 8-bit quantization for memory efficiency")
+    
+    # Flash attention for memory efficiency when supported
+    if model_args.use_flash_attn and torch.cuda.is_available() and model_args.use_cuda:
+        model_kwargs["attn_implementation"] = "flash_attention_2"
+        logger.info("Using Flash Attention 2 for memory efficiency")
+    
+    # Load model with built-in memory management features
+    model, peft_config, tokenizer = create_and_prepare_model(
+        model_args, data_args, training_args, model_kwargs=model_kwargs
+    )
+    
+    # If model has meta tensors, handle them properly
+    if hasattr(model, "is_meta") and model.is_meta:
+        logger.info("Model has meta tensors, using to_empty() to properly initialize")
+        device = "cuda" if torch.cuda.is_available() and model_args.use_cuda else "cpu"
+        model = model.to_empty(device=device)
+    
+    # Apply gradient checkpointing for memory efficiency
+    if training_args.gradient_checkpointing and hasattr(model, "gradient_checkpointing_enable"):
+        logger.info("Enabling gradient checkpointing for memory efficiency")
+        model.gradient_checkpointing_enable()
+        model.config.use_cache = False
+    
+    # Allow only one full forward/backward pass at a time (if needed for memory)
+    if torch.cuda.is_available() and memory_manager.get_memory_info().get("vram_total_gb", 0) < 8:
+        torch.cuda.set_per_process_memory_fraction(0.9)
+        logger.info("Setting memory fraction limit to avoid OOM errors")
 
     # datasets
     train_dataset = create_chat_data(
         data_args,
         tokenizer,
     )
-
+    
     response_template = "\n<|im_start|>assistant\n"
-
+    
     collator = DataCollatorForCompletionOnlyLM(response_template, tokenizer=tokenizer)
     
     training_args.dataset_kwargs = {
         "append_concat_token": data_args.append_concat_token,
         "add_special_tokens": data_args.add_special_tokens,
     }
+
+    # Use DeepSpeed to handle meta tensors if available
+    try:
+        # Only configure DeepSpeed if meta tensors are present and DeepSpeed is available
+        if hasattr(model, "is_meta") and model.is_meta:
+            logger.info("Model has meta tensors, checking DeepSpeed availability")
+            # First verify DeepSpeed is properly installed and importable
+            try:
+                import deepspeed
+                logger.info("DeepSpeed is available, configuring for meta tensor handling")
+                
+                # Configure with appropriate settings for meta tensors
+                training_args.deepspeed = {
+                    "zero_stage": 3,
+                    "offload_optimizer": {
+                        "device": "cpu"
+                    },
+                    "offload_param": {
+                        "device": "cpu"
+                    },
+                    "zero3_init_flag": True,
+                    "zero_force_ds_cpu_optimizer": False
+                }
+                logger.info("DeepSpeed configured for meta tensor handling")
+            except ImportError:
+                logger.warning("DeepSpeed is not available, meta tensors will be handled differently")
+                # If DeepSpeed isn't available, use alternative approach to handle meta tensors
+                if torch.cuda.is_available() and model_args.use_cuda:
+                    logger.info("Initializing meta tensors on GPU")
+                    # Use device_map instead of DeepSpeed for meta tensor initialization
+                    from accelerate import init_empty_weights
+                    with init_empty_weights():
+                        model.to_empty(device="cuda")
+                else:
+                    logger.info("Initializing meta tensors on CPU")
+                    model.to_empty(device="cpu")
+    except Exception as e:
+        logger.warning(f"Could not configure meta tensor handling: {e}")
+        logger.warning(traceback.format_exc())
 
     trainer = SFTTrainer(
         model=model,
@@ -252,145 +354,46 @@ def main(model_args, data_args, training_args):
         formatting_func=formatting_prompts_func,
         data_collator=collator,
     )
+    
+    # Print model details
     trainer.accelerator.print(f"{trainer.model}")
-    trainer.model.print_trainable_parameters()
-
-    logger.info("start 6")
-    # train
-    checkpoint = None
-    if training_args.resume_from_checkpoint is not None:
-        logger.info("start 6.1")
-        checkpoint = training_args.resume_from_checkpoint
-    logger.info("start 6.2")
-
-    class DebugCallback(transformers.TrainerCallback):
-        """
-        Debug callback to monitor training process
-        """
-
+    
+    if hasattr(trainer.model, "print_trainable_parameters"):
+        trainer.model.print_trainable_parameters()
+    
+    # Memory usage tracking callback
+    class MemoryMonitorCallback(transformers.TrainerCallback):
         def __init__(self):
-            self.step_times = {}
-            self.current_step_start = None
-
-        def on_train_begin(self, args, state, control, **kwargs):
-            logger.info("=== Training Begin ===")
-            logger.info("Checking initial conditions:")
-            trainer = kwargs.get("trainer")
-            if trainer:
-                # Check model status
-                logger.info(f"Model device: {trainer.model.device}")
-                logger.info(f"Model dtype: {next(trainer.model.parameters()).dtype}")
-
-                # Check data loader
-                if hasattr(trainer, "train_dataset"):
-                    logger.info(f"Training dataset size: {len(trainer.train_dataset)}")
-
-                # Check optimizer
-                if hasattr(trainer, "optimizer"):
-                    logger.info("Optimizer configuration:")
-                    for i, group in enumerate(trainer.optimizer.param_groups):
-                        logger.info(
-                            f"Group {i}: lr={group['lr']}, weight_decay={group['weight_decay']}"
-                        )
-
-        def on_step_begin(self, args, state, control, **kwargs):
-            self.current_step_start = time.time()
-            logger.info(f"\n=== Starting Step {state.global_step + 1} ===")
-
-            # Check system status every 10 steps
-            if state.global_step % 10 == 0:
-                process = psutil.Process()
-                with process.oneshot():
-                    logger.info(f"CPU Usage: {process.cpu_percent()}%")
-                    logger.info(
-                        f"Memory Usage: {process.memory_info().rss / 1024**2:.2f}MB"
-                    )
-                    logger.info(f"Thread Count: {process.num_threads()}")
-
+            self.memory_manager = get_memory_manager()
+        
         def on_step_end(self, args, state, control, **kwargs):
-            if self.current_step_start:
-                step_time = time.time() - self.current_step_start
-                self.step_times[state.global_step] = step_time
-                avg_time = sum(self.step_times.values()) / len(self.step_times)
-                logger.info(
-                    f"Step {state.global_step + 1} completed in {step_time:.2f}s (avg: {avg_time:.2f}s)"
-                )
+            # Check memory every 5 steps
+            if state.global_step % 5 == 0 and torch.cuda.is_available():
+                info = self.memory_manager.get_memory_info()
+                vram_usage_pct = info.get("vram_used_gb", 0) / info.get("vram_total_gb", 1) * 100
+                
+                if vram_usage_pct > 90:
+                    logger.info(f"VRAM usage high ({vram_usage_pct:.1f}%), cleaning cache")
+                    self.memory_manager.cleanup_memory()
+        
+        def on_save(self, args, state, control, **kwargs):
+            # Free up memory before saving
+            self.memory_manager.cleanup_memory(force=True)
 
-                # Check if step time is much longer than average
-                if step_time > avg_time * 2 and len(self.step_times) > 1:
-                    logger.warning(
-                        f"Step {state.global_step + 1} took {step_time:.2f}s, which is much longer than average!"
-                    )
-
-                trainer = kwargs.get("trainer")
-                if trainer and hasattr(trainer, "optimizer"):
-                    # Check gradient status
-                    grad_norms = []
-                    for name, param in trainer.model.named_parameters():
-                        if param.grad is not None:
-                            grad_norms.append(param.grad.norm().item())
-
-                    if grad_norms:
-                        avg_grad_norm = sum(grad_norms) / len(grad_norms)
-                        logger.info(f"Average gradient norm: {avg_grad_norm:.5f}")
-                    else:
-                        logger.warning("No gradients found in this step!")
-
-        def on_log(self, args, state, control, logs=None, **kwargs):
-            if logs:
-                logger.info(f"=== Logs for Step {state.global_step} ===")
-                for key, value in logs.items():
-                    logger.info(f"{key}: {value}")
-
-        def on_train_end(self, args, state, control, **kwargs):
-            logger.info("=== Training Ended ===")
-            logger.info(f"Total steps completed: {state.global_step}")
-            if self.step_times:
-                avg_time = sum(self.step_times.values()) / len(self.step_times)
-                logger.info(f"Average step time: {avg_time:.2f}s")
-
+    # Add memory monitoring
+    trainer.add_callback(MemoryMonitorCallback())
+    
+    # Add existing debug callback
     trainer.add_callback(DebugCallback())
 
-    # Add more detailed logs
-    logger.info("Starting training preparation...")
+    # Resume from checkpoint if specified
+    checkpoint = None
+    if training_args.resume_from_checkpoint is not None:
+        checkpoint = training_args.resume_from_checkpoint
+
+    # Training with automatic memory management
     try:
-        logger.info("Initializing training process...")
-        # Check model loading and structure
-        logger.info("Analyzing model structure...")
-        model = trainer.model
-
-        def print_model_structure(model, prefix=""):
-            logger.info(f"{prefix}Model class: {model.__class__.__name__}")
-            for name, child in model.named_children():
-                logger.info(f"{prefix}Child: {name} ({child.__class__.__name__})")
-                if len(list(child.named_children())) > 0:
-                    print_model_structure(child, prefix + "  ")
-
-        # print_model_structure(model)
-
-        # Check model size
-        total_params = sum(p.numel() for p in trainer.model.parameters())
-        trainable_params = sum(
-            p.numel() for p in trainer.model.parameters() if p.requires_grad
-        )
-        logger.info(f"Total parameters: {total_params:,}")
-        logger.info(f"Trainable parameters: {trainable_params:,}")
-
-        # Check optimizer settings
-        logger.info("Checking optimizer settings...")
-
-        # Check data loader
-        train_dataloader = trainer.get_train_dataloader()
-        logger.info(f"Train dataloader created with {len(train_dataloader)} batches")
-
-        process = psutil.Process()
-        memory_info = process.memory_info()
-        logger.info(f"Memory usage details:")
-        logger.info(f"RSS (Resident Set Size): {memory_info.rss / 1024**2:.2f}MB")
-        logger.info(f"VMS (Virtual Memory Size): {memory_info.vms / 1024**2:.2f}MB")
-
-        # Start training
-        logger.info("Starting actual training process...")
+        logger.info("Starting training with memory-optimized configuration")
         trainer.train(resume_from_checkpoint=checkpoint)
     except Exception as e:
         logger.error(f"Error during training: {str(e)}")
@@ -398,9 +401,13 @@ def main(model_args, data_args, training_args):
         logger.error(f"Traceback: {traceback.format_exc()}")
         raise
 
-    logger.info("start 7")
+    # Save the model
     if trainer.is_fsdp_enabled:
         trainer.accelerator.state.fsdp_plugin.set_state_dict_type("FULL_STATE_DICT")
+    
+    # Clean up before saving
+    memory_manager.cleanup_memory(force=True)
+    
     trainer.save_model()
     logger.info("Training completed successfully")
 

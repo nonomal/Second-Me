@@ -3,8 +3,10 @@ from .common.repository.database_session import DatabaseSession, Base
 from .common.logging import logger
 from .api import init_routes
 from .api.file_server.handler import FileServerHandler
+from .database.migration_manager import MigrationManager
 import os
 import atexit
+import subprocess
 
 
 def create_app():
@@ -14,6 +16,7 @@ def create_app():
     try:
         DatabaseSession.initialize()
         logger.info("Database connection initialized successfully")
+    
     except Exception as e:
         logger.error(f"Failed to initialize database connection: {str(e)}")
         raise

@@ -82,6 +82,10 @@ python docker/app/init_chroma.py
 # Get local IP address (excluding localhost and docker networks)
 LOCAL_IP=$(ifconfig | grep "inet " | grep -v "127.0.0.1" | grep "192.168" | awk '{print $2}' | head -n 1)
 
+# Run database migrations first
+log_info "Running database migrations..."
+python scripts/run_migrations.py
+
 # Start Flask application
 log_info "Starting Flask application..."
 log_info "Application will run at the following addresses:"

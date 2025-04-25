@@ -148,6 +148,37 @@ class DocumentService:
             self._update_analyze_status_failed(doc.id)
             raise
 
+    def analyze_document(self, document_id: int) -> DocumentDTO:
+        """
+        Analyze a single document by ID
+        
+        Args:
+            document_id (int): ID of document to analyze
+            
+        Returns:
+            DocumentDTO: The analyzed document
+            
+        Raises:
+            ValueError: If document not found
+            Exception: If analysis fails
+        """
+        try:
+            # Get document
+            document = self._repository.find_one(document_id)
+            if not document:
+                raise ValueError(f"Document not found with id: {document_id}")
+                
+            # Perform analysis
+            return self._analyze_document(document)
+            
+        except ValueError as e:
+            logger.error(f"Document {document_id} not found: {str(e)}")
+            raise
+        except Exception as e:
+            logger.error(f"Error analyzing document {document_id}: {str(e)}", exc_info=True)
+            self._update_analyze_status_failed(document_id)
+            raise
+
     def _update_analyze_status_failed(self, doc_id: int) -> None:
         """update status as failed"""
         try:
@@ -591,6 +622,120 @@ class DocumentService:
             
         except Exception as e:
             logger.error(f"Error deleting file: {str(e)}", exc_info=True)
+            raise
+
+    def fix_missing_document_analysis(self) -> int:
+        """Fix documents with missing insights or summaries
+        
+        Returns:
+            int: Number of documents fixed
+        """
+        try:
+            # Find all documents that have analysis issues
+            docs = self._repository.list()
+            fixed_count = 0
+            
+            for doc in docs:
+                needs_fixing = False
+                
+                # Check if document needs analysis
+                if not doc.analyze_status or doc.analyze_status != ProcessStatus.SUCCESS:
+                    needs_fixing = True
+                    logger.info(f"Document {doc.id} needs analysis (status: {doc.analyze_status})")
+                
+                # Check if document has missing insights or summaries
+                elif not doc.insight or not doc.summary:
+                    needs_fixing = True
+                    logger.info(f"Document {doc.id} has missing insight or summary")
+                
+                # Process documents that need fixing
+                if needs_fixing:
+                    try:
+                        # Process document analysis
+                        self.analyze_document(doc.id)
+                        fixed_count += 1
+                        logger.info(f"Fixed document {doc.id} analysis")
+                    except Exception as e:
+                        logger.error(f"Error fixing document {doc.id} analysis: {str(e)}")
+                
+            logger.info(f"Fixed {fixed_count} documents with missing analysis")
+            return fixed_count
+            
+        except Exception as e:
+            logger.error(f"Error in fix_missing_document_analysis: {str(e)}")
+            raise FileProcessingError(f"Failed to fix document analysis: {str(e)}")
+
+    def verify_document_embeddings(self, verbose=True) -> Dict:
+        """
+        Verify all document embeddings and return statistics
+        
+        Args:
+            verbose (bool): Whether to log detailed information
+            
+        Returns:
+            Dict: Statistics about document embeddings
+        """
+        try:
+            docs = self._repository.list()
+            results = {
+                "total_documents": len(docs),
+                "documents_with_embedding": 0,
+                "documents_without_embedding": 0,
+                "documents_with_content": 0,
+                "documents_without_content": 0,
+                "documents_with_summary": 0,
+                "documents_without_summary": 0,
+                "documents_with_insight": 0,
+                "documents_without_insight": 0,
+                "documents_needing_repair": 0,
+            }
+            
+            documents_needing_repair = []
+            
+            for doc in docs:
+                # Check if document has content
+                if doc.raw_content:
+                    results["documents_with_content"] += 1
+                else:
+                    results["documents_without_content"] += 1
+                    
+                # Check if document has summary
+                if doc.summary:
+                    results["documents_with_summary"] += 1
+                else:
+                    results["documents_without_summary"] += 1
+                    
+                # Check if document has insight
+                if doc.insight:
+                    results["documents_with_insight"] += 1
+                else:
+                    results["documents_without_insight"] += 1
+                
+                # Check if embeddings exist in ChromaDB
+                embedding = self.get_document_embedding(doc.id)
+                if embedding is not None:
+                    results["documents_with_embedding"] += 1
+                    if verbose:
+                        logger.info(f"Document {doc.id}: '{doc.name}' has embedding of dimension {len(embedding)}")
+                else:
+                    results["documents_without_embedding"] += 1
+                    if verbose:
+                        logger.warning(f"Document {doc.id}: '{doc.name}' missing embedding")
+                    
+                # Check if document needs repair (has content but missing embedding or analysis)
+                if doc.raw_content and (embedding is None or not doc.summary or not doc.insight):
+                    documents_needing_repair.append(doc.id)
+                    results["documents_needing_repair"] += 1
+                    
+            # Log statistics
+            logger.info(f"Document embedding verification results: {results}")
+            if documents_needing_repair and verbose:
+                logger.info(f"Documents needing repair: {documents_needing_repair}")
+                
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error verifying document embeddings: {str(e)}", exc_info=True)
             raise
 
 

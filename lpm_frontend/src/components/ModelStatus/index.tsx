@@ -136,7 +136,13 @@ export function ModelStatus() {
   };
 
   const handleServiceAction = () => {
-    const config = JSON.parse(localStorage.getItem('trainingConfig') || '{}');
+    const config = JSON.parse(localStorage.getItem('trainingParams') || '{}');
+
+    if (!config.model_name) {
+      message.error('Please train a base model first');
+
+      return;
+    }
 
     if (status === 'running') {
       setServiceStopping(true);
@@ -160,7 +166,7 @@ export function ModelStatus() {
         });
     } else {
       setServiceStarting(true);
-      startService({ model_name: config.baseModel || 'Qwen2.5-0.5B-Instruct' })
+      startService({ model_name: config.model_name })
         .then((res) => {
           if (res.data.code === 0) {
             messageApi.success({ content: 'Service starting...', duration: 1 });

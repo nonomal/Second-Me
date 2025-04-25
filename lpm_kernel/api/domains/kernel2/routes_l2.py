@@ -3,6 +3,8 @@ import logging
 import os
 import time
 import sys
+import torch  # Add torch import for CUDA detection
+import traceback
 from dataclasses import asdict
 
 from flask import Blueprint, jsonify, Response, request
@@ -352,6 +354,19 @@ def train2():
         model_name = data["model_name"]
         paths = get_model_paths(model_name)
 
+        # Get optional parameters with defaults
+        learning_rate = data.get("learning_rate", 2e-4)
+        num_train_epochs = data.get("number_of_epochs", 3)
+        concurrency_threads = data.get("concurrency_threads", 2)
+        data_synthesis_mode = data.get("data_synthesis_mode", "low")
+        use_cuda = data.get("use_cuda", False)
+        
+        # Convert use_cuda to string "True" or "False" for the shell script
+        use_cuda_str = "True" if use_cuda else "False"
+        
+        logger.info(f"Training configuration: learning_rate={learning_rate}, epochs={num_train_epochs}, "
+                   f"threads={concurrency_threads}, mode={data_synthesis_mode}, use_cuda={use_cuda} ({use_cuda_str})")
+
         # Check if model exists
         if not os.path.exists(paths["base_path"]):
             return jsonify(APIResponse.error(
@@ -385,29 +400,61 @@ def train2():
 
         script_path = os.path.join(os.getcwd(), "lpm_kernel/L2/train_for_user.sh")
 
+        # Build command arguments
+        cmd_args = [
+            "--lr", str(learning_rate),
+            "--epochs", str(num_train_epochs),
+            "--threads", str(concurrency_threads),
+            "--mode", str(data_synthesis_mode),
+            "--cuda", use_cuda_str  # Use the properly formatted string
+        ]
+
         # Start training
         import threading
         _training_thread = threading.Thread(
-            target=start_training,
-            args=(script_path, log_path),
+            target=start_training_with_args,
+            args=(script_path, log_path, cmd_args),
             daemon=True
         )
         _training_thread.start()
 
         return jsonify(APIResponse.success(
             data={
+                "status": "training_started",
                 "model_name": model_name,
                 "log_path": log_path,
-                "personal_dir": paths["personal_dir"],
-                "merged_dir": paths["merged_dir"]
             },
-            message="Training task started"
+            message="Training task started successfully"
         ))
 
     except Exception as e:
-        error_msg = f"Failed to start training: {str(e)}"
-        logger.error(error_msg)
-        return jsonify(APIResponse.error(message=error_msg, code=500))
+        logger.error(f"Error starting training task: {str(e)}")
+        traceback.print_exc()
+        return jsonify(APIResponse.error(message=f"Failed to start training: {str(e)}"))
+
+
+def start_training_with_args(script_path: str, log_path: str, args: list) -> None:
+    """Start training with additional arguments"""
+    global _training_process
+    try:
+        # Convert script path and args to a command
+        cmd = [script_path] + args
+        
+        # Use ScriptRunner to execute the script
+        runner = ScriptRunner(log_path=log_path)
+        _training_process = runner.execute_script(
+            script_path=script_path,
+            script_type="training",
+            is_python=False,  # This is a bash script
+            args=args
+        )
+
+        logger.info(f"Training process started with args: {args}, process: {_training_process}")
+
+    except Exception as e:
+        logger.error(f"Failed to start training process: {str(e)}")
+        _training_process = None
+        raise
 
 
 @kernel2_bp.route("/merge_weights", methods=["POST"])
@@ -550,6 +597,9 @@ def start_llama_server():
             return jsonify(APIResponse.error(message="Missing required parameter: model_name", code=400))
 
         model_name = data["model_name"]
+        # Get optional use_gpu parameter with default value of True
+        use_gpu = data.get("use_gpu", True)
+        
         paths = get_model_paths(model_name)
         gguf_path = os.path.join(paths["gguf_dir"], "model.gguf")
 
@@ -564,53 +614,34 @@ def start_llama_server():
             server_executable = "llama-server"
         server_path = os.path.join(server_path, server_executable)
 
-        # Check if service and model file exist
-        if not os.path.exists(server_path):
-            return jsonify(APIResponse.error(message="llama-server executable file does not exist", code=400))
+        # Check if model file exists
         if not os.path.exists(gguf_path):
             return jsonify(APIResponse.error(
                 message=f"Model '{model_name}' GGUF file does not exist, please convert model first",
                 code=400
             ))
 
-        # Check if service is already running
+        # Start the server using the LocalLLMService with GPU acceleration if requested
+        success = local_llm_service.start_server(gguf_path, use_gpu=use_gpu)
+        
+        if not success:
+            return jsonify(APIResponse.error(message="Failed to start llama-server", code=500))
+            
+        # Get updated service status
         status = local_llm_service.get_server_status()
-        if status.is_running:
-            return jsonify(
-                APIResponse.error(
-                    message=f"llama-server is already running, PID: {status.process_info.pid}",
-                    code=400
-                )
-            )
-
-        # Build parameters
-        args = [server_path, "-m", gguf_path, "--port", "8080"]
-
-        # Use thread to start service asynchronously
-        def start_server():
-            script_executor.execute(
-                script_path=server_path,
-                script_type="llama_server",
-                args=args[1:],  # Remove first parameter (executable file path)
-                shell=False,
-            )
-
-        # Start new thread to run service
-        from threading import Thread
-
-        thread = Thread(target=start_server)
-        thread.daemon = True
-        thread.start()
-
-        # Return start status immediately
+        
+        # Return success response with GPU info
+        gpu_info = "with GPU acceleration" if use_gpu and torch.cuda.is_available() else "with CPU only"
         return jsonify(
             APIResponse.success(
                 data={
                     "model_name": model_name,
                     "gguf_path": gguf_path,
-                    "status": "starting"
+                    "status": "running" if status.is_running else "starting",
+                    "use_gpu": use_gpu and torch.cuda.is_available(),
+                    "gpu_info": gpu_info
                 },
-                message="llama-server service is starting"
+                message=f"llama-server service started {gpu_info}"
             )
         )
 
@@ -805,3 +836,31 @@ def chat(body: ChatRequest):
         if not getattr(body, 'stream', True):  # Default to stream if attribute missing
             return jsonify(error_response), 500
         return local_llm_service.handle_stream_response(iter([error_response]))
+
+
+@kernel2_bp.route("/cuda/available", methods=["GET"])
+def check_cuda_available():
+    """Check if CUDA is available for model training/inference"""
+    try:
+        import torch
+        cuda_available = torch.cuda.is_available()
+        cuda_info = {}
+        
+        if cuda_available:
+            cuda_info = {
+                "device_count": torch.cuda.device_count(),
+                "current_device": torch.cuda.current_device(),
+                "device_name": torch.cuda.get_device_name(0)
+            }
+        
+        return jsonify(APIResponse.success(
+            data={
+                "cuda_available": cuda_available,
+                "cuda_info": cuda_info
+            },
+            message="CUDA availability check completed"
+        ))
+    except Exception as e:
+        error_msg = f"Error checking CUDA availability: {str(e)}"
+        logger.error(error_msg)
+        return jsonify(APIResponse.error(message=error_msg, code=500))

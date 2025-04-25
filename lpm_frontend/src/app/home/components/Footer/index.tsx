@@ -24,7 +24,7 @@ const Footer = (props: IProps) => {
           <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
             <a
               className="text-sm text-secondme-blue hover:text-secondme-blue/80 hover:underline flex items-center gap-1"
-              href="https://secondme.io/"
+              href="https://youtu.be/TogHaqdExvc"
               rel="noopener noreferrer"
               target="_blank"
             >

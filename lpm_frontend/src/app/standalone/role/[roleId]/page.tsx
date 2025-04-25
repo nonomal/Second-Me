@@ -57,7 +57,7 @@ export default function RoleChat() {
           const storedMessages = roleplayChatStorage.getMessages(role_id);
           const systemMessage: IChatMessage = {
             id: generateMessageId(),
-            content: role?.system_prompt ||'',
+            content: role?.system_prompt || '',
             role: 'system',
             timestamp: new Date().toLocaleTimeString([], {
               hour: '2-digit',
@@ -123,11 +123,11 @@ export default function RoleChat() {
     };
 
     // Update message list, add user message and empty assistant message
-    let newMessages = [...messages, userMessage, assistantMessage];
+    let newMessages = [...messages, userMessage];
 
     const systemMessage: IChatMessage = {
       id: generateMessageId(),
-      content: role?.system_prompt ||'',
+      content: role.system_prompt || '',
       role: 'system',
       timestamp: new Date().toLocaleTimeString([], {
         hour: '2-digit',
@@ -136,20 +136,20 @@ export default function RoleChat() {
     };
 
     if (!newMessages.find((item) => item.role === 'system')) {
-      newMessages = [systemMessage, ...newMessages]
+      newMessages = [systemMessage, ...newMessages];
     } else {
       newMessages = newMessages.map((msg) => {
         if (msg.role === 'system') {
-          return { ...msg, content: role?.system_prompt ||'' };
+          return { ...msg, content: role.system_prompt || '' };
         }
+
         return msg;
       });
     }
 
-
-    setMessages(newMessages);
+    setMessages([...newMessages, assistantMessage]);
     // Save messages
-    roleplayChatStorage.saveMessages(role_id, newMessages);
+    roleplayChatStorage.saveMessages(role_id, [...newMessages, assistantMessage]);
 
     // Send request
     const chatRequest: ChatRequest = {
@@ -263,8 +263,8 @@ export default function RoleChat() {
                   index === messages.length - 1 &&
                   msg.role === 'assistant'
                 }
-                role={msg.role}
                 message={msg.content}
+                role={msg.role}
                 timestamp={msg.timestamp}
               />
             ))}

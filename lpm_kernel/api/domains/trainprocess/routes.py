@@ -24,6 +24,7 @@ def start_process():
         number_of_epochs: Number of training epochs (optional)
         concurrency_threads: Number of threads for concurrent processing (optional)
         data_synthesis_mode: Mode for data synthesis (optional)
+        use_cuda: Whether to use CUDA for training (optional)
     
     Includes the following steps:
     1. Health check
@@ -63,9 +64,11 @@ def start_process():
         number_of_epochs = data.get("number_of_epochs", None)
         concurrency_threads = data.get("concurrency_threads", None)
         data_synthesis_mode = data.get("data_synthesis_mode", None)
+        use_cuda = data.get("use_cuda", False)  # Default to False if not provided
+        is_cot = data.get("is_cot", None)
         
         # Log the received parameters
-        logger.info(f"Training parameters: model_name={model_name}, learning_rate={learning_rate}, number_of_epochs={number_of_epochs}, concurrency_threads={concurrency_threads}, data_synthesis_mode={data_synthesis_mode}")
+        logger.info(f"Training parameters: model_name={model_name}, learning_rate={learning_rate}, number_of_epochs={number_of_epochs}, concurrency_threads={concurrency_threads}, data_synthesis_mode={data_synthesis_mode}, is_cot={is_cot}")
 
         # Create service instance with model name and additional parameters
         train_service = TrainProcessService(
@@ -88,7 +91,9 @@ def start_process():
             "learning_rate": learning_rate,
             "number_of_epochs": number_of_epochs,
             "concurrency_threads": concurrency_threads,
-            "data_synthesis_mode": data_synthesis_mode
+            "data_synthesis_mode": data_synthesis_mode,
+            "use_cuda": use_cuda,  # Make sure to include use_cuda parameter
+            "is_cot": is_cot
         }
         
         params_manager = TrainingParamsManager()
@@ -110,7 +115,9 @@ def start_process():
                     "learning_rate": learning_rate,
                     "number_of_epochs": number_of_epochs,
                     "concurrency_threads": concurrency_threads,
-                    "data_synthesis_mode": data_synthesis_mode
+                    "data_synthesis_mode": data_synthesis_mode,
+                    "use_cuda": use_cuda,  # Include in response
+                    "is_cot": is_cot
                 }
             )
         )

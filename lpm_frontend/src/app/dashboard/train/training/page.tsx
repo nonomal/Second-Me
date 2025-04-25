@@ -4,13 +4,12 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import InfoModal from '@/components/InfoModal';
 import type { TrainingConfig } from '@/service/train';
-import { startTrain, stopTrain, retrain, getTrainingParams, resetProgress } from '@/service/train';
+import { startTrain, stopTrain, retrain, getTrainingParams, checkCudaAvailability, resetProgress } from '@/service/train';
 import { useTrainingStore } from '@/store/useTrainingStore';
 import { getMemoryList } from '@/service/memory';
 import { message, Modal } from 'antd';
 import { useModelConfigStore } from '@/store/useModelConfigStore';
 import CelebrationEffect from '@/components/Celebration';
-import { getModelConfig } from '@/service/modelConfig';
 import TrainingLog from '@/components/train/TrainingLog';
 import TrainingProgress from '@/components/train/TrainingProgress';
 import TrainingConfiguration from '@/components/train/TrainingConfiguration';
@@ -60,11 +59,22 @@ const baseModelOptions = [
   }
 ];
 
+// Title and explanation section
+const pageTitle = 'Training Process';
+const pageDescription =
+  'Transform your memories into a personalized AI model that thinks and communicates like you.';
+
 export default function TrainingPage() {
-  // Title and explanation section
-  const pageTitle = 'Training Process';
-  const pageDescription =
-    'Transform your memories into a personalized AI model that thinks and communicates like you.';
+  const checkTrainStatus = useTrainingStore((state) => state.checkTrainStatus);
+  const resetTrainingState = useTrainingStore((state) => state.resetTrainingState);
+  const trainingError = useTrainingStore((state) => state.error);
+  const setStatus = useTrainingStore((state) => state.setStatus);
+  const fetchModelConfig = useModelConfigStore((state) => state.fetchModelConfig);
+  const modelConfig = useModelConfigStore((store) => store.modelConfig);
+  const status = useTrainingStore((state) => state.status);
+  const trainingProgress = useTrainingStore((state) => state.trainingProgress);
+
+  const router = useRouter();
 
   const [selectedInfo, setSelectedInfo] = useState<boolean>(false);
   const isTraining = useTrainingStore((state) => state.isTraining);
@@ -72,17 +82,19 @@ export default function TrainingPage() {
   const [trainingParams, setTrainingParams] = useState<TrainingConfig>({} as TrainingConfig);
   const [nowTrainingParams, setNowTrainingParams] = useState<TrainingConfig | null>(null);
   const [trainActionLoading, setTrainActionLoading] = useState(false);
-
-  const containerRef = useRef<HTMLDivElement>(null);
-  const firstLoadRef = useRef<boolean>(true);
   const [showCelebration, setShowCelebration] = useState(false);
   const [showMemoryModal, setShowMemoryModal] = useState(false);
-  const modelConfig = useModelConfigStore((store) => store.modelConfig);
-  const updateModelConfig = useModelConfigStore((store) => store.updateModelConfig);
+  const [changeBaseModel, setChangeBaseModel] = useState(false);
 
   const cleanupEventSourceRef = useRef<(() => void) | undefined>();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const firstLoadRef = useRef<boolean>(true);
+  const pollingStopRef = useRef<boolean>(false);
 
-  const [changeBaseModel, setChangeBaseModel] = useState(false);
+  const [cudaAvailable, setCudaAvailable] = useState<boolean>(false);
+  const [isResume, setIsResume] = useState(
+    trainingProgress.status === 'suspended' || trainingProgress.status === 'failed'
+  );
 
   useEffect(() => {
     const localTrainingParams = JSON.parse(localStorage.getItem('trainingParams') || '{}');
@@ -91,29 +103,31 @@ export default function TrainingPage() {
   }, [trainingParams.model_name]);
 
   useEffect(() => {
-    getModelConfig().then((res) => {
-      if (res.data.code == 0) {
-        const data = res.data.data || {};
-
-        updateModelConfig(data);
-      } else {
-        message.error(res.data.message);
-      }
-    });
+    fetchModelConfig();
   }, []);
 
-  const pollingStopRef = useRef<boolean>(false);
-  const router = useRouter();
-
-  const status = useTrainingStore((state) => state.status);
-  const trainingProgress = useTrainingStore((state) => state.trainingProgress);
-  const [isResume, setIsResume] = useState(
-    trainingProgress.status === 'suspended' || trainingProgress.status === 'failed'
-  );
-  const checkTrainStatus = useTrainingStore((state) => state.checkTrainStatus);
-  const resetTrainingState = useTrainingStore((state) => state.resetTrainingState);
-  const trainingError = useTrainingStore((state) => state.error);
-  const setStatus = useTrainingStore((state) => state.setStatus);
+  useEffect(() => {
+    // Check CUDA availability once on load
+    checkCudaAvailability()
+      .then(res => {
+        if (res.data.code === 0) {
+          const { cuda_available, cuda_info } = res.data.data;
+          setCudaAvailable(cuda_available);
+          
+          if (cuda_available) {
+            console.log('CUDA is available:', cuda_info);
+          } else {
+            console.log('CUDA is not available on this system');
+          }
+        } else {
+          message.error(res.data.message || 'Failed to check CUDA availability');
+        }
+      })
+      .catch(err => {
+        console.error('CUDA availability check failed', err);
+        message.error('CUDA availability check failed');
+      });
+  }, []);
 
   // Start polling training progress
   const startPolling = () => {
@@ -172,13 +186,6 @@ export default function TrainingPage() {
     }
   }, [status, trainingError]);
 
-  // Monitor training status changes, scroll to bottom when status becomes 'training'
-  useEffect(() => {
-    if (status === 'training') {
-      scrollToBottom();
-    }
-  }, [status]);
-
   // Check training status once when component loads
   useEffect(() => {
     // Check if user has at least 3 memories
@@ -202,14 +209,6 @@ export default function TrainingPage() {
 
       // Only proceed with training status check if memory check passes
       checkTrainStatus();
-
-      // Check if we were in the middle of retraining
-      const isRetraining = localStorage.getItem('isRetraining') === 'true';
-
-      if (isRetraining) {
-        // If we were retraining, set status to training
-        startGetTrainingProgress();
-      }
     };
 
     checkMemoryCount();
@@ -226,7 +225,9 @@ export default function TrainingPage() {
 
       if (firstLoadRef.current) {
         scrollPageToBottom();
-        scrollToBottom();
+
+        // On first load, start polling and get training progress.
+        startGetTrainingProgress();
       }
     }
     // If training is completed or failed, stop polling
@@ -295,11 +296,6 @@ export default function TrainingPage() {
     firstLoadRef.current = false;
   };
 
-  const scrollToBottom = () => {
-    // This function is kept for backward compatibility
-    // The actual scrolling is now handled by the TrainingLog component
-  };
-
   const updateTrainingParams = (params: TrainingConfig) => {
     setTrainingParams((state: TrainingConfig) => ({ ...state, ...params }));
   };
@@ -309,45 +305,28 @@ export default function TrainingPage() {
     const eventSource = new EventSource('/api/trainprocess/logs');
 
     eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
+      // Don't try to parse as JSON, just use the raw text data directly
+      const logMessage = event.data;
+      
+      setTrainingDetails((prev) => {
+        const newLogs = [
+          ...prev.slice(-500), // Keep more log entries (500 instead of 100)
+          {
+            message: logMessage,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+          }
+        ];
 
-        setTrainingDetails((prev) => {
-          const newLogs = [
-            ...prev.slice(-100),
-            {
-              message: data.message,
-              timestamp: new Date().toISOString()
-            }
-          ];
+        // Save logs to localStorage for persistence between page refreshes
+        localStorage.setItem('trainingLogs', JSON.stringify(newLogs));
 
-          // Save logs to localStorage
-          // localStorage.setItem('trainingLogs', JSON.stringify(newLogs));
-
-          return newLogs;
-        });
-      } catch {
-        setTrainingDetails((prev) => {
-          const newLogs = [
-            ...prev.slice(-100),
-            {
-              message: event.data,
-              timestamp: new Date().toISOString()
-            }
-          ];
-
-          // Save logs to localStorage
-          // localStorage.setItem('trainingLogs', JSON.stringify(newLogs));
-
-          return newLogs;
-        });
-      }
+        return newLogs;
+      });
     };
 
     eventSource.onerror = (error) => {
       console.error('EventSource failed:', error);
       eventSource.close();
-      message.error('Failed to get training logs');
     };
 
     return () => {
@@ -412,7 +391,6 @@ export default function TrainingPage() {
     resetTrainingState();
 
     try {
-      // updateTrainLog();
       setNowTrainingParams(trainingParams);
 
       console.log('Using startTrain API to train new model:', trainingParams.model_name);
@@ -572,6 +550,7 @@ export default function TrainingPage() {
           trainActionLoading={trainActionLoading}
           trainingParams={trainingParams}
           updateTrainingParams={updateTrainingParams}
+          cudaAvailable={cudaAvailable}
         />
 
         {/* Only show training progress after training starts */}

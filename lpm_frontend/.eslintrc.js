@@ -17,5 +17,15 @@ module.exports = {
   ],
   rules: {
     '@next/next/no-sync-scripts': 'off'
+  },
+  settings: {
+    'import/resolver': {
+      typescript: {
+        project: 'Second-Me/lpm_frontend/tsconfig.json'
+      },
+      node: {
+        extensions: ['.js', '.jsx', '.ts', '.tsx']
+      }
+    }
   }
 };

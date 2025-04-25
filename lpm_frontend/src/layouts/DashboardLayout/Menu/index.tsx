@@ -255,10 +255,7 @@ const Menu = () => {
             <button
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 rounded-md transition-colors hover:bg-gray-800/5"
               onClick={() =>
-                window.open(
-                  'https://second-me.gitbook.io/a-new-ai-species-making-we-matter-again',
-                  '_blank'
-                )
+                window.open('https://secondme.gitbook.io/secondme/getting-started', '_blank')
               }
             >
               <DocumentIcon className="w-4 h-4 shrink-0" />

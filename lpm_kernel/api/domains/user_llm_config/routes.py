@@ -40,7 +40,28 @@ def validate_llm_config(data: Dict[Any, Any]) -> Dict[str, str]:
                 errors[field] = f'{field} is required for custom provider'
     else:
         errors['provider_type'] = 'provider_type is required'
+    
+    return errors
+
+
+def validate_thinking_model(data: Dict[Any, Any]) -> Dict[str, str]:
+    """Validate thinking model configuration
+    
+    Args:
+        data: Configuration data
         
+    Returns:
+        Dictionary with error messages if validation fails, empty dict if validation passes
+    """
+    errors = {}
+    
+    # Validate required fields
+    if not data.get('thinking_model_name'):
+        errors['thinking_model_name'] = 'Thinking model name is required'
+    
+    if not data.get('thinking_endpoint'):
+        errors['thinking_endpoint'] = 'Thinking endpoint is required'
+    
     return errors
 
 def process_openai_config(data: Dict[Any, Any]) -> Dict[Any, Any]:
@@ -55,6 +76,9 @@ def process_openai_config(data: Dict[Any, Any]) -> Dict[Any, Any]:
         data['embedding_endpoint'] = OPENAI_ENDPOINT
             
     return data
+
+
+
 
 
 @user_llm_config_bp.route("", methods=["GET"])
@@ -113,6 +137,50 @@ def update_config():
         logger.error(f"Failed to update configuration: {str(e)}", exc_info=True)
         return jsonify(
             APIResponse.error(f"Failed to update configuration: {str(e)}")
+        ), HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+
+
+
+@user_llm_config_bp.route("/thinking", methods=["PUT"])
+def update_thinking_model():
+    """Update thinking model configuration"""
+    try:
+        # Validate request data
+        request_data = request.json
+        validation_errors = validate_thinking_model(request_data)
+        
+        if validation_errors:
+            error_message = "; ".join([f"{k}: {v}" for k, v in validation_errors.items()])
+            return jsonify(
+                APIResponse.error(f"Validation failed: {error_message}")
+            ), HTTPStatus.BAD_REQUEST
+        
+        # Create a DTO with only thinking model fields
+        thinking_data = {}
+        if 'thinking_model_name' in request_data:
+            thinking_data['thinking_model_name'] = request_data['thinking_model_name']
+        if 'thinking_endpoint' in request_data:
+            thinking_data['thinking_endpoint'] = request_data['thinking_endpoint']
+        if 'thinking_api_key' in request_data:
+            thinking_data['thinking_api_key'] = request_data['thinking_api_key']
+        
+        # Update the configuration
+        data = UpdateUserLLMConfigDTO(**thinking_data)
+        config = user_llm_config_service.update_config(1, data)  # Default configuration ID is 1
+        
+        return jsonify(
+            APIResponse.success(
+                data=config.dict(),
+                message="Thinking model configuration updated successfully"
+            )
+        ), HTTPStatus.OK
+    
+    except Exception as e:
+        logger.error(f"Failed to update thinking model configuration: {str(e)}", exc_info=True)
+        return jsonify(
+            APIResponse.error(f"Failed to update thinking model configuration: {str(e)}")
         ), HTTPStatus.INTERNAL_SERVER_ERROR
 
 

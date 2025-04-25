@@ -60,10 +60,10 @@ class LoadService:
         """
         try:
             with DatabaseSession.session() as session:
-                # Check if a load record with the same name exists
-                existing_load = session.query(Load).filter(Load.name == name).first()
+                # Check if any load record exists
+                existing_load = session.query(Load).first()
                 if existing_load:
-                    return None, f"A load record with name '{name}' already exists", 400
+                    return None, f"A load record already exists. Only one load record is allowed in the system.", 400
                 
                 # Create a new Load instance
                 new_load = Load(
@@ -106,13 +106,9 @@ class LoadService:
                     return None, "Load record not found", 404
                 
                 # Update fields
-                updatable_fields = ["name", "description", "email", "avatar_data", "instance_id", "status"]
+                updatable_fields = ["name", "description", "email", "avatar_data"]
                 for field in updatable_fields:
                     if field in data:
-                        # Special validation for status field
-                        if field == "status" and data[field] not in ["active", "inactive", "deleted"]:
-                            return None, f"Status must be one of 'active', 'inactive', or 'deleted'", 400
-                        
                         setattr(load, field, data[field])
                 
                 session.commit()
@@ -144,7 +140,7 @@ class LoadService:
         return LoadService.update_load(current_load.id, data)
     
     @staticmethod
-    def update_instance_id(instance_id: str, instance_password: str = None) -> Tuple[bool, Optional[str], int]:
+    def update_instance_credentials(instance_id: str, instance_password: str) -> Tuple[bool, Optional[str], int]:
         """
         Update the instance_id and instance_password of the current load
         
@@ -158,22 +154,34 @@ class LoadService:
             - Error message or None if successful
             - Status code (200 for success, 400/404/500 for errors)
         """
-        try:
-            logger.info(f"Updating instance_id to {instance_id} and instance_password to {instance_password}")
+        try:            
+            logger.info(f"Updating instance credentials: ID={instance_id}, Password={'*****' if instance_password else None}")
+
+            # Get current load
+            current_load, error, status_code = LoadService.get_current_load()
+            if error:
+                return False, error, status_code
+            
+            if not current_load:
+                logger.warning("Load record not found")
+                return False, "Load record not found", 404
+            
+            # Update fields in database
             with DatabaseSession.session() as session:
-                load = session.query(Load).first()
+                load = session.query(Load).get(current_load.id)
                 if not load:
-                    logger.warning("Load record not found")
-                    return False, "Load record not found", 404
+                    logger.warning("Load record not found in database")
+                    return False, "Load record not found in database", 404
                 
                 load.instance_id = instance_id
-                if instance_password:
-                    load.instance_password = instance_password
+                load.instance_password = instance_password
+                
                 session.commit()
-                logger.info(f"Updated instance_id in database to: {instance_id}, instance_password: {instance_password}")
+                
+                logger.info(f"Updated instance credentials successfully")
                 return True, None, 200
         except Exception as e:
-            logger.error(f"Error updating instance_id: {str(e)}", exc_info=True)
+            logger.error(f"Error updating instance credentials: {str(e)}", exc_info=True)
             return False, f"Internal server error: {str(e)}", 500
     
     @staticmethod

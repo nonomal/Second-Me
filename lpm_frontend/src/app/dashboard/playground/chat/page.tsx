@@ -13,9 +13,12 @@ import {
 import type { ChatRequest } from '@/hooks/useSSE';
 import { useSSE } from '@/hooks/useSSE';
 import { useLoadInfoStore } from '@/store/useLoadInfoStore';
+import { getTrainingParams } from '@/service/train';
 
 // Use the Message type directly from storage
 type Message = StorageMessage;
+
+type ModelType = 'chat' | 'thinking';
 
 interface PlaygroundSettings {
   enableL0Retrieval: boolean;
@@ -36,17 +39,44 @@ const generateMessageId = () => {
 };
 
 export default function PlaygroundChat() {
+  const loadInfo = useLoadInfoStore((state) => state.loadInfo);
+
+  const { sendStreamMessage, streaming, streamContent, stopSSE } = useSSE();
+
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const { sendStreamMessage, streaming, streamContent, stopSSE } = useSSE();
+  const [modelType, setModelType] = useState<ModelType | undefined>(undefined);
 
-  const loadInfo = useLoadInfoStore((state) => state.loadInfo);
   const originPrompt = useMemo(() => {
     const name = loadInfo?.name || 'user';
 
-    return `You are ${name}'s "Second Me", which is a personalized AI created by ${name}. You can help ${name} answer questions based on your understanding of ${name}'s background information and past records.`;
-  }, [loadInfo]);
+    if (modelType === 'chat') {
+      return `You are ${name}'s "Second Me", which is a personalized AI created by ${name}. You can help ${name} answer questions based on your understanding of ${name}'s background information and past records.`;
+    }
+
+    if (modelType === 'thinking') {
+      return `You are ${name}'s "Second Me", and you are currently in conversation with ${name}.
+            Your task is to help ${name} answer relevant questions based on your understanding of ${name}'s background information and past records.
+            Please ensure your answers meet ${name}'s needs and provide precise solutions based on their historical information and personal preferences.
+
+            When thinking, please follow these steps and output the results clearly in order:
+                1. Consider the connection between questions and background: Review ${name}'s past records and personal information, analyzing the connections between their questions and these records.
+                2. Derive answers to questions: Based on ${name}'s historical data and specific question content, conduct reasoning and analysis to ensure accuracy and relevance of answers.
+                3. Generate high-quality responses: Distill answers that best meet ${name}'s needs and present them systematically with high information density.
+
+            Your output format must follow the following structure:
+
+            <think>  
+            As "Second Me"'s thinking process, analyze the relationships between ${name}'s background information, historical records and the questions raised, deriving reasonable solution approaches.  
+            </think>
+            <answer>  
+            This is the final answer for ${name}, ensuring the response is precise and meets their needs, while being systematic and information-dense.
+            </answer>`;
+    }
+
+    return '';
+  }, [loadInfo, modelType]);
   const originSettings = useMemo(() => {
     return {
       enableL0Retrieval: true,
@@ -71,6 +101,23 @@ export default function PlaygroundChat() {
       return newSettings;
     });
   }, [originPrompt]);
+
+  useEffect(() => {
+    getTrainingParams()
+      .then((res) => {
+        if (res.data.code === 0) {
+          const data = res.data.data;
+
+          localStorage.setItem('trainingParams', JSON.stringify(data));
+          setModelType(data.is_cot ? 'thinking' : 'chat');
+        } else {
+          throw new Error(res.data.message);
+        }
+      })
+      .catch((error) => {
+        console.error(error.message);
+      });
+  }, []);
 
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
@@ -173,7 +220,7 @@ export default function PlaygroundChat() {
     };
 
     // Update message list, adding user message and empty assistant message
-    let newMessages = [...messages, userMessage, assistantMessage];
+    let newMessages = [...messages, userMessage];
 
     const systemMessage: Message = {
       id: generateMessageId(),
@@ -186,21 +233,22 @@ export default function PlaygroundChat() {
     };
 
     if (!newMessages.find((item) => item.role === 'system')) {
-      newMessages = [systemMessage, ...newMessages]
+      newMessages = [systemMessage, ...newMessages];
     } else {
       newMessages = newMessages.map((msg) => {
         if (msg.role === 'system') {
           return { ...msg, content: originPrompt };
         }
+
         return msg;
       });
     }
 
-    setMessages(newMessages);
+    setMessages([...newMessages, assistantMessage]);
 
     // Save messages to session
     if (activeSessionId) {
-      chatStorage.saveSessionMessages(activeSessionId, newMessages);
+      chatStorage.saveSessionMessages(activeSessionId, [...newMessages, assistantMessage]);
 
       // If it's the first message in a new session, update session title
       if (messages.length === 0) {
@@ -306,8 +354,8 @@ export default function PlaygroundChat() {
                       index === messages.length - 1 &&
                       message.role === 'assistant'
                     }
-                    role={message.role}
                     message={message.content}
+                    role={message.role}
                     timestamp={message.timestamp}
                   />
                 ))}

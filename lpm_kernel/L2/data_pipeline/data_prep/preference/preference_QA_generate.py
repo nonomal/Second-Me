@@ -4,7 +4,6 @@ import json
 import os
 import random
 import re
-from dotenv import load_dotenv
 from tqdm import tqdm
 import openai
 from enum import Enum
@@ -54,8 +53,18 @@ class PreferenceQAGenerator:
             bio: Biography or context information to use in prompt generation.
             preference_language: Language for prompts ("Chinese/中文" or otherwise English).
         """
+        # Ensure the filename is actually a string
+        if filename is None:
+            raise ValueError("Filename cannot be None")
+            
         self.filename = filename
-        self.is_cot = is_cot
+        # Convert is_cot to bool if it's a string
+        if isinstance(is_cot, str):
+            self.is_cot = is_cot.lower() == 'true'
+        else:
+            self.is_cot = bool(is_cot)
+            
+        logger.info(f"PreferenceQAGenerator initialized with is_cot={self.is_cot}")
         
         with open(self.filename, "r", encoding="utf-8") as f:
             self.pre_msg = json.load(f)
@@ -74,19 +83,11 @@ class PreferenceQAGenerator:
             )
         if self.is_cot:
             logger.info("generate pereference data in longcot pattern!!!")
-            self.env_path = os.path.join(os.getcwd(), "lpm_kernel/L2/.env")
-            if os.path.exists(self.env_path):
-                load_dotenv(self.env_path)
-            else:
-                raise FileNotFoundError(f"Config file not found: {self.env_path}")
-            self.model_name = os.getenv("DEEPSEEK_MODEL_NAME", "")
-            self.api_key = os.getenv("DEEPSEEK_API_KEY", "")
-            self.base_url = os.getenv("DEEPSEEK_BASE_URL", "")
+            self.model_name = user_llm_config.thinking_model_name
+            self.api_key = user_llm_config.thinking_api_key
+            self.base_url = user_llm_config.thinking_endpoint
             if self.model_name.startswith("deepseek"):
-                    self.client = openai.OpenAI(
-                    api_key=self.api_key,
-                    base_url=self.base_url,
-                )
+                self.client = openai.OpenAI(api_key=self.api_key, base_url=self.base_url)
             else:
                 logger.error(f"Error model_name, longcot data generating model_name: deepseek series")
                 raise

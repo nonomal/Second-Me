@@ -1,6 +1,6 @@
-import { getModelConfig, updateModelConfig } from '@/service/modelConfig';
-import { useModelConfigStore } from '@/store/useModelConfigStore';
-import { Input, message, Modal, Radio } from 'antd';
+import { updateModelConfig } from '../../service/modelConfig';
+import { useModelConfigStore } from '../../store/useModelConfigStore';
+import { Input, Modal, Radio } from 'antd';
 import Image from 'next/image';
 import { useCallback, useEffect, useState } from 'react';
 import { QuestionCircleOutlined } from '@ant-design/icons';
@@ -28,22 +28,21 @@ const options = [
 const ModelConfigModal = (props: IProps) => {
   const { open, onClose } = props;
   const modelConfig = useModelConfigStore((store) => store.modelConfig);
-  const updateLocalModelConfig = useModelConfigStore((store) => store.updateModelConfig);
-
+  const baseModelConfig = useModelConfigStore((store) => store.baseModelConfig);
+  const updateBaseModelConfig = useModelConfigStore((store) => store.updateBaseModelConfig);
+  const fetchModelConfig = useModelConfigStore((store) => store.fetchModelConfig);
+  const localProviderType = useModelConfigStore((store) => store.modelConfig.provider_type);
   const [modelType, setModelType] = useState<string>('');
 
   useEffect(() => {
-    getModelConfig().then((res) => {
-      if (res.data.code == 0) {
-        const data = res.data.data || {};
+    if (open) {
+      fetchModelConfig();
+    }
+  }, [open]);
 
-        updateLocalModelConfig(data);
-        setModelType(data.provider_type);
-      } else {
-        message.error(res.data.message);
-      }
-    });
-  }, []);
+  useEffect(() => {
+    setModelType(localProviderType);
+  }, [localProviderType]);
 
   const renderEmpty = () => {
     return (
@@ -69,10 +68,10 @@ const ModelConfigModal = (props: IProps) => {
           <label className="block text-sm font-medium text-gray-700 mb-1">API Key</label>
           <Input.Password
             onChange={(e) => {
-              updateLocalModelConfig({ ...modelConfig, key: e.target.value });
+              updateBaseModelConfig({ ...baseModelConfig, key: e.target.value });
             }}
             placeholder="Enter your OpenAI API key"
-            value={modelConfig.key}
+            value={baseModelConfig.key}
           />
           <div className="mt-2 text-sm text-gray-500">
             You can get your API key from{' '}
@@ -89,7 +88,7 @@ const ModelConfigModal = (props: IProps) => {
         </div>
       </div>
     );
-  }, [modelConfig]);
+  }, [baseModelConfig]);
 
   const renderCustom = useCallback(() => {
     return (
@@ -106,10 +105,10 @@ const ModelConfigModal = (props: IProps) => {
                 className="w-full"
                 data-form-type="other"
                 onChange={(e) => {
-                  updateLocalModelConfig({ ...modelConfig, chat_model_name: e.target.value });
+                  updateBaseModelConfig({ ...baseModelConfig, chat_model_name: e.target.value });
                 }}
                 spellCheck="false"
-                value={modelConfig.chat_model_name}
+                value={baseModelConfig.chat_model_name}
               />
             </div>
 
@@ -122,10 +121,10 @@ const ModelConfigModal = (props: IProps) => {
                 className="w-full"
                 data-form-type="other"
                 onChange={(e) => {
-                  updateLocalModelConfig({ ...modelConfig, chat_api_key: e.target.value });
+                  updateBaseModelConfig({ ...baseModelConfig, chat_api_key: e.target.value });
                 }}
                 spellCheck="false"
-                value={modelConfig.chat_api_key}
+                value={baseModelConfig.chat_api_key}
               />
             </div>
           </div>
@@ -136,9 +135,9 @@ const ModelConfigModal = (props: IProps) => {
               autoComplete="off"
               className="w-full"
               onChange={(e) => {
-                updateLocalModelConfig({ ...modelConfig, chat_endpoint: e.target.value });
+                updateBaseModelConfig({ ...baseModelConfig, chat_endpoint: e.target.value });
               }}
-              value={modelConfig.chat_endpoint}
+              value={baseModelConfig.chat_endpoint}
             />
           </div>
         </div>
@@ -151,9 +150,12 @@ const ModelConfigModal = (props: IProps) => {
               <Input
                 className="w-full"
                 onChange={(e) => {
-                  updateLocalModelConfig({ ...modelConfig, embedding_model_name: e.target.value });
+                  updateBaseModelConfig({
+                    ...baseModelConfig,
+                    embedding_model_name: e.target.value
+                  });
                 }}
-                value={modelConfig.embedding_model_name}
+                value={baseModelConfig.embedding_model_name}
               />
             </div>
 
@@ -162,9 +164,9 @@ const ModelConfigModal = (props: IProps) => {
               <Input.Password
                 className="w-full"
                 onChange={(e) => {
-                  updateLocalModelConfig({ ...modelConfig, embedding_api_key: e.target.value });
+                  updateBaseModelConfig({ ...baseModelConfig, embedding_api_key: e.target.value });
                 }}
-                value={modelConfig.embedding_api_key}
+                value={baseModelConfig.embedding_api_key}
               />
             </div>
           </div>
@@ -174,31 +176,27 @@ const ModelConfigModal = (props: IProps) => {
             <Input
               className="w-full"
               onChange={(e) => {
-                updateLocalModelConfig({ ...modelConfig, embedding_endpoint: e.target.value });
+                updateBaseModelConfig({ ...baseModelConfig, embedding_endpoint: e.target.value });
               }}
-              value={modelConfig.embedding_endpoint}
+              value={baseModelConfig.embedding_endpoint}
             />
           </div>
         </div>
       </div>
     );
-  }, [modelConfig]);
+  }, [baseModelConfig, updateBaseModelConfig]);
 
   const handleUpdate = () => {
-    // When None is selected, save an empty provider_type instead of deleting the config
-    const providerType = modelType || '';
-
-    updateModelConfig({ ...modelConfig, provider_type: providerType })
+    updateModelConfig(modelConfig)
       .then((res) => {
         if (res.data.code == 0) {
-          updateLocalModelConfig({ ...modelConfig, provider_type: providerType });
           onClose();
         } else {
           throw new Error(res.data.message);
         }
       })
-      .catch((error: any) => {
-        message.error(error.message || 'Failed to update model config');
+      .catch((error) => {
+        console.error(error.message || 'Failed to update model config');
       });
   };
 
@@ -246,7 +244,10 @@ const ModelConfigModal = (props: IProps) => {
           </p>
           <Radio.Group
             buttonStyle="solid"
-            onChange={(e) => setModelType(e.target.value)}
+            onChange={(e) => {
+              setModelType(e.target.value);
+              updateBaseModelConfig({ ...baseModelConfig, provider_type: e.target.value });
+            }}
             optionType="button"
             options={options}
             value={modelType ? modelType : ''}

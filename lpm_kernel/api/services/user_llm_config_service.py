@@ -42,7 +42,7 @@ class UserLLMConfigService:
         
         # Update or create the configuration
         return self.repository.update(config_id, dto)
-    
+
     def delete_key(self, config_id: int = 1) -> Optional[UserLLMConfigDTO]:
         """Delete API key from the configuration
         

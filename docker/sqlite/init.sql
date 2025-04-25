@@ -188,6 +188,11 @@ CREATE TABLE IF NOT EXISTS user_llm_configs (
     embedding_api_key VARCHAR(200),
     embedding_model_name VARCHAR(200),
     
+    -- Thinking configuration
+    thinking_model_name VARCHAR(200),
+    thinking_endpoint VARCHAR(200),
+    thinking_api_key VARCHAR(200),
+    
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

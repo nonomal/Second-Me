@@ -2,6 +2,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 import http.client
 import json
+import requests
 
 mindverse = FastMCP("mindverse_public")
 url = "app.secondme.io"
@@ -65,6 +66,31 @@ async def get_response(query:str, instance_id:str) -> str | None:
         return full_content
     else:
         return None
+
+@mindverse.tool()
+async def get_online_instances():
+    """
+    Check which secondme models are available for chatting online.
+    """
+    url = "https://app.secondme.io/api/upload/list?page_size=100"
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        data = response.json()
+        items = data.get("data", {}).get("items", [])
+
+        online_items = [
+            {
+                "upload_name": item["upload_name"],
+                "instance_id": item["instance_id"],
+                "description": item["description"]
+            }
+            for item in items if item.get("status") == "online"
+        ]
+
+        return json.dumps(online_items, ensure_ascii=False, indent=2)
+    else:
+        raise Exception(f"Request failed with status code: {response.status_code}")
 
 if __name__ == "__main__":
 

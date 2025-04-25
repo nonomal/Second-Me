@@ -10,7 +10,6 @@ import openai
 import pandas as pd
 from tqdm import tqdm
 from enum import Enum
-from dotenv import load_dotenv
 from lpm_kernel.api.services.user_llm_config_service import UserLLMConfigService
 from lpm_kernel.configs.config import Config
 from lpm_kernel.L2.data_pipeline.data_prep.diversity.utils import remove_similar_dicts
@@ -70,19 +69,11 @@ class DiversityDataGenerator:
         self.is_cot = is_cot
         if self.is_cot:
             logger.info("generate diversity data in longcot pattern!!!")
-            self.env_path = os.path.join(os.getcwd(), "lpm_kernel/L2/.env")
-            if os.path.exists(self.env_path):
-                load_dotenv(self.env_path)
-            else:
-                raise FileNotFoundError(f"Config file not found: {self.env_path}")
-            self.model_name = os.getenv("DEEPSEEK_MODEL_NAME", "")
-            self.api_key = os.getenv("DEEPSEEK_API_KEY", "")
-            self.base_url = os.getenv("DEEPSEEK_BASE_URL", "")
+            self.model_name = user_llm_config.thinking_model_name
+            self.api_key = user_llm_config.thinking_api_key
+            self.base_url = user_llm_config.thinking_endpoint
             if self.model_name.startswith("deepseek"):
-                    self.client = openai.OpenAI(
-                    api_key=self.api_key,
-                    base_url=self.base_url,
-                )
+                self.client = openai.OpenAI(api_key=self.api_key, base_url=self.base_url)
             else:
                 logger.error(f"Error model_name, longcot data generating model_name: deepseek series")
                 raise

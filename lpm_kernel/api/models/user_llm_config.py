@@ -21,7 +21,10 @@ class UserLLMConfig(Base):
     embedding_api_key = Column(String(200), nullable=True, comment='Embedding API key')
     embedding_model_name = Column(String(200), nullable=True, comment='Embedding model name')
     
-
+    # Thinking configuration
+    thinking_model_name = Column(String(200), nullable=True, comment='Thinking model name')
+    thinking_endpoint = Column(String(200), nullable=True, comment='Thinking API endpoint')
+    thinking_api_key = Column(String(200), nullable=True, comment='Thinking API key')
     
     created_at = Column(DateTime, default=datetime.utcnow, comment='Creation time')
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment='Update time')
@@ -41,6 +44,9 @@ class UserLLMConfig(Base):
             'embedding_endpoint': self.embedding_endpoint,
             'embedding_api_key': self.embedding_api_key,
             'embedding_model_name': self.embedding_model_name,
+            'thinking_model_name': self.thinking_model_name,
+            'thinking_endpoint': self.thinking_endpoint,
+            'thinking_api_key': self.thinking_api_key,
             'created_at': self.created_at,
             'updated_at': self.updated_at
         }
@@ -58,6 +64,9 @@ class UserLLMConfig(Base):
             embedding_endpoint=data.get('embedding_endpoint'),
             embedding_api_key=data.get('embedding_api_key'),
             embedding_model_name=data.get('embedding_model_name'),
+            thinking_model_name=data.get('thinking_model_name'),
+            thinking_endpoint=data.get('thinking_endpoint'),
+            thinking_api_key=data.get('thinking_api_key'),
             created_at=data.get('created_at'),
             updated_at=data.get('updated_at')
         )

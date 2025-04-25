@@ -15,6 +15,7 @@ services:
       - ./resources:/app/resources
       - ./docker:/app/docker
       - ./.env:/app/.env
+      - llama-cpp-build:/app/llama.cpp/build  # Persist the llama.cpp build
     environment:
       # Environment variables
       - LOCAL_APP_PORT=8002
@@ -62,3 +63,7 @@ services:
 networks:
   second-me-network:
     driver: bridge
+
+volumes:
+  llama-cpp-build:
+    driver: local
