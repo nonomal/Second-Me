@@ -92,7 +92,8 @@ class TrainProcessService:
         """
         if cls._instance is None:
             if current_model_name is None:
-                raise ValueError("current_model_name must be provided when creating a new instance")
+                logger.warning("current_model_name must be provided when creating a new instance")
+                return None
             return cls(current_model_name)
         
         if current_model_name is not None:

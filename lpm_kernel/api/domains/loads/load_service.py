@@ -3,12 +3,14 @@ Load Service Module
 
 This module provides service functions for managing Load entities.
 """
-
+import os
 import logging
 from typing import Optional, Dict, Any, Tuple
 from lpm_kernel.models.load import Load
 from lpm_kernel.common.repository.database_session import DatabaseSession
 from lpm_kernel.api.domains.loads.dto import LoadDTO
+from lpm_kernel.train.trainprocess_service import TrainProcessService
+from lpm_kernel.api.domains.kernel2.routes_l2 import _training_process, _training_thread, _stopping_training
 
 logger = logging.getLogger(__name__)
 
@@ -424,10 +426,6 @@ class LoadService:
     def _reset_training_progress() -> None:
         """Reset training progress objects in memory"""
         try:
-            import os
-            # Import training service
-            from lpm_kernel.train.trainprocess_service import TrainProcessService
-            
             # Get all possible training progress file patterns
             base_dir = os.getenv('LOCAL_BASE_DIR', '.')
             progress_dir = os.path.join(base_dir, 'data', 'progress')
@@ -443,14 +441,16 @@ class LoadService:
             
             # Reset default training progress
             default_train_service = TrainProcessService.get_instance()
-            default_train_service.progress.reset_progress()
+            if default_train_service is not None:
+                default_train_service.progress.reset_progress()
+            
             logger.info("Reset default training progress")
             
             # Reset global training process variables
             from lpm_kernel.api.domains.kernel2.routes_l2 import _training_process, _training_thread, _stopping_training
             if _training_process is not None:
                 logger.info("Resetting global training process variables")
-                _training_process = None
+                _training_process = None 
                 _training_thread = None
                 _stopping_training = False
             
