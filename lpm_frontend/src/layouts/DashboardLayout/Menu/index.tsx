@@ -26,6 +26,7 @@ const Menu = () => {
   const status = useTrainingStore((state) => state.status);
   const loadInfo = useLoadInfoStore((state) => state.loadInfo);
   const clearLoadInfo = useLoadInfoStore((state) => state.clearLoadInfo);
+  const serviceStarted = useTrainingStore((state) => state.serviceStarted);
 
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -72,13 +73,7 @@ const Menu = () => {
       path.startsWith(ROUTER_PATH.PLAYGROUND) ||
       path === ROUTER_PATH.APPLICATIONS
     ) {
-      if (status !== 'running' && status !== 'trained') {
-        e.preventDefault();
-        message.info({
-          content: 'Please train your model first',
-          duration: 2
-        });
-      } else if (status === 'trained') {
+      if (!serviceStarted) {
         e.preventDefault();
         message.info({
           content: 'Please start your model service first',

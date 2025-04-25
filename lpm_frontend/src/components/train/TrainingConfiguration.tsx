@@ -82,7 +82,7 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
     return isTraining
       ? 'Stop Training'
       : !changeBaseModel
-        ? status === 'trained' || status === 'running'
+        ? status === 'trained'
           ? 'Retrain'
           : isResume
             ? 'Resume Training'

@@ -9,7 +9,7 @@ interface ProcessInfo {
   pid: string;
 }
 
-interface ServiceStatusRes {
+export interface ServiceStatusRes {
   process_info?: ProcessInfo;
   is_running?: boolean;
 }

@@ -80,6 +80,7 @@ export default function TrainingPage() {
   const modelConfig = useModelConfigStore((store) => store.modelConfig);
   const status = useTrainingStore((state) => state.status);
   const trainingProgress = useTrainingStore((state) => state.trainingProgress);
+  const serviceStarted = useTrainingStore((state) => state.serviceStarted);
 
   const router = useRouter();
 
@@ -475,7 +476,7 @@ export default function TrainingPage() {
       return;
     }
 
-    if (!isTraining && status === 'running') {
+    if (!isTraining && serviceStarted) {
       message.error('Model is already running, please stop it first');
 
       return;
@@ -491,8 +492,8 @@ export default function TrainingPage() {
       return;
     }
 
-    // If the same model has already been trained and status is 'trained' or 'running', perform retraining
-    if (!changeBaseModel && (status === 'trained' || status === 'running')) {
+    // If the same model has already been trained and service is started, perform retraining
+    if (!changeBaseModel && (status === 'trained' || serviceStarted)) {
       await handleRetrainModel();
     } else {
       // Otherwise start new training
@@ -566,7 +567,7 @@ export default function TrainingPage() {
         />
 
         {/* Only show training progress after training starts */}
-        {(status === 'training' || status === 'trained' || status === 'running') &&
+        {(status === 'training' || status === 'trained' || serviceStarted) &&
           renderTrainingProgress()}
 
         {/* Always show training log regardless of training status */}

@@ -1,40 +1,45 @@
 import { create } from 'zustand';
-import { getTrainProgress, type TrainProgress } from '@/service/train';
+import {
+  getServiceStatus,
+  getTrainProgress,
+  type TrainProgress,
+  type ServiceStatusRes
+} from '@/service/train';
+import type { CommonResponse } from '@/types/responseModal';
 
-export type ModelStatus = 'seed_identity' | 'memory_upload' | 'training' | 'trained' | 'running';
+export type ModelStatus = 'seed_identity' | 'memory_upload' | 'training' | 'trained';
 
 export enum Status {
   SEED_IDENTITY = 'seed_identity',
   MEMORY_UPLOAD = 'memory_upload',
   TRAINING = 'training',
-  TRAINED = 'trained',
-  RUNNING = 'running'
+  TRAINED = 'trained'
 }
 
 export const statusRankMap = {
   [Status.SEED_IDENTITY]: 0,
   [Status.MEMORY_UPLOAD]: 1,
   [Status.TRAINING]: 2,
-  [Status.TRAINED]: 3,
-  [Status.RUNNING]: 3
+  [Status.TRAINED]: 2
 };
 
 interface ModelState {
   status: ModelStatus;
   error: boolean;
   isTraining: boolean;
+  serviceStarted: boolean;
   isServiceStarting: boolean;
   isServiceStopping: boolean;
   trainingProgress: TrainProgress;
   setStatus: (status: ModelStatus) => void;
   setError: (error: boolean) => void;
   setIsTraining: (isTraining: boolean) => void;
+  fetchServiceStatus: () => Promise<CommonResponse<ServiceStatusRes>>;
   setServiceStarting: (isStarting: boolean) => void;
   setServiceStopping: (isStopping: boolean) => void;
   setTrainingProgress: (progress: TrainProgress) => void;
   checkTrainStatus: () => Promise<void>;
   resetTrainingState: () => void;
-  // fetchStatus: () => void;
 }
 
 const defaultTrainingProgress: TrainProgress = {
@@ -99,6 +104,7 @@ const defaultTrainingProgress: TrainProgress = {
 export const useTrainingStore = create<ModelState>((set, get) => ({
   status: 'seed_identity',
   isTraining: false,
+  serviceStarted: false,
   isServiceStarting: false,
   isServiceStopping: false,
   error: false,
@@ -112,6 +118,21 @@ export const useTrainingStore = create<ModelState>((set, get) => ({
     }
 
     set({ status });
+  },
+  fetchServiceStatus: () => {
+    return getServiceStatus().then((res) => {
+      if (res.data.code === 0) {
+        const isRunning = res.data.data.is_running;
+
+        if (isRunning) {
+          set({ serviceStarted: true });
+        } else {
+          set({ serviceStarted: false });
+        }
+      }
+
+      return res;
+    });
   },
   setError: (error) => set({ error }),
   setIsTraining: (isTraining) => set({ isTraining }),
@@ -140,14 +161,6 @@ export const useTrainingStore = create<ModelState>((set, get) => ({
         }
 
         set((state) => {
-          // If current status is running, keep it unchanged
-          if (state.status === 'running') {
-            return {
-              ...state,
-              trainingProgress: newProgress
-            };
-          }
-
           const newState = {
             ...state,
             trainingProgress: newProgress
@@ -170,45 +183,4 @@ export const useTrainingStore = create<ModelState>((set, get) => ({
       set({ error: true });
     }
   }
-  // fetchStatus: async () => {
-  //   const serviceStatus = await getServiceStatus();
-
-  //   if (serviceStatus.data.code === 0 && serviceStatus.data.data.is_running) {
-  //     set({ status: 'running' });
-
-  //     return;
-  //   }
-
-  //   const config = JSON.parse(localStorage.getItem('trainingParams') || '{}');
-
-  //   if (!config.model_name) {
-  //     const trainingStatus = await getTrainProgress({
-  //       model_name: config.model_name
-  //     });
-
-  //     if (trainingStatus.data.code == 0) {
-  //       if (trainingStatus.data.data.overall_progress == 100) {
-  //         set({ status: 'trained' });
-
-  //         return;
-  //       }
-
-  //       if (trainingStatus.data.data.overall_progress > 0) {
-  //         set({ status: 'training' });
-
-  //         return;
-  //       }
-  //     }
-  //   }
-
-  //   const memoryStatus = await getMemoryList();
-
-  //   if (memoryStatus.data.code === 0 && memoryStatus.data.data.length > 0) {
-  //     set({ status: 'memory_upload' });
-
-  //     return;
-  //   }
-
-  //   set({ status: 'seed_identity' });
-  // }
 }));

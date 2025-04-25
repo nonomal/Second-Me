@@ -1,5 +1,5 @@
 import { Status, statusRankMap, useTrainingStore } from '@/store/useTrainingStore';
-import { startService, stopService, getServiceStatus } from '@/service/train';
+import { startService, stopService } from '@/service/train';
 import { StatusBar } from '../StatusBar';
 import { useRef, useEffect, useState, useMemo } from 'react';
 import { message } from 'antd';
@@ -25,10 +25,12 @@ const StatusDot = ({ active }: { active: boolean }) => (
 export function ModelStatus() {
   const status = useTrainingStore((state) => state.status);
   const setStatus = useTrainingStore((state) => state.setStatus);
+  const serviceStarted = useTrainingStore((state) => state.serviceStarted);
   const isServiceStarting = useTrainingStore((state) => state.isServiceStarting);
   const isServiceStopping = useTrainingStore((state) => state.isServiceStopping);
   const setServiceStarting = useTrainingStore((state) => state.setServiceStarting);
   const setServiceStopping = useTrainingStore((state) => state.setServiceStopping);
+  const fetchServiceStatus = useTrainingStore((state) => state.fetchServiceStatus);
   const isTraining = useTrainingStore((state) => state.isTraining);
 
   const [messageApi, contextHolder] = message.useMessage();
@@ -42,37 +44,13 @@ export function ModelStatus() {
   const [showtrainingModal, setShowtrainingModal] = useState(false);
 
   const handleRegistryClick = () => {
-    if (status !== 'trained' && status !== 'running') {
-      messageApi.info({
-        content: 'Please train your model first',
-        duration: 1
-      });
-    } else if (status === 'trained') {
+    if (!serviceStarted) {
       messageApi.info({
         content: 'Please start your model service first',
         duration: 1
       });
-    } else if (status === 'running') {
+    } else {
       setShowRegisterModal(true);
-    }
-  };
-
-  const fetchServiceStatus = async () => {
-    try {
-      const statusRes = await getServiceStatus();
-
-      if (statusRes.data.code === 0) {
-        const isRunning = statusRes.data.data.is_running;
-
-        if (isRunning) {
-          setStatus('running');
-          setServiceStarting(false);
-        } else if (status === 'running') {
-          setStatus('trained');
-        }
-      }
-    } catch (error) {
-      console.error('Error checking initial service status:', error);
     }
   };
 
@@ -115,13 +93,12 @@ export function ModelStatus() {
 
     // Start new polling interval
     pollingInterval.current = setInterval(() => {
-      getServiceStatus()
-        .then((statusRes) => {
-          if (statusRes.data.code === 0) {
-            const isRunning = statusRes.data.data.is_running;
+      fetchServiceStatus()
+        .then((res) => {
+          if (res.data.code === 0) {
+            const isRunning = res.data.data.is_running;
 
             if (isRunning) {
-              setStatus('running');
               setServiceStarting(false);
               clearPolling();
             }
@@ -138,13 +115,12 @@ export function ModelStatus() {
 
     // Start new polling interval
     pollingInterval.current = setInterval(() => {
-      getServiceStatus()
-        .then((statusRes) => {
-          if (statusRes.data.code === 0) {
-            const isRunning = statusRes.data.data.is_running;
+      fetchServiceStatus()
+        .then((res) => {
+          if (res.data.code === 0) {
+            const isRunning = res.data.data.is_running;
 
             if (!isRunning) {
-              setStatus('trained');
               setServiceStopping(false);
               clearPolling();
             }
@@ -209,7 +185,7 @@ export function ModelStatus() {
   };
 
   const handleServiceAction = () => {
-    if (status === 'running') {
+    if (serviceStarted) {
       handleStopService();
     } else {
       if (isTraining) {
@@ -246,7 +222,7 @@ export function ModelStatus() {
                 <LoadingOutlined className="text-lg" spin />
                 <span>{isServiceStarting ? 'Starting...' : 'Stopping...'}</span>
               </>
-            ) : status === 'running' ? (
+            ) : serviceStarted ? (
               <>
                 <StatusDot active={true} />
                 <PauseCircleOutlined className="text-lg" />
