@@ -282,6 +282,13 @@ def retrain():
     
     Request parameters:
         model_name: Model name (required)
+        learning_rate: Learning rate for model training (optional)
+        number_of_epochs: Number of training epochs (optional)
+        concurrency_threads: Number of threads for concurrent processing (optional)
+        data_synthesis_mode: Mode for data synthesis (optional)
+        use_cuda: Whether to use CUDA for training (optional)
+        is_cot: Whether to use Chain of Thought (optional)
+        use_previous_params: Whether to use previous training parameters (optional, default True)
     
     Returns:
         Response: JSON response
@@ -302,6 +309,17 @@ def retrain():
         if not model_name:
             return jsonify(APIResponse.error(message="missing necessary parameter: model_name", code=400))
         
+        # Get optional parameters
+        learning_rate = data.get("learning_rate", None)
+        number_of_epochs = data.get("number_of_epochs", None)
+        concurrency_threads = data.get("concurrency_threads", None)
+        data_synthesis_mode = data.get("data_synthesis_mode", None)
+        use_cuda = data.get("use_cuda", False)
+        is_cot = data.get("is_cot", None)
+        
+        # Log the received parameters
+        logger.info(f"Retrain parameters: model_name={model_name}, learning_rate={learning_rate}, number_of_epochs={number_of_epochs}, concurrency_threads={concurrency_threads}, data_synthesis_mode={data_synthesis_mode}, use_cuda={use_cuda}, is_cot={is_cot}, use_previous_params={use_previous_params}")
+        
         # Create training service instance
         train_service = TrainProcessService(current_model_name=model_name)
         
@@ -312,6 +330,24 @@ def retrain():
             
         train_service.reset_progress()
 
+        # Save training parameters
+        training_params = {
+            "model_name": model_name,
+            "learning_rate": learning_rate,
+            "number_of_epochs": number_of_epochs,
+            "concurrency_threads": concurrency_threads,
+            "data_synthesis_mode": data_synthesis_mode,
+            "use_cuda": use_cuda,
+            "is_cot": is_cot
+        }
+        
+        params_manager = TrainingParamsManager()
+        # Update the training parameters, optionally using previous params as base
+        params_manager.update_training_params(training_params, use_previous_params=False)
+        
+        # Log training parameters
+        logger.info(f"Saved training parameters: {training_params}")
+
         thread = Thread(target=train_service.start_process)
         thread.daemon = True
         thread.start()
@@ -320,7 +356,13 @@ def retrain():
             APIResponse.success(
                 message="Successfully reset progress to data processing stage and started training process",
                 data={
-                    "model_name": model_name
+                    "model_name": model_name,
+                    "learning_rate": learning_rate,
+                    "number_of_epochs": number_of_epochs,
+                    "concurrency_threads": concurrency_threads,
+                    "data_synthesis_mode": data_synthesis_mode,
+                    "use_cuda": use_cuda,
+                    "is_cot": is_cot
                 }
             )
         )
