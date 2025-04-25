@@ -349,3 +349,56 @@ def get_document_embedding(document_id: int):
         return jsonify(
             APIResponse.error(message=f"Error getting document embedding: {str(e)}")
         )
+
+
+@document_bp.route("/documents/verify-embeddings", methods=["GET"])
+def verify_document_embeddings():
+    """Verify all document embeddings and return statistics"""
+    try:
+        verbose = request.args.get("verbose", "").lower() == "true"
+        results = document_service.verify_document_embeddings(verbose=verbose)
+        return jsonify(APIResponse.success(data=results))
+
+    except Exception as e:
+        logger.error(f"Error verifying document embeddings: {str(e)}", exc_info=True)
+        return jsonify(APIResponse.error(message=f"Error verifying document embeddings: {str(e)}"))
+
+
+@document_bp.route("/documents/repair", methods=["POST"])
+def repair_documents():
+    """Repair documents with missing analysis and embeddings"""
+    try:
+        # First, fix missing document analysis (summaries and insights)
+        fixed_analysis_count = document_service.fix_missing_document_analysis()
+        
+        # Get verification results after fixing analysis
+        verification_results = document_service.verify_document_embeddings(verbose=False)
+        
+        # Process documents with missing embeddings
+        documents_fixed = 0
+        for doc in document_service._repository.list():
+            embedding = document_service.get_document_embedding(doc.id)
+            if doc.raw_content and embedding is None:
+                try:
+                    document_service.process_document_embedding(doc.id)
+                    # Also process chunk embeddings
+                    document_service.generate_document_chunk_embeddings(doc.id)
+                    documents_fixed += 1
+                except Exception as e:
+                    logger.error(f"Error processing document {doc.id} embedding: {str(e)}")
+        
+        # Get final verification results
+        final_results = document_service.verify_document_embeddings(verbose=False)
+        
+        return jsonify(APIResponse.success(
+            data={
+                "analysis_fixed": fixed_analysis_count,
+                "embeddings_fixed": documents_fixed,
+                "initial_state": verification_results,
+                "final_state": final_results
+            }
+        ))
+
+    except Exception as e:
+        logger.error(f"Error repairing documents: {str(e)}", exc_info=True)
+        return jsonify(APIResponse.error(message=f"Error repairing documents: {str(e)}"))

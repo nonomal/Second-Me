@@ -26,6 +26,14 @@ interface ModelConfig {
   [key: string]: any;
 }
 
+interface TrainingParams {
+  data_synthesis_mode: string;
+  learning_rate: number;
+  number_of_epochs: number;
+  concurrency_threads: number;
+  use_cuda: boolean;
+}
+
 interface TrainingConfigurationProps {
   baseModelOptions: BaseModelOption[];
   modelConfig: ModelConfig | null;
@@ -40,6 +48,7 @@ interface TrainingConfigurationProps {
   trainActionLoading: boolean;
   setSelectedInfo: React.Dispatch<React.SetStateAction<boolean>>;
   trainingParams: TrainingConfig;
+  cudaAvailable: boolean;
 }
 
 const synthesisModeOptions = [
@@ -61,7 +70,8 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
   changeBaseModel,
   trainActionLoading,
   handleTrainingAction,
-  setSelectedInfo
+  setSelectedInfo,
+  cudaAvailable
 }) => {
   const [disabledChangeParams, setDisabledChangeParams] = useState<boolean>(false);
   const [openThinkingModel, setOpenThinkingModel] = useState<boolean>(false);
@@ -392,6 +402,47 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                 />
                 <div className="text-xs text-gray-500">
                   Enter an integer between 1 and 10 (recommended: 2)
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 mt-4">
+                <div className="flex gap-3 items-center">
+                  <div className="font-medium">Enable CUDA GPU Acceleration</div>
+                  <Tooltip title="When enabled, training will use CUDA GPU acceleration if available on your system. This can significantly speed up training but requires compatible NVIDIA hardware and drivers.">
+                    <QuestionCircleOutlined className="cursor-pointer" />
+                  </Tooltip>
+                </div>
+                <div className="flex items-center">
+                  <label className="inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={
+                        disabledChangeParams && nowTrainingParams && !changeBaseModel
+                          ? nowTrainingParams.use_cuda
+                          : trainingParams.use_cuda
+                      }
+                      className="sr-only peer"
+                      disabled={disabledChangeParams || !cudaAvailable}
+                      onChange={(e) => {
+                        updateTrainingParams({ ...trainingParams, use_cuda: e.target.checked });
+                      }}
+                    />
+                    <div className={`relative w-11 h-6 ${!cudaAvailable ? 'bg-gray-300' : 'bg-gray-200'} peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${cudaAvailable ? 'peer-checked:bg-blue-600' : 'peer-checked:bg-gray-400'}`}></div>
+                    <span className={`ms-3 text-sm font-medium ${!cudaAvailable ? 'text-gray-500' : 'text-gray-700'}`}>
+                      {disabledChangeParams && nowTrainingParams && !changeBaseModel
+                        ? nowTrainingParams.use_cuda
+                          ? 'Enabled'
+                          : 'Disabled'
+                        : trainingParams.use_cuda
+                        ? 'Enabled'
+                        : 'Disabled'}
+                    </span>
+                  </label>
+                </div>
+                <div className="text-xs text-gray-500">
+                  {cudaAvailable 
+                    ? 'Enable for faster training on NVIDIA GPUs.'
+                    : 'CUDA acceleration is not available on this system.'}
                 </div>
               </div>
             </div>

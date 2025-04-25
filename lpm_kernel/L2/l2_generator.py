@@ -35,11 +35,19 @@ class L2Generator:
         Args:
             data_path: Path to the raw data directory. Defaults to "../raw_data".
             preferred_lang: Preferred language for data processing. Defaults to "English".
+            is_cot: Whether to use Chain of Thought reasoning. Can be bool or string.
         """
         self.data_path = data_path
         self.data_processor = L2DataProcessor(data_path, preferred_lang)
         self.preferred_lang = preferred_lang
-        self.is_cot = is_cot
+        
+        # Convert is_cot to bool if it's a string
+        if isinstance(is_cot, str):
+            self.is_cot = is_cot.lower() == 'true'
+        else:
+            self.is_cot = bool(is_cot)
+            
+        logging.info(f"L2Generator initialized with is_cot={self.is_cot}")
         
     def data_preprocess(self, note_list: List[Note], basic_info: Dict):
         """Preprocess the input notes and basic information.
@@ -60,39 +68,50 @@ class L2Generator:
         graph_path: str,
         config_path: str,
     ):
-        """Generate subjective data based on input notes and user information.
+        """Generate subjective data for personalization.
+        
+        This method orchestrates the generation of subjective data including preferences,
+        diversity, self-Q&A data, and graph indexing.
         
         Args:
-            note_list: List of Note objects.
-            basic_info: Dictionary containing basic user information.
+            note_list: List of Note objects to process.
+            basic_info: Dictionary containing user information.
             data_output_base_dir: Base directory for output data.
             topics_path: Path to topics data.
-            entities_path: Path to entities data.
+            entities_path: Path to entity data.
             graph_path: Path to graph data.
             config_path: Path to configuration file.
         """
-        global_bio = basic_info["globalBio"]
-        user_name = basic_info["username"]
-        user_intro = basic_info["aboutMe"]
+        if not os.path.exists(data_output_base_dir):
+            os.makedirs(data_output_base_dir)
 
-        preference_output_path = "preference.json"
-        diversity_output_path = "diversity.json"
-        selfqa_output_path = "selfqa.json"
+        # Check if the file exists
+        if not os.path.exists(topics_path):
+            # Create an empty file
+            with open(topics_path, "w") as f:
+                f.write(json.dumps([]))
 
+        # Generate subjective data
         self.data_processor.gen_subjective_data(
-            note_list,
-            data_output_base_dir,
-            preference_output_path,
-            diversity_output_path,
-            selfqa_output_path,
-            global_bio,
-            topics_path,
-            entities_path,
-            graph_path,
-            user_name,
-            config_path,
-            user_intro,
+            note_list=note_list,
+            data_output_base_dir=data_output_base_dir,
+            preference_output_path="preference.json",
+            diversity_output_path="diversity.json",
+            selfqa_output_path="selfqa.json",
+            global_bio=basic_info["globalBio"],
+            topics_path=topics_path,
+            entitys_path=entities_path,
+            graph_path=graph_path,
+            user_name=basic_info["username"],
+            config_path=config_path,
+            user_intro=basic_info["aboutMe"],
         )
+        
+        # Merge JSON files for training
+        self.merge_json_files(data_output_base_dir)
+        
+        # Release Ollama models from memory after data synthesis is complete
+        self._release_ollama_models()
 
     def gen_preference_data(
         self,
@@ -187,6 +206,20 @@ class L2Generator:
         with open(merged_output_path, 'w', encoding='utf-8') as f:
             json.dump(merged_data, f, ensure_ascii=False, indent=2)
     
+    def _release_ollama_models(self):
+        """Release Ollama models from memory to free up VRAM for training.
+        
+        This method calls the release function defined in the train module.
+        It's important to release models after data synthesis and before training
+        to ensure VRAM is properly freed.
+        """
+        try:
+            from lpm_kernel.L2.train import release_ollama_models
+            release_ollama_models()
+        except Exception as e:
+            import logging
+            logging = logging.getLogger(__name__)
+            logging.warning(f"Failed to release Ollama models: {str(e)}")
 
     def clean_graphrag_keys(self):
         GRAPH_CONFIG = os.path.join(

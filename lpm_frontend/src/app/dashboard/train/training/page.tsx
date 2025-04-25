@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import InfoModal from '@/components/InfoModal';
 import type { TrainingConfig } from '@/service/train';
-import { startTrain, stopTrain, retrain, getTrainingParams, resetProgress } from '@/service/train';
+import { startTrain, stopTrain, retrain, getTrainingParams, checkCudaAvailability, resetProgress } from '@/service/train';
 import { useTrainingStore } from '@/store/useTrainingStore';
 import { getMemoryList } from '@/service/memory';
 import { message, Modal } from 'antd';
@@ -90,6 +90,7 @@ export default function TrainingPage() {
   const firstLoadRef = useRef<boolean>(true);
   const pollingStopRef = useRef<boolean>(false);
 
+  const [cudaAvailable, setCudaAvailable] = useState<boolean>(false);
   const [isResume, setIsResume] = useState(
     trainingProgress.status === 'suspended' || trainingProgress.status === 'failed'
   );
@@ -102,6 +103,29 @@ export default function TrainingPage() {
 
   useEffect(() => {
     fetchModelConfig();
+  }, []);
+
+  useEffect(() => {
+    // Check CUDA availability once on load
+    checkCudaAvailability()
+      .then(res => {
+        if (res.data.code === 0) {
+          const { cuda_available, cuda_info } = res.data.data;
+          setCudaAvailable(cuda_available);
+          
+          if (cuda_available) {
+            console.log('CUDA is available:', cuda_info);
+          } else {
+            console.log('CUDA is not available on this system');
+          }
+        } else {
+          message.error(res.data.message || 'Failed to check CUDA availability');
+        }
+      })
+      .catch(err => {
+        console.error('CUDA availability check failed', err);
+        message.error('CUDA availability check failed');
+      });
   }, []);
 
   // Start polling training progress
@@ -280,39 +304,23 @@ export default function TrainingPage() {
     const eventSource = new EventSource('/api/trainprocess/logs');
 
     eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
+      // Don't try to parse as JSON, just use the raw text data directly
+      const logMessage = event.data;
+      
+      setTrainingDetails((prev) => {
+        const newLogs = [
+          ...prev.slice(-500), // Keep more log entries (500 instead of 100)
+          {
+            message: logMessage,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+          }
+        ];
 
-        setTrainingDetails((prev) => {
-          const newLogs = [
-            ...prev.slice(-100),
-            {
-              message: data.message,
-              timestamp: new Date().toISOString()
-            }
-          ];
+        // Save logs to localStorage for persistence between page refreshes
+        localStorage.setItem('trainingLogs', JSON.stringify(newLogs));
 
-          // Save logs to localStorage
-          // localStorage.setItem('trainingLogs', JSON.stringify(newLogs));
-
-          return newLogs;
-        });
-      } catch {
-        setTrainingDetails((prev) => {
-          const newLogs = [
-            ...prev.slice(-100),
-            {
-              message: event.data,
-              timestamp: new Date().toISOString()
-            }
-          ];
-
-          // Save logs to localStorage
-          // localStorage.setItem('trainingLogs', JSON.stringify(newLogs));
-
-          return newLogs;
-        });
-      }
+        return newLogs;
+      });
     };
 
     eventSource.onerror = (error) => {
@@ -535,6 +543,7 @@ export default function TrainingPage() {
           trainActionLoading={trainActionLoading}
           trainingParams={trainingParams}
           updateTrainingParams={updateTrainingParams}
+          cudaAvailable={cudaAvailable}
         />
 
         {/* Only show training progress after training starts */}

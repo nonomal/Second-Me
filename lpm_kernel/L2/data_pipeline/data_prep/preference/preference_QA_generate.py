@@ -53,8 +53,18 @@ class PreferenceQAGenerator:
             bio: Biography or context information to use in prompt generation.
             preference_language: Language for prompts ("Chinese/中文" or otherwise English).
         """
+        # Ensure the filename is actually a string
+        if filename is None:
+            raise ValueError("Filename cannot be None")
+            
         self.filename = filename
-        self.is_cot = is_cot
+        # Convert is_cot to bool if it's a string
+        if isinstance(is_cot, str):
+            self.is_cot = is_cot.lower() == 'true'
+        else:
+            self.is_cot = bool(is_cot)
+            
+        logger.info(f"PreferenceQAGenerator initialized with is_cot={self.is_cot}")
         
         with open(self.filename, "r", encoding="utf-8") as f:
             self.pre_msg = json.load(f)

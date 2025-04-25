@@ -169,6 +169,18 @@ Domain Timelines:
         content = response.choices[0].message.content
         shift_pattern = r"\{.*\}"
         shift_perspective_result = self.__parse_json_response(content, shift_pattern)
+        
+        # Check if result is None and provide default values to avoid TypeError
+        if shift_perspective_result is None:
+            logger.warning(f"Failed to parse perspective shift result, using default values: {content}")
+            # Create a default mapping with expected parameters
+            shift_perspective_result = {
+                "domainDesc": f"You have knowledge and experience related to {shade_info.name}.",
+                "domainContent": shade_info.content_third_view,
+                "domainTimeline": []
+            }
+            
+        # Now it's safe to pass shift_perspective_result as kwargs
         shade_info.add_second_view(**shift_perspective_result)
         return shade_info
 

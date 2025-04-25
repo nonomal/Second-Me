@@ -2,7 +2,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: ${DOCKER_BACKEND_DOCKERFILE:-Dockerfile.backend}
+      dockerfile: ${DOCKER_BACKEND_DOCKERFILE:-Dockerfile.backend.cuda}
     container_name: second-me-backend
     restart: unless-stopped
     ports:
@@ -21,16 +21,21 @@ services:
       - LOCAL_APP_PORT=8002
       - IN_DOCKER_ENV=1
       - PLATFORM=${PLATFORM:-linux}
+      - USE_CUDA=1
     extra_hosts:
       - "host.docker.internal:host-gateway"
     deploy:
       resources:
         limits:
-          # Set container memory limit to 24GB
+          # Set container memory limit to 64GB
           memory: 64G
         reservations:
           # Memory reservation
           memory: 6G
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     networks:
       - second-me-network
 
@@ -52,7 +57,7 @@ services:
     deploy:
       resources:
         limits:
-          # Set container memory limit to 8GB
+          # Set container memory limit to 2GB
           memory: 2G
         reservations:
           # Memory reservation

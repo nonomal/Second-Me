@@ -7,6 +7,13 @@ from lpm_kernel.configs.logging import get_train_process_logger
 logger = get_train_process_logger()
 import lpm_kernel.common.strategy.classification as classification
 from sentence_transformers import SentenceTransformer
+import json
+
+class EmbeddingError(Exception):
+    """Custom exception class for embedding-related errors"""
+    def __init__(self, message, original_error=None):
+        super().__init__(message)
+        self.original_error = original_error
 
 class LLMClient:
     """LLM client utility class"""
@@ -55,10 +62,8 @@ class LLMClient:
 
         user_llm_config = self.user_llm_config_service.get_available_llm()
         if not user_llm_config:
-
-            raise Exception("No LLM configuration found")
-        # Prepare request data
-
+            raise EmbeddingError("No LLM configuration found")
+        
         try:
             # Send request to embedding endpoint
             embeddings_array = classification.strategy_classification(user_llm_config, chunked_texts)
@@ -81,7 +86,25 @@ class LLMClient:
             return embeddings_array
 
         except requests.exceptions.RequestException as e:
-            raise Exception(f"Failed to get embeddings: {str(e)}")
+            # Handle request errors
+            error_msg = f"Request error getting embeddings: {str(e)}"
+            logger.error(error_msg)
+            raise EmbeddingError(error_msg, e)
+        except json.JSONDecodeError as e:
+            # Handle JSON parsing errors
+            error_msg = f"Invalid JSON response from embedding API: {str(e)}"
+            logger.error(error_msg)
+            raise EmbeddingError(error_msg, e)
+        except (KeyError, IndexError, ValueError) as e:
+            # Handle response structure errors
+            error_msg = f"Invalid response structure from embedding API: {str(e)}"
+            logger.error(error_msg)
+            raise EmbeddingError(error_msg, e)
+        except Exception as e:
+            # Fallback for any other errors
+            error_msg = f"Unexpected error getting embeddings: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise EmbeddingError(error_msg, e)
 
     @property
     def chat_credentials(self):

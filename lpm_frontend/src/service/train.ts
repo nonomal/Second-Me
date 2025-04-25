@@ -138,3 +138,17 @@ export const getTrainingParams = () => {
     url: `/api/trainprocess/training_params`
   });
 };
+
+export const checkCudaAvailability = () => {
+  return Request<CommonResponse<{
+    cuda_available: boolean;
+    cuda_info: {
+      device_count?: number;
+      current_device?: number;
+      device_name?: string;
+    };
+  }>>({
+    method: 'get',
+    url: '/api/kernel2/cuda/available'
+  });
+};

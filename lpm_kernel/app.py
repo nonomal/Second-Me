@@ -6,6 +6,7 @@ from .api.file_server.handler import FileServerHandler
 from .database.migration_manager import MigrationManager
 import os
 import atexit
+import subprocess
 
 
 def create_app():

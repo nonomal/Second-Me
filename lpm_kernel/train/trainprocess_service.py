@@ -42,7 +42,7 @@ class TrainProcessService:
     
     _instance = None
     _initialized = False
-
+    
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
@@ -658,6 +658,7 @@ class TrainProcessService:
             num_train_epochs = training_params.get("number_of_epochs")
             concurrency_threads = training_params.get("concurrency_threads")
             data_synthesis_mode = training_params.get("data_synthesis_mode")
+            use_cuda = training_params.get("use_cuda", False)
             is_cot = training_params.get("is_cot", False)
             
             # Log training parameters
@@ -666,6 +667,8 @@ class TrainProcessService:
             logger.info(f"  Number of epochs: {num_train_epochs}")
             logger.info(f"  Concurrency threads: {concurrency_threads}")
             logger.info(f"  Data synthesis mode: {data_synthesis_mode}")
+            logger.info(f"  Use CUDA: {use_cuda}")
+            logger.info(f"  Is CoT: {is_cot}")
             
             # Prepare arguments for the script
             # Build command line arguments, need to include script path as the first parameter
@@ -675,6 +678,7 @@ class TrainProcessService:
                 "--epochs", str(num_train_epochs),
                 "--threads", str(concurrency_threads),
                 "--mode", str(data_synthesis_mode),
+                "--cuda", str(use_cuda),
                 "--is_cot", str(is_cot)
             ]
             
