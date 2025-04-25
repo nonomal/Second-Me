@@ -67,7 +67,8 @@ export default function TrainingPage() {
     'Transform your memories into a personalized AI model that thinks and communicates like you.';
 
   const [selectedInfo, setSelectedInfo] = useState<boolean>(false);
-  const [isTraining, setIsTraining] = useState(false);
+  const isTraining = useTrainingStore((state) => state.isTraining);
+  const setIsTraining = useTrainingStore((state) => state.setIsTraining);
   const [trainingParams, setTrainingParams] = useState<TrainingConfig>({} as TrainingConfig);
   const [nowTrainingParams, setNowTrainingParams] = useState<TrainingConfig | null>(null);
   const [trainActionLoading, setTrainActionLoading] = useState(false);
@@ -480,6 +481,12 @@ export default function TrainingPage() {
   const handleTrainingAction = async () => {
     if (trainActionLoading) {
       message.info('Please wait a moment...');
+
+      return;
+    }
+
+    if (!isTraining && status === 'running') {
+      message.error('Model is already running, please stop it first');
 
       return;
     }

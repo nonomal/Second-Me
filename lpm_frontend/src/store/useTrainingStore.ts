@@ -3,14 +3,32 @@ import { getTrainProgress, type TrainProgress } from '@/service/train';
 
 export type ModelStatus = 'seed_identity' | 'memory_upload' | 'training' | 'trained' | 'running';
 
+enum Status {
+  SEED_IDENTITY = 'seed_identity',
+  MEMORY_UPLOAD = 'memory_upload',
+  TRAINING = 'training',
+  TRAINED = 'trained',
+  RUNNING = 'running'
+}
+
+const statusRankMap = {
+  [Status.SEED_IDENTITY]: 0,
+  [Status.MEMORY_UPLOAD]: 1,
+  [Status.TRAINING]: 2,
+  [Status.TRAINED]: 3,
+  [Status.RUNNING]: 3
+};
+
 interface ModelState {
   status: ModelStatus;
   error: boolean;
+  isTraining: boolean;
   isServiceStarting: boolean;
   isServiceStopping: boolean;
   trainingProgress: TrainProgress;
   setStatus: (status: ModelStatus) => void;
   setError: (error: boolean) => void;
+  setIsTraining: (isTraining: boolean) => void;
   setServiceStarting: (isStarting: boolean) => void;
   setServiceStopping: (isStopping: boolean) => void;
   setTrainingProgress: (progress: TrainProgress) => void;
@@ -77,14 +95,25 @@ const defaultTrainingProgress: TrainProgress = {
   status: 'pending'
 };
 
-export const useTrainingStore = create<ModelState>((set) => ({
+export const useTrainingStore = create<ModelState>((set, get) => ({
   status: 'seed_identity',
+  isTraining: false,
   isServiceStarting: false,
   isServiceStopping: false,
   error: false,
   trainingProgress: defaultTrainingProgress,
-  setStatus: (status) => set({ status }),
+  setStatus: (status) => {
+    const preStatus = get().status;
+
+    //Only trained and running can be interchanged.
+    if (statusRankMap[status] < statusRankMap[preStatus]) {
+      return;
+    }
+
+    set({ status });
+  },
   setError: (error) => set({ error }),
+  setIsTraining: (isTraining) => set({ isTraining }),
   setServiceStarting: (isStarting) => set({ isServiceStarting: isStarting }),
   setServiceStopping: (isStopping) => set({ isServiceStopping: isStopping }),
   setTrainingProgress: (progress) => set({ trainingProgress: progress }),
