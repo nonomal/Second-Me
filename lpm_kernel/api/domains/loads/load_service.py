@@ -9,8 +9,7 @@ from typing import Optional, Dict, Any, Tuple
 from lpm_kernel.models.load import Load
 from lpm_kernel.common.repository.database_session import DatabaseSession
 from lpm_kernel.api.domains.loads.dto import LoadDTO
-from lpm_kernel.train.trainprocess_service import TrainProcessService
-from lpm_kernel.api.domains.kernel2.routes_l2 import _training_process, _training_thread, _stopping_training
+from lpm_kernel.api.domains.trainprocess.trainprocess_service import TrainProcessService
 
 logger = logging.getLogger(__name__)
 

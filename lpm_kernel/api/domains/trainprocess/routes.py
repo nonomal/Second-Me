@@ -3,8 +3,8 @@ from werkzeug.utils import secure_filename
 from flask import Blueprint, jsonify, Response, request
 from charset_normalizer import from_path
 
-from lpm_kernel.train.trainprocess_service import TrainProcessService
-from lpm_kernel.train.training_params_manager import TrainingParamsManager
+from lpm_kernel.api.domains.trainprocess.trainprocess_service import TrainProcessService
+from lpm_kernel.api.domains.trainprocess.training_params_manager import TrainingParamsManager
 from ...common.responses import APIResponse
 from threading import Thread
 

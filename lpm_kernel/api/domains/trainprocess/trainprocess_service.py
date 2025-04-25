@@ -1,11 +1,7 @@
-from enum import Enum
-from typing import Dict, List, Optional
-import json
 import os
 import re
 import time
 import psutil
-from lpm_kernel.configs.config import Config
 from lpm_kernel.L1.utils import save_true_topics
 from lpm_kernel.L1.serializers import NotesStorage
 from lpm_kernel.kernel.note_service import NoteService
@@ -26,10 +22,9 @@ from lpm_kernel.file_data.chunker import DocumentChunker
 from lpm_kernel.kernel.l1.l1_manager import generate_l1_from_l0
 import threading
 from lpm_kernel.api.domains.trainprocess.progress_enum import Status
-from lpm_kernel.api.domains.trainprocess.train_progress import TrainProgress
 from lpm_kernel.api.domains.trainprocess.process_step import ProcessStep
 from lpm_kernel.api.domains.trainprocess.progress_holder import TrainProgressHolder
-from lpm_kernel.train.training_params_manager import TrainingParamsManager
+from lpm_kernel.api.domains.trainprocess.training_params_manager import TrainingParamsManager
 from lpm_kernel.common.repository.database_session import DatabaseSession
 from lpm_kernel.api.domains.kernel.routes import store_l1_data
 import gc
