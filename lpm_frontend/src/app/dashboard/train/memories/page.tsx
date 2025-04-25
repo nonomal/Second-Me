@@ -95,7 +95,7 @@ export default function TrainPage() {
         });
     };
 
-    // fetchMemories();
+    fetchMemories();
     addEventListener(EVENT.REFRESH_MEMORIES, fetchMemories);
 
     return () => {

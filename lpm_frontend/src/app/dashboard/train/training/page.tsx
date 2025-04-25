@@ -4,7 +4,14 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import InfoModal from '@/components/InfoModal';
 import type { TrainingConfig } from '@/service/train';
-import { startTrain, stopTrain, retrain, getTrainingParams, checkCudaAvailability, resetProgress } from '@/service/train';
+import {
+  startTrain,
+  stopTrain,
+  retrain,
+  getTrainingParams,
+  checkCudaAvailability,
+  resetProgress
+} from '@/service/train';
 import { useTrainingStore } from '@/store/useTrainingStore';
 import { getMemoryList } from '@/service/memory';
 import { message, Modal } from 'antd';
@@ -109,11 +116,12 @@ export default function TrainingPage() {
   useEffect(() => {
     // Check CUDA availability once on load
     checkCudaAvailability()
-      .then(res => {
+      .then((res) => {
         if (res.data.code === 0) {
           const { cuda_available, cuda_info } = res.data.data;
+
           setCudaAvailable(cuda_available);
-          
+
           if (cuda_available) {
             console.log('CUDA is available:', cuda_info);
           } else {
@@ -123,7 +131,7 @@ export default function TrainingPage() {
           message.error(res.data.message || 'Failed to check CUDA availability');
         }
       })
-      .catch(err => {
+      .catch((err) => {
         console.error('CUDA availability check failed', err);
         message.error('CUDA availability check failed');
       });
@@ -307,13 +315,17 @@ export default function TrainingPage() {
     eventSource.onmessage = (event) => {
       // Don't try to parse as JSON, just use the raw text data directly
       const logMessage = event.data;
-      
+
       setTrainingDetails((prev) => {
         const newLogs = [
           ...prev.slice(-500), // Keep more log entries (500 instead of 100)
           {
             message: logMessage,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            timestamp: new Date().toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit'
+            })
           }
         ];
 
@@ -539,6 +551,7 @@ export default function TrainingPage() {
         <TrainingConfiguration
           baseModelOptions={baseModelOptions}
           changeBaseModel={changeBaseModel}
+          cudaAvailable={cudaAvailable}
           handleResetProgress={handleResetProgress}
           handleTrainingAction={handleTrainingAction}
           isResume={isResume}
@@ -550,7 +563,6 @@ export default function TrainingPage() {
           trainActionLoading={trainActionLoading}
           trainingParams={trainingParams}
           updateTrainingParams={updateTrainingParams}
-          cudaAvailable={cudaAvailable}
         />
 
         {/* Only show training progress after training starts */}

@@ -3,7 +3,7 @@ import { getTrainProgress, type TrainProgress } from '@/service/train';
 
 export type ModelStatus = 'seed_identity' | 'memory_upload' | 'training' | 'trained' | 'running';
 
-enum Status {
+export enum Status {
   SEED_IDENTITY = 'seed_identity',
   MEMORY_UPLOAD = 'memory_upload',
   TRAINING = 'training',
@@ -11,7 +11,7 @@ enum Status {
   RUNNING = 'running'
 }
 
-const statusRankMap = {
+export const statusRankMap = {
   [Status.SEED_IDENTITY]: 0,
   [Status.MEMORY_UPLOAD]: 1,
   [Status.TRAINING]: 2,
@@ -34,6 +34,7 @@ interface ModelState {
   setTrainingProgress: (progress: TrainProgress) => void;
   checkTrainStatus: () => Promise<void>;
   resetTrainingState: () => void;
+  // fetchStatus: () => void;
 }
 
 const defaultTrainingProgress: TrainProgress = {
@@ -169,4 +170,45 @@ export const useTrainingStore = create<ModelState>((set, get) => ({
       set({ error: true });
     }
   }
+  // fetchStatus: async () => {
+  //   const serviceStatus = await getServiceStatus();
+
+  //   if (serviceStatus.data.code === 0 && serviceStatus.data.data.is_running) {
+  //     set({ status: 'running' });
+
+  //     return;
+  //   }
+
+  //   const config = JSON.parse(localStorage.getItem('trainingParams') || '{}');
+
+  //   if (!config.model_name) {
+  //     const trainingStatus = await getTrainProgress({
+  //       model_name: config.model_name
+  //     });
+
+  //     if (trainingStatus.data.code == 0) {
+  //       if (trainingStatus.data.data.overall_progress == 100) {
+  //         set({ status: 'trained' });
+
+  //         return;
+  //       }
+
+  //       if (trainingStatus.data.data.overall_progress > 0) {
+  //         set({ status: 'training' });
+
+  //         return;
+  //       }
+  //     }
+  //   }
+
+  //   const memoryStatus = await getMemoryList();
+
+  //   if (memoryStatus.data.code === 0 && memoryStatus.data.data.length > 0) {
+  //     set({ status: 'memory_upload' });
+
+  //     return;
+  //   }
+
+  //   set({ status: 'seed_identity' });
+  // }
 }));
