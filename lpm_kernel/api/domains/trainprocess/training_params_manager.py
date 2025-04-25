@@ -45,23 +45,42 @@ class TrainingParamsManager:
         return cls._params_file_path
     
     @classmethod
-    def update_training_params(cls, params):
+    def update_training_params(cls, params, preserve_previous=True):
         """
         Update the latest training parameters and save to file
         
         Args:
-            params: Dictionary containing training parameters
+            params: Training parameters, either a TrainingParams object or a dictionary
+            preserve_previous: If True, preserve previous parameters and update with new ones.
+                              If False, use only the new parameters, discarding previous ones.
         """
-        # First try to load existing parameters
-        current_params = cls.get_latest_training_params()
+        # Convert params to dict if it's a TrainingParams object
+        if hasattr(params, 'to_dict') and callable(getattr(params, 'to_dict')):
+            params_dict = params.to_dict()
+        else:
+            params_dict = params
         
-        # Update parameters
-        for key, value in params.items():
-            if key in cls._default_training_params:
-                current_params[key] = value
-                logger.debug(f"Updated training parameter {key} to {value}")
-            else:
-                logger.warning(f"Ignoring unknown parameter: {key}")
+        # Get current parameters based on preserve_previous flag
+        if preserve_previous:
+            # First try to load existing parameters
+            current_params = cls.get_latest_training_params()
+            
+            # Update parameters
+            for key, value in params_dict.items():
+                if key in cls._default_training_params:
+                    current_params[key] = value
+                    logger.debug(f"Updated training parameter {key} to {value}")
+                else:
+                    logger.warning(f"Ignoring unknown parameter: {key}")
+        else:
+            # Use only the new parameters, with defaults for missing ones
+            current_params = cls._default_training_params.copy()
+            for key, value in params_dict.items():
+                if key in cls._default_training_params:
+                    current_params[key] = value
+                    logger.debug(f"Set training parameter {key} to {value}")
+                else:
+                    logger.warning(f"Ignoring unknown parameter: {key}")
         
         # Save to file
         params_file = cls._get_params_file_path()
