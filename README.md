@@ -8,6 +8,7 @@
 [![Discord](https://img.shields.io/badge/Chat-Discord-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/GpWHQNUwrg)
 [![Twitter](https://img.shields.io/badge/Follow-@SecondMe_AI-1DA1F2?style=flat-square&logo=x&logoColor=white)](https://x.com/SecondMe_AI1)
 [![Reddit](https://img.shields.io/badge/Join-Reddit-FF4500?style=flat-square&logo=reddit&logoColor=white)](https://www.reddit.com/r/SecondMeAI/)
+[![View FAQ](https://img.shields.io/badge/FAQ-GitBook-blue?style=flat-square)](https://secondme.gitbook.io/secondme/faq)
 
 </div>
 
@@ -60,6 +61,14 @@ Star and join us, and you will receive all release notifications from GitHub wit
  <p align="center">
   <img src="https://github.com/user-attachments/assets/5c14d956-f931-4c25-b0b3-3c2c96cd7581" width="94%" />
 </p>
+
+## FAQ
+
+Got questions about running Second Me, model setup, or memory configuration?
+
+📖 [Check out the FAQ here](https://secondme.gitbook.io/secondme/faq)
+
+
 
 ## Quick Start
 

@@ -545,8 +545,7 @@ export default function TrainingPage() {
         />
 
         {/* Only show training progress after training starts */}
-        {(status === 'training' || status === 'trained' || serviceStarted) &&
-          renderTrainingProgress()}
+        {(status === 'training' || status === 'trained') && renderTrainingProgress()}
 
         {/* Always show training log regardless of training status */}
         {renderTrainingLog()}
