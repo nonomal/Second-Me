@@ -1,5 +1,5 @@
-import { useTrainingStore } from '@/store/useTrainingStore';
-import { startService, stopService, getServiceStatus } from '@/service/train';
+import { Status, statusRankMap, useTrainingStore } from '@/store/useTrainingStore';
+import { startService, stopService } from '@/service/train';
 import { StatusBar } from '../StatusBar';
 import { useRef, useEffect, useState, useMemo } from 'react';
 import { message } from 'antd';
@@ -13,6 +13,8 @@ import {
 import RegisterUploadModal from '../upload/RegisterUploadModal';
 
 import { useLoadInfoStore } from '@/store/useLoadInfoStore';
+import TrainingTipModal from '../upload/TraingTipModal';
+import { getMemoryList } from '@/service/memory';
 
 const StatusDot = ({ active }: { active: boolean }) => (
   <div
@@ -23,10 +25,13 @@ const StatusDot = ({ active }: { active: boolean }) => (
 export function ModelStatus() {
   const status = useTrainingStore((state) => state.status);
   const setStatus = useTrainingStore((state) => state.setStatus);
+  const serviceStarted = useTrainingStore((state) => state.serviceStarted);
   const isServiceStarting = useTrainingStore((state) => state.isServiceStarting);
   const isServiceStopping = useTrainingStore((state) => state.isServiceStopping);
   const setServiceStarting = useTrainingStore((state) => state.setServiceStarting);
   const setServiceStopping = useTrainingStore((state) => state.setServiceStopping);
+  const fetchServiceStatus = useTrainingStore((state) => state.fetchServiceStatus);
+  const isTraining = useTrainingStore((state) => state.isTraining);
 
   const [messageApi, contextHolder] = message.useMessage();
 
@@ -36,43 +41,37 @@ export function ModelStatus() {
   }, [loadInfo]);
 
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [showtrainingModal, setShowtrainingModal] = useState(false);
 
   const handleRegistryClick = () => {
-    if (status !== 'trained' && status !== 'running') {
-      messageApi.info({
-        content: 'Please train your model first',
-        duration: 1
-      });
-    } else if (status === 'trained') {
+    if (!serviceStarted) {
       messageApi.info({
         content: 'Please start your model service first',
         duration: 1
       });
-    } else if (status === 'running') {
+    } else {
       setShowRegisterModal(true);
     }
   };
 
-  const fetchServiceStatus = async () => {
+  const fetchMemories = async () => {
     try {
-      const statusRes = await getServiceStatus();
+      const memoryRes = await getMemoryList();
 
-      if (statusRes.data.code === 0) {
-        const isRunning = statusRes.data.data.is_running;
+      if (memoryRes.data.code === 0) {
+        const memories = memoryRes.data.data;
 
-        if (isRunning) {
-          setStatus('running');
-          setServiceStarting(false);
-        } else if (status === 'running') {
-          setStatus('trained');
+        if (memories.length > 0 && statusRankMap[status] < statusRankMap[Status.MEMORY_UPLOAD]) {
+          setStatus(Status.MEMORY_UPLOAD);
         }
       }
     } catch (error) {
-      console.error('Error checking initial service status:', error);
+      console.error('Error fetching memories:', error);
     }
   };
 
   useEffect(() => {
+    fetchMemories();
     fetchServiceStatus();
 
     return () => {
@@ -94,13 +93,12 @@ export function ModelStatus() {
 
     // Start new polling interval
     pollingInterval.current = setInterval(() => {
-      getServiceStatus()
-        .then((statusRes) => {
-          if (statusRes.data.code === 0) {
-            const isRunning = statusRes.data.data.is_running;
+      fetchServiceStatus()
+        .then((res) => {
+          if (res.data.code === 0) {
+            const isRunning = res.data.data.is_running;
 
             if (isRunning) {
-              setStatus('running');
               setServiceStarting(false);
               clearPolling();
             }
@@ -117,13 +115,12 @@ export function ModelStatus() {
 
     // Start new polling interval
     pollingInterval.current = setInterval(() => {
-      getServiceStatus()
-        .then((statusRes) => {
-          if (statusRes.data.code === 0) {
-            const isRunning = statusRes.data.data.is_running;
+      fetchServiceStatus()
+        .then((res) => {
+          if (res.data.code === 0) {
+            const isRunning = res.data.data.is_running;
 
             if (!isRunning) {
-              setStatus('trained');
               setServiceStopping(false);
               clearPolling();
             }
@@ -135,7 +132,7 @@ export function ModelStatus() {
     }, 3000);
   };
 
-  const handleServiceAction = () => {
+  const handleStartService = () => {
     const config = JSON.parse(localStorage.getItem('trainingParams') || '{}');
 
     if (!config.model_name) {
@@ -144,46 +141,60 @@ export function ModelStatus() {
       return;
     }
 
-    if (status === 'running') {
-      setServiceStopping(true);
-      stopService()
-        .then((res) => {
-          if (res.data.code === 0) {
-            messageApi.success({ content: 'Service stopping...', duration: 1 });
-            startStopPolling();
-          } else {
-            messageApi.error({ content: res.data.message!, duration: 1 });
-            setServiceStopping(false);
-          }
-        })
-        .catch((error) => {
-          console.error('Error stopping service:', error);
-          messageApi.error({
-            content: error.response?.data?.message || error.message,
-            duration: 1
-          });
-          setServiceStopping(false);
-        });
-    } else {
-      setServiceStarting(true);
-      startService({ model_name: config.model_name })
-        .then((res) => {
-          if (res.data.code === 0) {
-            messageApi.success({ content: 'Service starting...', duration: 1 });
-            startPolling();
-          } else {
-            setServiceStarting(false);
-            messageApi.error({ content: res.data.message!, duration: 1 });
-          }
-        })
-        .catch((error) => {
-          console.error('Error starting service:', error);
+    setServiceStarting(true);
+    startService({ model_name: config.model_name })
+      .then((res) => {
+        if (res.data.code === 0) {
+          messageApi.success({ content: 'Service starting...', duration: 1 });
+          startPolling();
+        } else {
           setServiceStarting(false);
-          messageApi.error({
-            content: error.response?.data?.message || error.message,
-            duration: 1
-          });
+          messageApi.error({ content: res.data.message!, duration: 1 });
+        }
+      })
+      .catch((error) => {
+        console.error('Error starting service:', error);
+        setServiceStarting(false);
+        messageApi.error({
+          content: error.response?.data?.message || error.message,
+          duration: 1
         });
+      });
+  };
+
+  const handleStopService = () => {
+    setServiceStopping(true);
+    stopService()
+      .then((res) => {
+        if (res.data.code === 0) {
+          messageApi.success({ content: 'Service stopping...', duration: 1 });
+          startStopPolling();
+        } else {
+          messageApi.error({ content: res.data.message!, duration: 1 });
+          setServiceStopping(false);
+        }
+      })
+      .catch((error) => {
+        console.error('Error stopping service:', error);
+        messageApi.error({
+          content: error.response?.data?.message || error.message,
+          duration: 1
+        });
+        setServiceStopping(false);
+      });
+  };
+
+  const handleServiceAction = () => {
+    if (serviceStarted) {
+      handleStopService();
+    } else {
+      if (isTraining) {
+        setShowtrainingModal(true);
+
+        return;
+      }
+
+      handleStartService();
     }
   };
 
@@ -211,7 +222,7 @@ export function ModelStatus() {
                 <LoadingOutlined className="text-lg" spin />
                 <span>{isServiceStarting ? 'Starting...' : 'Stopping...'}</span>
               </>
-            ) : status === 'running' ? (
+            ) : serviceStarted ? (
               <>
                 <StatusDot active={true} />
                 <PauseCircleOutlined className="text-lg" />
@@ -250,6 +261,14 @@ export function ModelStatus() {
       </div>
 
       <RegisterUploadModal onClose={() => setShowRegisterModal(false)} open={showRegisterModal} />
+      <TrainingTipModal
+        confirm={() => {
+          handleStartService();
+          setShowtrainingModal(false);
+        }}
+        onClose={() => setShowtrainingModal(false)}
+        open={showtrainingModal}
+      />
     </div>
   );
 }

@@ -4,7 +4,14 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import InfoModal from '@/components/InfoModal';
 import type { TrainingConfig } from '@/service/train';
-import { startTrain, stopTrain, retrain, getTrainingParams, checkCudaAvailability, resetProgress } from '@/service/train';
+import {
+  startTrain,
+  stopTrain,
+  retrain,
+  getTrainingParams,
+  checkCudaAvailability,
+  resetProgress
+} from '@/service/train';
 import { useTrainingStore } from '@/store/useTrainingStore';
 import { getMemoryList } from '@/service/memory';
 import { message, Modal } from 'antd';
@@ -73,11 +80,13 @@ export default function TrainingPage() {
   const modelConfig = useModelConfigStore((store) => store.modelConfig);
   const status = useTrainingStore((state) => state.status);
   const trainingProgress = useTrainingStore((state) => state.trainingProgress);
+  const serviceStarted = useTrainingStore((state) => state.serviceStarted);
 
   const router = useRouter();
 
   const [selectedInfo, setSelectedInfo] = useState<boolean>(false);
-  const [isTraining, setIsTraining] = useState(false);
+  const isTraining = useTrainingStore((state) => state.isTraining);
+  const setIsTraining = useTrainingStore((state) => state.setIsTraining);
   const [trainingParams, setTrainingParams] = useState<TrainingConfig>({} as TrainingConfig);
   const [nowTrainingParams, setNowTrainingParams] = useState<TrainingConfig | null>(null);
   const [trainActionLoading, setTrainActionLoading] = useState(false);
@@ -108,11 +117,12 @@ export default function TrainingPage() {
   useEffect(() => {
     // Check CUDA availability once on load
     checkCudaAvailability()
-      .then(res => {
+      .then((res) => {
         if (res.data.code === 0) {
           const { cuda_available, cuda_info } = res.data.data;
+
           setCudaAvailable(cuda_available);
-          
+
           if (cuda_available) {
             console.log('CUDA is available:', cuda_info);
           } else {
@@ -122,7 +132,7 @@ export default function TrainingPage() {
           message.error(res.data.message || 'Failed to check CUDA availability');
         }
       })
-      .catch(err => {
+      .catch((err) => {
         console.error('CUDA availability check failed', err);
         message.error('CUDA availability check failed');
       });
@@ -306,13 +316,17 @@ export default function TrainingPage() {
     eventSource.onmessage = (event) => {
       // Don't try to parse as JSON, just use the raw text data directly
       const logMessage = event.data;
-      
+
       setTrainingDetails((prev) => {
         const newLogs = [
           ...prev.slice(-500), // Keep more log entries (500 instead of 100)
           {
             message: logMessage,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            timestamp: new Date().toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit'
+            })
           }
         ];
 
@@ -462,6 +476,12 @@ export default function TrainingPage() {
       return;
     }
 
+    if (!isTraining && serviceStarted) {
+      message.error('Model is already running, please stop it first');
+
+      return;
+    }
+
     setTrainActionLoading(true);
 
     // If training is in progress, stop it
@@ -472,8 +492,8 @@ export default function TrainingPage() {
       return;
     }
 
-    // If the same model has already been trained and status is 'trained' or 'running', perform retraining
-    if (!changeBaseModel && (status === 'trained' || status === 'running')) {
+    // If the same model has already been trained and service is started, perform retraining
+    if (!changeBaseModel && (status === 'trained' || serviceStarted)) {
       await handleRetrainModel();
     } else {
       // Otherwise start new training
@@ -532,6 +552,7 @@ export default function TrainingPage() {
         <TrainingConfiguration
           baseModelOptions={baseModelOptions}
           changeBaseModel={changeBaseModel}
+          cudaAvailable={cudaAvailable}
           handleResetProgress={handleResetProgress}
           handleTrainingAction={handleTrainingAction}
           isResume={isResume}
@@ -543,11 +564,10 @@ export default function TrainingPage() {
           trainActionLoading={trainActionLoading}
           trainingParams={trainingParams}
           updateTrainingParams={updateTrainingParams}
-          cudaAvailable={cudaAvailable}
         />
 
         {/* Only show training progress after training starts */}
-        {(status === 'training' || status === 'trained' || status === 'running') &&
+        {(status === 'training' || status === 'trained' || serviceStarted) &&
           renderTrainingProgress()}
 
         {/* Always show training log regardless of training status */}

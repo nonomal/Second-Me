@@ -34,7 +34,7 @@ const TrainingProgress = (props: TrainingProgressProps) => {
         <h3 className="text-lg font-medium text-gray-900">
           Training Progress (may take long with more data and larger model)
         </h3>
-        {(status === 'trained' || status === 'running') && (
+        {status === 'trained' && (
           <span className="px-2.5 py-1 bg-green-50 text-green-700 text-sm font-medium rounded-full">
             Training Complete
           </span>

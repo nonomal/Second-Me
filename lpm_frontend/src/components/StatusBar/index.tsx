@@ -13,14 +13,6 @@ export function StatusBar({ status }: StatusBarProps) {
   ] as const;
 
   const getStepState = (stepStatus: (typeof steps)[number]['status']) => {
-    // If current status is running, all steps should be shown as completed, and trained should be active
-    if (status === 'running') {
-      return {
-        isActive: stepStatus === 'trained',
-        isCompleted: stepStatus !== 'trained'
-      };
-    }
-
     const statusOrder = ['seed_identity', 'memory_upload', 'training', 'trained'];
     const currentIndex = statusOrder.indexOf(status);
     const stepIndex = statusOrder.indexOf(stepStatus);

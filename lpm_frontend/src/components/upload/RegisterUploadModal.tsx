@@ -15,7 +15,6 @@ import type { Upload } from '@/service/upload';
 import { registerUpload, deleteUpload, connectUpload } from '@/service/upload';
 
 import { useUploadStore } from '@/store/useUploadStore';
-import { useTrainingStore } from '@/store/useTrainingStore';
 import { updateRegisteredUpload } from '@/utils/localRegisteredUpload';
 import NetWorkMemberList from './NetWorkMemberList';
 import { useLoadInfoStore } from '@/store/useLoadInfoStore';
@@ -29,7 +28,6 @@ interface RegisterUploadModalProps {
 
 export default function RegisterUploadModal({ open, onClose }: RegisterUploadModalProps) {
   const [currentUpload, setCurrentUpload] = useState<Upload | null>(null);
-  const statusTimeoutRef = useRef<NodeJS.Timeout>();
 
   const addUpload = useUploadStore((state) => state.addUpload);
   const removeUpload = useUploadStore((state) => state.removeUpload);
@@ -50,7 +48,6 @@ export default function RegisterUploadModal({ open, onClose }: RegisterUploadMod
   }, [loadInfo]);
 
   const [messageApi, contextHolder] = message.useMessage();
-  const status = useTrainingStore((state) => state.status);
 
   useEffect(() => {
     if (open) {
@@ -58,12 +55,6 @@ export default function RegisterUploadModal({ open, onClose }: RegisterUploadMod
       fetchUploadList();
     }
   }, [open, registerStatus]);
-
-  useEffect(() => {
-    if (status !== 'running' && statusTimeoutRef.current) {
-      clearInterval(statusTimeoutRef.current);
-    }
-  }, [status]);
 
   useEffect(() => {
     // Clean up all polling when component closes
