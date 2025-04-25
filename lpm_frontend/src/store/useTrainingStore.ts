@@ -31,6 +31,7 @@ interface ModelState {
   isServiceStarting: boolean;
   isServiceStopping: boolean;
   trainingProgress: TrainProgress;
+  trainSuspended: boolean;
   setStatus: (status: ModelStatus) => void;
   setError: (error: boolean) => void;
   setIsTraining: (isTraining: boolean) => void;
@@ -38,6 +39,7 @@ interface ModelState {
   setServiceStarting: (isStarting: boolean) => void;
   setServiceStopping: (isStopping: boolean) => void;
   setTrainingProgress: (progress: TrainProgress) => void;
+  setTrainSuspended: (suspended: boolean) => void;
   checkTrainStatus: () => Promise<void>;
   resetTrainingState: () => void;
 }
@@ -109,6 +111,7 @@ export const useTrainingStore = create<ModelState>((set, get) => ({
   isServiceStopping: false,
   error: false,
   trainingProgress: defaultTrainingProgress,
+  trainSuspended: false,
   setStatus: (status) => {
     const preStatus = get().status;
 
@@ -139,6 +142,7 @@ export const useTrainingStore = create<ModelState>((set, get) => ({
   setServiceStarting: (isStarting) => set({ isServiceStarting: isStarting }),
   setServiceStopping: (isStopping) => set({ isServiceStopping: isStopping }),
   setTrainingProgress: (progress) => set({ trainingProgress: progress }),
+  setTrainSuspended: (suspended) => set({ trainSuspended: suspended }),
   resetTrainingState: () => set({ trainingProgress: defaultTrainingProgress }),
   checkTrainStatus: async () => {
     const config = JSON.parse(localStorage.getItem('trainingParams') || '{}');
@@ -152,7 +156,7 @@ export const useTrainingStore = create<ModelState>((set, get) => ({
 
       if (res.data.code === 0) {
         const data = res.data.data;
-        const { overall_progress } = data;
+        const { overall_progress, status } = data;
 
         const newProgress = data;
 
@@ -165,6 +169,10 @@ export const useTrainingStore = create<ModelState>((set, get) => ({
             ...state,
             trainingProgress: newProgress
           };
+
+          if (status === 'suspended' || status === 'failed') {
+            newState.trainSuspended = true;
+          }
 
           // If total progress is 100%, set status to trained
           if (overall_progress === 100) {

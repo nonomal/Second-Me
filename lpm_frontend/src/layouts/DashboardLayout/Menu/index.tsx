@@ -23,7 +23,6 @@ const Menu = () => {
   const pathname = usePathname();
   const router = useRouter();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const status = useTrainingStore((state) => state.status);
   const loadInfo = useLoadInfoStore((state) => state.loadInfo);
   const clearLoadInfo = useLoadInfoStore((state) => state.clearLoadInfo);
   const serviceStarted = useTrainingStore((state) => state.serviceStarted);
@@ -32,6 +31,13 @@ const Menu = () => {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleteConfirmLoading, setDeleteConfirmLoading] = useState(false);
   const [showModelConfig, setShowModelConfig] = useState(false);
+
+  const isTraining = useTrainingStore((state) => state.isTraining);
+  const trainSuspended = useTrainingStore((state) => state.trainSuspended);
+
+  const disabledChangeParams = useMemo(() => {
+    return isTraining || trainSuspended;
+  }, [isTraining, trainSuspended]);
 
   const isRegistered = useMemo(() => {
     return loadInfo?.status === 'online';
@@ -265,8 +271,19 @@ const Menu = () => {
             </button>
 
             <button
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 rounded-md transition-colors hover:bg-gray-800/5"
-              onClick={() => setShowModelConfig(true)}
+              className={classNames(
+                'w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 rounded-md transition-colors hover:bg-gray-800/5',
+                disabledChangeParams && 'opacity-50 cursor-not-allowed'
+              )}
+              onClick={() => {
+                if (disabledChangeParams) {
+                  message.warning('Cancel the current train in order to configure the model');
+
+                  return;
+                }
+
+                setShowModelConfig(true);
+              }}
             >
               <SettingsIcon className="w-4 h-4 shrink-0" />
               <span

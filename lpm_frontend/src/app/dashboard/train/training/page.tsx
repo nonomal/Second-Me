@@ -88,11 +88,9 @@ export default function TrainingPage() {
   const isTraining = useTrainingStore((state) => state.isTraining);
   const setIsTraining = useTrainingStore((state) => state.setIsTraining);
   const [trainingParams, setTrainingParams] = useState<TrainingConfig>({} as TrainingConfig);
-  const [nowTrainingParams, setNowTrainingParams] = useState<TrainingConfig | null>(null);
   const [trainActionLoading, setTrainActionLoading] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [showMemoryModal, setShowMemoryModal] = useState(false);
-  const [changeBaseModel, setChangeBaseModel] = useState(false);
 
   const cleanupEventSourceRef = useRef<(() => void) | undefined>();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -100,15 +98,8 @@ export default function TrainingPage() {
   const pollingStopRef = useRef<boolean>(false);
 
   const [cudaAvailable, setCudaAvailable] = useState<boolean>(false);
-  const [isResume, setIsResume] = useState(
-    trainingProgress.status === 'suspended' || trainingProgress.status === 'failed'
-  );
-
-  useEffect(() => {
-    const localTrainingParams = JSON.parse(localStorage.getItem('trainingParams') || '{}');
-
-    setChangeBaseModel(localTrainingParams?.model_name !== trainingParams.model_name);
-  }, [trainingParams.model_name]);
+  const trainSuspended = useTrainingStore((state) => state.trainSuspended);
+  const setTrainSuspended = useTrainingStore((state) => state.setTrainSuspended);
 
   useEffect(() => {
     fetchModelConfig();
@@ -174,10 +165,6 @@ export default function TrainingPage() {
   const stopPolling = () => {
     pollingStopRef.current = true;
   };
-
-  useEffect(() => {
-    setIsResume(trainingProgress.status === 'suspended' || trainingProgress.status === 'failed');
-  }, [trainingProgress]);
 
   useEffect(() => {
     if (status === 'trained' || trainingError) {
@@ -277,7 +264,6 @@ export default function TrainingPage() {
           const data = res.data.data;
 
           setTrainingParams(data);
-          setNowTrainingParams(data);
 
           localStorage.setItem('trainingParams', JSON.stringify(data));
         } else {
@@ -362,7 +348,7 @@ export default function TrainingPage() {
 
       if (res.data.code === 0) {
         setIsTraining(false);
-        setIsResume(true);
+        setTrainSuspended(true);
       } else {
         message.error(res.data.message || 'Failed to stop training');
       }
@@ -378,9 +364,7 @@ export default function TrainingPage() {
     resetProgress()
       .then((res) => {
         if (res.data.code === 0) {
-          setTrainingParams(nowTrainingParams || ({} as TrainingConfig));
-          setNowTrainingParams(null);
-          setIsResume(false);
+          setTrainSuspended(false);
           resetTrainingState();
         } else {
           throw new Error(res.data.message || 'Failed to reset progress');
@@ -404,18 +388,15 @@ export default function TrainingPage() {
     resetTrainingState();
 
     try {
-      setNowTrainingParams(trainingParams);
-
       console.log('Using startTrain API to train new model:', trainingParams.model_name);
       const res = await startTrain({
-        ...(isResume && !changeBaseModel ? {} : trainingParams),
+        ...trainingParams,
         model_name: trainingParams.model_name
       });
 
       if (res.data.code === 0) {
         // Save training configuration and start polling
         localStorage.setItem('trainingParams', JSON.stringify(trainingParams));
-        setChangeBaseModel(false);
         scrollPageToBottom();
         startGetTrainingProgress();
       } else {
@@ -425,7 +406,6 @@ export default function TrainingPage() {
     } catch (error: unknown) {
       console.error('Error starting training:', error);
       setIsTraining(false);
-      setNowTrainingParams(null);
 
       if (error instanceof Error) {
         message.error(error.message || 'Failed to start training');
@@ -492,8 +472,8 @@ export default function TrainingPage() {
       return;
     }
 
-    // If the same model has already been trained and service is started, perform retraining
-    if (!changeBaseModel && (status === 'trained' || serviceStarted)) {
+    // If the same model has already been trained and status is 'trained' or 'running', perform retraining
+    if (status === 'trained') {
       await handleRetrainModel();
     } else {
       // Otherwise start new training
@@ -551,17 +531,15 @@ export default function TrainingPage() {
         {/* Training Configuration Component */}
         <TrainingConfiguration
           baseModelOptions={baseModelOptions}
-          changeBaseModel={changeBaseModel}
           cudaAvailable={cudaAvailable}
           handleResetProgress={handleResetProgress}
           handleTrainingAction={handleTrainingAction}
-          isResume={isResume}
           isTraining={isTraining}
           modelConfig={modelConfig}
-          nowTrainingParams={nowTrainingParams}
           setSelectedInfo={setSelectedInfo}
           status={status}
           trainActionLoading={trainActionLoading}
+          trainSuspended={trainSuspended}
           trainingParams={trainingParams}
           updateTrainingParams={updateTrainingParams}
         />
