@@ -213,7 +213,7 @@ ifeq ($(WINDOWS),1)
 	@echo "Prompting for CUDA preference..."
 	@scripts\prompt_cuda.bat
 	@echo "Checking CUDA preference..."
-	@cmd /c "if exist .gpu_selected ( echo CUDA support detected, using GPU configuration... & docker compose -f docker-compose-gpu.yml build --no-cache & docker compose -f docker-compose-gpu.yml up -d ) else ( echo No CUDA support selected, using CPU-only configuration... & docker compose -f docker-compose.yml build --no-cache & docker compose -f docker-compose.yml up -d )"
+	@cmd /c "if exist .gpu_selected ( echo CUDA support detected, using GPU configuration... & docker compose -f docker-compose-gpu.yml build & docker compose -f docker-compose-gpu.yml up -d ) else ( echo No CUDA support selected, using CPU-only configuration... & docker compose -f docker-compose.yml build & docker compose -f docker-compose.yml up -d )"
 else
 	@echo "Prompting for CUDA preference..."
 	@chmod +x ./scripts/prompt_cuda.sh
