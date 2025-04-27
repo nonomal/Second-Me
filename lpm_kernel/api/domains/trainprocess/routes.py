@@ -353,7 +353,7 @@ def retrain():
         is_cot = data.get("is_cot", None)
         
         # Log the received parameters
-        logger.info(f"Retrain parameters: model_name={model_name}, learning_rate={learning_rate}, number_of_epochs={number_of_epochs}, concurrency_threads={concurrency_threads}, data_synthesis_mode={data_synthesis_mode}, use_cuda={use_cuda}, is_cot={is_cot}, use_previous_params={use_previous_params}")
+        logger.info(f"Retrain parameters: model_name={model_name}, learning_rate={learning_rate}, number_of_epochs={number_of_epochs}, concurrency_threads={concurrency_threads}, data_synthesis_mode={data_synthesis_mode}, use_cuda={use_cuda}, is_cot={is_cot}")
         
         # Create training service instance
         train_service = TrainProcessService(current_model_name=model_name)
