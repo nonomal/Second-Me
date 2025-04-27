@@ -31,7 +31,7 @@ const TrainExposureModel = (props: IProps) => {
   }, [stepName]);
 
   const renderOutputContent = () => {
-    if (!outputContent || typeof outputContent !== 'object') return null;
+    if (!outputContent) return 'There are no resources for this step at this time';
 
     if (outputContent.file_type == 'json') {
       const showContent = JSON.stringify(outputContent.content, null, 2);
@@ -64,7 +64,7 @@ const TrainExposureModel = (props: IProps) => {
       );
     }
 
-    return null;
+    return 'There are no resources for this step at this time';
   };
 
   return (
