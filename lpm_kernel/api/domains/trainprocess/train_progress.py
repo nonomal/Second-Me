@@ -19,7 +19,9 @@ class TrainProgress:
                         {
                             "name": "Model Download",
                             "completed": False,
-                            "status": "pending"
+                            "status": "pending",
+                            "have_output": False,
+                            "path": None
                         }
                     ]
                 },
@@ -32,22 +34,30 @@ class TrainProgress:
                         {
                             "name": "List Documents",
                             "completed": False,
-                            "status": "pending"
+                            "status": "pending",
+                            "have_output": False,
+                            "path": None
                         },
                         {
                             "name": "Generate Document Embeddings",
                             "completed": False,
-                            "status": "pending"
+                            "status": "pending",
+                            "have_output": False,
+                            "path": None
                         },
                         {
                             "name": "Process Chunks",
                             "completed": False,
-                            "status": "pending"
+                            "status": "pending",
+                            "have_output": False,
+                            "path": None
                         },
                         {
                             "name": "Chunk Embedding",
                             "completed": False,
-                            "status": "pending"
+                            "status": "pending",
+                            "have_output": False,
+                            "path": None
                         }
                     ]
                 },
@@ -60,17 +70,23 @@ class TrainProgress:
                         {
                             "name": "Extract Dimensional Topics",
                             "completed": False,
-                            "status": "pending"
+                            "status": "pending",
+                            "have_output": True,
+                            "path": "resources/L2/data_pipeline/raw_data/topics.json"
                         },
                         {
                             "name": "Generate Biography",
                             "completed": False,
-                            "status": "pending"
+                            "status": "pending",
+                            "have_output": True,
+                            "path": "From database"
                         },
                         {
                             "name": "Map Your Entity Network",
                             "completed": False,
-                            "status": "pending"
+                            "status": "pending",
+                            "have_output": True,
+                            "path": "resources/L1/graphrag_indexing_output/subjective/entities.parquet"
                         }
                     ]
                 },
@@ -83,17 +99,23 @@ class TrainProgress:
                         {
                             "name": "Decode Preference Patterns",
                             "completed": False,
-                            "status": "pending"
+                            "status": "pending",
+                            "have_output": True,
+                            "path": "resources/L2/data/preference.json"
                         },
                         {
                             "name": "Reinforce Identity",
                             "completed": False,
-                            "status": "pending"
+                            "status": "pending",
+                            "have_output": True,
+                            "path": "resources/L2/data/selfqa.json"
                         },
                         {
                             "name": "Augment Content Retention",
                             "completed": False,
-                            "status": "pending"
+                            "status": "pending",
+                            "have_output": True,
+                            "path": "resources/L2/data/diversity.json"
                         }
                     ]
                 },
@@ -106,17 +128,23 @@ class TrainProgress:
                         {
                             "name": "Train",
                             "completed": False,
-                            "status": "pending"
+                            "status": "pending",
+                            "have_output": False,
+                            "path": None
                         },
                         {
                             "name": "Merge Weights",
                             "completed": False,
-                            "status": "pending"
+                            "status": "pending",
+                            "have_output": False,
+                            "path": None
                         },
                         {
                             "name": "Convert Model",
                             "completed": False,
-                            "status": "pending"
+                            "status": "pending",
+                            "have_output": False,
+                            "path": None
                         }
                     ]
                 }
