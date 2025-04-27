@@ -262,7 +262,10 @@ def get_step_output_content():
     """
     try:
         # Get TrainProcessService instance
-        train_service = TrainProcessService()
+        train_service = TrainProcessService.get_instance()
+        if train_service is None:
+            logger.error("No active training process found.")
+            return jsonify(APIResponse.error(message="No active training process found."))
         
         # Get step name from query parameters
         step_name = request.args.get('step_name')
