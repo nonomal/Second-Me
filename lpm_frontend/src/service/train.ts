@@ -34,12 +34,17 @@ interface TrainStage {
   steps: TrainStep[];
   current_step: string | null;
 }
-
-interface TrainStepOutput {
-  columns?: string[];
+export interface TrainStepJson {
   content: object[];
-  file_type: string;
+  file_type: 'json';
 }
+
+export interface TrainStepParquet {
+  columns: string[];
+  content: object[];
+  file_type: 'parquet';
+}
+export type TrainStepOutput = TrainStepJson | TrainStepParquet;
 
 export type StageName =
   | 'downloading_the_base_model'
