@@ -9,7 +9,7 @@ from lpm_kernel.common.repository.database_session import DatabaseSession
 # Output file mapping for each process step
 output_files = {
     "extract_dimensional_topics": os.path.join(os.getcwd(), "resources/L2/data_pipeline/raw_data/topics.json"),
-    "map_entity_network": os.path.join(os.getcwd(), "resources/L1/graphrag_indexing_output/subjective/entities.parquet"),
+    "map_your_entity_network": os.path.join(os.getcwd(), "resources/L1/graphrag_indexing_output/subjective/entities.parquet"),
     "decode_preference_patterns": os.path.join(os.getcwd(), "resources/L2/data/preference.json"),
     "reinforce_identity": os.path.join(os.getcwd(), "resources/L2/data/selfqa.json"),
     "augment_content_retention": os.path.join(os.getcwd(), "resources/L2/data/diversity.json"),
@@ -40,11 +40,13 @@ def query_l1_version_data(version: int) -> dict:
 
             # Build response data
             data = {
-                "version": version,
-                "bio": {
-                    "content": bio.content,
-                    "content_third_view": bio.content_third_view,
-                    "summary": bio.summary,
+                "file_type": "json",
+                "content": {
+                    "version": version,
+                    "bio": {
+                        "content": bio.content,
+                        "content_third_view": bio.content_third_view,
+                        "summary": bio.summary,
                     "summary_third_view": bio.summary_third_view,
                     "shades": [
                         {
@@ -58,19 +60,20 @@ def query_l1_version_data(version: int) -> dict:
                         }
                         for s in shades
                     ],
-                },
-                "clusters": [
-                    {
-                        "cluster_id": c.cluster_id,
-                        "memory_ids": c.memory_ids,
-                        "cluster_center": c.cluster_center,
-                    }
-                    for c in clusters
-                ],
-                "chunk_topics": [
-                    {"chunk_id": t.chunk_id, "topic": t.topic, "tags": t.tags}
-                    for t in chunk_topics
-                ],
+                    },
+                    "clusters": [
+                        {
+                            "cluster_id": c.cluster_id,
+                            "memory_ids": c.memory_ids,
+                            "cluster_center": c.cluster_center,
+                        }
+                        for c in clusters
+                    ],
+                    "chunk_topics": [
+                        {"chunk_id": t.chunk_id, "topic": t.topic, "tags": t.tags}
+                        for t in chunk_topics
+                    ],
+                }
             }
             return data
 
