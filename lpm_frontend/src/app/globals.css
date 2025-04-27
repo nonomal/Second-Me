@@ -12,6 +12,7 @@
   --accent-2: #50b86b;
   --accent-3: #ffd93d;
   --btn-width: 240px;
+  overflow: hidden;
 }
 
 @layer base {
