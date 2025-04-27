@@ -2,6 +2,7 @@ import os
 import re
 import time
 import psutil
+from typing import Optional, Dict
 from lpm_kernel.L1.utils import save_true_topics
 from lpm_kernel.L1.serializers import NotesStorage
 from lpm_kernel.kernel.note_service import NoteService
