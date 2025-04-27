@@ -3,7 +3,6 @@ import re
 import time
 import psutil
 from typing import Optional, Dict
-import json
 from lpm_kernel.L1.utils import save_true_topics
 from lpm_kernel.L1.serializers import NotesStorage
 from lpm_kernel.kernel.note_service import NoteService
@@ -27,8 +26,10 @@ from lpm_kernel.api.domains.trainprocess.progress_enum import Status
 from lpm_kernel.api.domains.trainprocess.process_step import ProcessStep
 from lpm_kernel.api.domains.trainprocess.progress_holder import TrainProgressHolder
 from lpm_kernel.api.domains.trainprocess.training_params_manager import TrainingParamsManager
+from lpm_kernel.models.l1 import L1Bio, L1Shade
 from lpm_kernel.common.repository.database_session import DatabaseSession
 from lpm_kernel.api.domains.kernel.routes import store_l1_data
+from lpm_kernel.api.domains.trainprocess.L1_exposure_manager import output_files, query_l1_version_data, read_file_content
 import gc
 import subprocess
 from lpm_kernel.configs.logging import get_train_process_logger, TRAIN_LOG_FILE
@@ -1147,99 +1148,25 @@ class TrainProcessService:
             Optional[Dict]: Content of the output file for the specified step, or None if not found
         """
         try:
-            # Define paths for all output files
-            output_files = {
-                ProcessStep.EXTRACT_DIMENSIONAL_TOPICS.value: os.path.join(os.getcwd(), "resources/L2/data_pipeline/raw_data/topics.json"),
-                ProcessStep.MAP_ENTITY_NETWORK.value: os.path.join(os.getcwd(), "resources/L1/graphrag_indexing_output/subjective/entities.parquet"),
-                ProcessStep.DECODE_PREFERENCE_PATTERNS.value: os.path.join(os.getcwd(), "resources/L2/data/preference.json"),
-                ProcessStep.REINFORCE_IDENTITY.value: os.path.join(os.getcwd(), "resources/L2/data/selfqa.json"),
-                ProcessStep.AUGMENT_CONTENT_RETENTION.value: os.path.join(os.getcwd(), "resources/L2/data/diversity.json")
-            }
-            
+            if step_name == "generate_biography":
+                logger.info("Querying L1 version data for biography")
+                return query_l1_version_data(1)
+
             # If step_name is not provided or invalid, return None
             if not step_name or step_name not in output_files:
                 return None
-                
+            
             # Get file path for the requested step
             file_path = output_files[step_name]
             if not os.path.exists(file_path):
                 return None
-                
+            
             # Read and return file content
-            return self._read_file_content(file_path)
+            return read_file_content(file_path)
         except Exception as e:
             logger.error(f"Error getting step output content: {str(e)}")
             return None
-            
-    def _read_file_content(self, file_path: str) -> Optional[Dict]:
-        """Read content from a file based on its type
-        
-        Args:
-            file_path: Path to the file to read
-            
-        Returns:
-            Optional[Dict]: File content or None if error
-        """
-        try:
-            # Handle different file types
-            if file_path.endswith(".json"):
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content = json.load(f)
-                    
-                    # Add file_type field to be consistent with parquet files
-                    return {
-                        "file_type": "json",
-                        "content": content
-                    }
-                except Exception as e:
-                    logger.error(f"Error reading JSON file {file_path}: {str(e)}")
-                    return None
-                    
-            elif file_path.endswith(".parquet"):
-                try:
-                    # Import pandas to read parquet
-                    import pandas as pd
-                    import numpy as np
-                    
-                    class NumpyEncoder(json.JSONEncoder):
-                        def default(self, obj):
-                            if isinstance(obj, np.integer):
-                                return int(obj)
-                            if isinstance(obj, np.floating):
-                                return float(obj)
-                            if isinstance(obj, np.ndarray):
-                                return obj.tolist()
-                            return super(NumpyEncoder, self).default(obj)
-                    
-                    df = pd.read_parquet(file_path)
-                    
-                    # Convert DataFrame to records (list of dictionaries)
-                    df_dict = df.to_dict(orient='records')
-                    
-                    # Use custom encoder to handle NumPy types
-                    json_str = json.dumps(df_dict, cls=NumpyEncoder)
-                    records = json.loads(json_str)
-                    
-                    # Add file metadata and full content
-                    return {
-                        "file_type": "parquet",
-                        "rows": len(df),
-                        "columns": list(df.columns),
-                        "size_bytes": os.path.getsize(file_path),
-                        "content": records
-                    }
-                except Exception as e:
-                    logger.error(f"Error reading parquet file {file_path}: {str(e)}")
-                    return None
-            else:
-                # Unsupported file types
-                logger.warning(f"Unsupported file type for {file_path}")
-                return None
-        except Exception as e:
-            logger.error(f"Error reading file {file_path}: {str(e)}")
-            return None
-    
+
     def stop_process(self):
         """Stop training process
         
