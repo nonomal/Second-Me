@@ -25,6 +25,8 @@ interface TrainStep {
   completed: boolean;
   name: string;
   status: StepStatus;
+  path?: string;
+  have_output?: boolean;
 }
 
 interface TrainStage {

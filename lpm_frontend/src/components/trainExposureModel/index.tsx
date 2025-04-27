@@ -5,21 +5,25 @@ import { useEffect, useState } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 
+export interface IStepOutputInfo {
+  path?: string;
+  stepName: string;
+}
 interface IProps {
   handleClose: () => void;
-  stepName: string;
+  stepOutputInfo?: IStepOutputInfo;
 }
 
 const TrainExposureModel = (props: IProps) => {
-  const { handleClose, stepName } = props;
+  const { handleClose, stepOutputInfo } = props;
   const [outputContent, setOutputContent] = useState<TrainStepOutput | null>(null);
 
   useEffect(() => {
-    if (!stepName) return;
+    if (!stepOutputInfo?.stepName) return;
 
     setOutputContent(null);
 
-    getStepOutputContent(stepName).then((res) => {
+    getStepOutputContent(stepOutputInfo.stepName).then((res) => {
       if (res.data.code == 0) {
         const data = res.data.data;
 
@@ -28,7 +32,7 @@ const TrainExposureModel = (props: IProps) => {
         console.error(res.data.message);
       }
     });
-  }, [stepName]);
+  }, [stepOutputInfo?.stepName]);
 
   const renderOutputContent = () => {
     if (!outputContent) return 'There are no resources for this step at this time';
@@ -73,11 +77,18 @@ const TrainExposureModel = (props: IProps) => {
       closable={false}
       footer={null}
       onCancel={handleClose}
-      open={!!stepName}
+      open={!!stepOutputInfo?.stepName}
       width={800}
     >
-      <div className="bg-[#f5f5f5] max-h-[600px] w-full overflow-scroll border border-[#e0e0e0] rounded p-4 font-mono text-sm leading-6 text-[#333] shadow-sm transition-all duration-300 ease-in-out">
-        {renderOutputContent()}
+      <div className="flex flex-col">
+        {stepOutputInfo?.path && (
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-lg font-medium text-gray-900">{`path: ${stepOutputInfo.path}`}</span>
+          </div>
+        )}
+        <div className="bg-[#f5f5f5] flex flex-col max-h-[600px] w-full overflow-scroll border border-[#e0e0e0] rounded p-4 font-mono text-sm leading-6 text-[#333] shadow-sm transition-all duration-300 ease-in-out">
+          {renderOutputContent()}
+        </div>
       </div>
     </Modal>
   );
