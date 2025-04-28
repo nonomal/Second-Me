@@ -896,7 +896,7 @@ class TrainProcessService:
                                         )
                                         last_update_time = current_time
 
-                        if "Download completed." in line:
+                        if "Model downloaded successfully" in line:
                             self.progress.mark_step_status(ProcessStep.MODEL_DOWNLOAD, Status.COMPLETED)
                             logger.info("Model download completed")
                             return True
