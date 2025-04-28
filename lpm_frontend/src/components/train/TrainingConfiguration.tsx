@@ -392,7 +392,7 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                   </Tooltip>
                 </div>
                 <div className="flex items-center">
-                  <label className="inline-flex items-center cursor-pointer">
+                  <label className="inline-flex items-center cursor-pointer relative">
                     <input
                       checked={trainingParams.use_cuda}
                       className="sr-only peer"
@@ -403,7 +403,7 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                       type="checkbox"
                     />
                     <div
-                      className={`relative w-11 h-6 ${!cudaAvailable ? 'bg-gray-300' : 'bg-gray-200'} peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${cudaAvailable ? 'peer-checked:bg-blue-600' : 'peer-checked:bg-gray-400'}`}
+                      className={`w-11 h-6 ${!cudaAvailable ? 'bg-gray-300' : 'bg-gray-200'} peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${cudaAvailable ? 'peer-checked:bg-blue-600' : 'peer-checked:bg-gray-400'}`}
                     />
                     <span
                       className={`ms-3 text-sm font-medium ${!cudaAvailable ? 'text-gray-500' : 'text-gray-700'}`}
