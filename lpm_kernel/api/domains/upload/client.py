@@ -1,5 +1,6 @@
 import aiohttp
 import logging
+from lpm_kernel.api.domains.upload.TrainingTags import TrainingTags
 from lpm_kernel.configs import config
 import websockets
 import json
@@ -70,7 +71,7 @@ class RegistryClient:
         """
         return f"{self.ws_url}/api/ws/{instance_id}?password={instance_password}"
 
-    def register_upload(self, upload_name: str, instance_id: str = None, description: str = None, email: str = None, config: dict = None):
+    def register_upload(self, upload_name: str, instance_id: str = None, description: str = None, email: str = None, tags: TrainingTags = None):
         """
         Register Upload instance with the registry center
         
@@ -84,6 +85,7 @@ class RegistryClient:
             Registration data
         """
         headers = self._get_auth_header()
+        tags_dict = tags.model_dump() if tags else None
         response = requests.post(
             f"{self.server_url}/api/upload/register",
             headers=headers,
@@ -92,7 +94,7 @@ class RegistryClient:
                 "instance_id": instance_id,
                 "description": description,
                 "email": email,
-                "config":config
+                "tags": tags_dict
             }
         )
         return ResponseHandler.handle_response(
