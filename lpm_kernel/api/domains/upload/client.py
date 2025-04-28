@@ -1,5 +1,6 @@
 import aiohttp
 import logging
+from lpm_kernel.configs import config
 import websockets
 import json
 import asyncio
@@ -69,7 +70,7 @@ class RegistryClient:
         """
         return f"{self.ws_url}/api/ws/{instance_id}?password={instance_password}"
 
-    def register_upload(self, upload_name: str, instance_id: str = None, description: str = None, email: str = None):
+    def register_upload(self, upload_name: str, instance_id: str = None, description: str = None, email: str = None, config: dict = None):
         """
         Register Upload instance with the registry center
         
@@ -90,7 +91,8 @@ class RegistryClient:
                 "upload_name": upload_name,
                 "instance_id": instance_id,
                 "description": description,
-                "email": email
+                "email": email,
+                "config":config
             }
         )
         return ResponseHandler.handle_response(

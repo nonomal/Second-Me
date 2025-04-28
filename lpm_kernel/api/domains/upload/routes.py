@@ -11,6 +11,8 @@ from lpm_kernel.api.domains.loads.load_service import LoadService
 from .client import RegistryClient
 import threading
 from lpm_kernel.api.domains.loads.dto import LoadDTO
+from lpm_kernel.api.domains.trainprocess.training_params_manager import TrainingParamsManager
+from lpm_kernel.file_data.document_service import document_service
 
 upload_bp = Blueprint("upload", __name__)
 registry_client = RegistryClient()
@@ -27,9 +29,18 @@ def register_upload():
         instance_id = current_load.instance_id
         email = current_load.email
         description = current_load.description
+        params = TrainingParamsManager.get_latest_training_params()
+        model_name = params.get("model_name")
+        is_cot = params.get("is_cot")
+        document_count = len(document_service.list_documents())
+        config = {
+            "model_name": model_name,
+            "is_cot": is_cot,
+            "document_count": document_count
+        }
         
         result = registry_client.register_upload(
-            upload_name, instance_id, description, email
+            upload_name, instance_id, description, email, config
         )
 
         instance_id_new = result.get("instance_id")
