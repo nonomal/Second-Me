@@ -42,6 +42,8 @@ const trainInfo: TrainInfo = {
 
 const POLLING_INTERVAL = 3000;
 
+const STORAGE_KEY_LOG_OFFSET = 'trainLogOffset';
+
 interface TrainingDetail {
   message: string;
   timestamp: string;
@@ -96,6 +98,7 @@ export default function TrainingPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const firstLoadRef = useRef<boolean>(true);
   const pollingStopRef = useRef<boolean>(false);
+  const SSEOffsetRef = useRef<number>(0);
 
   const [cudaAvailable, setCudaAvailable] = useState<boolean>(false);
   const trainSuspended = useTrainingStore((state) => state.trainSuspended);
@@ -281,6 +284,19 @@ export default function TrainingPage() {
     setTrainingDetails(savedLogs ? JSON.parse(savedLogs) : []);
   }, []);
 
+  useEffect(() => {
+    setTrainOffset(getLocalOffset());
+  }, []);
+
+  const setTrainOffset = (offset: number) => {
+    SSEOffsetRef.current = offset;
+    localStorage.setItem(STORAGE_KEY_LOG_OFFSET, String(offset));
+  };
+
+  const getLocalOffset = () => {
+    return Number(localStorage.getItem(STORAGE_KEY_LOG_OFFSET) || 0);
+  };
+
   // Scroll to the bottom of the page
   const scrollPageToBottom = () => {
     window.scrollTo({
@@ -297,11 +313,14 @@ export default function TrainingPage() {
 
   const getDetails = () => {
     // Use EventSource to get logs
-    const eventSource = new EventSource('/api/trainprocess/logs');
+    const eventSource = new EventSource(`/api/trainprocess/logs?offset=${SSEOffsetRef.current}`);
 
     eventSource.onmessage = (event) => {
       // Don't try to parse as JSON, just use the raw text data directly
       const logMessage = event.data;
+
+      console.log('11111111number', SSEOffsetRef.current);
+      setTrainOffset(SSEOffsetRef.current + 1);
 
       setTrainingDetails((prev) => {
         const newLogs = [
@@ -366,6 +385,7 @@ export default function TrainingPage() {
         if (res.data.code === 0) {
           setTrainSuspended(false);
           resetTrainingState();
+          localStorage.removeItem('trainingLogs');
         } else {
           throw new Error(res.data.message || 'Failed to reset progress');
         }
@@ -386,6 +406,11 @@ export default function TrainingPage() {
     localStorage.removeItem('trainingLogs');
     // Reset training status to initial state
     resetTrainingState();
+
+    //resume dont clear offset
+    if (!trainSuspended) {
+      setTrainOffset(0);
+    }
 
     try {
       console.log('Using startTrain API to train new model:', trainingParams.model_name);
