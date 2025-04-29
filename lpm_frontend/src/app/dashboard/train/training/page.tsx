@@ -313,7 +313,9 @@ export default function TrainingPage() {
 
   const getDetails = () => {
     // Use EventSource to get logs
-    const eventSource = new EventSource(`/api/trainprocess/logs?offset=${SSEOffsetRef.current}`);
+    const eventSource = new EventSource(
+      `/api/trainprocess/logs?offset=${String(SSEOffsetRef.current)}`
+    );
 
     eventSource.onmessage = (event) => {
       // Don't try to parse as JSON, just use the raw text data directly
