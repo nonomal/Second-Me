@@ -154,7 +154,6 @@ def stream_logs():
                     # Seek to the last position
                     log_file.seek(last_position)
                     new_lines = log_file.readlines()  # Read new lines
-                    last_position = log_file.tell()
 
                     for line in new_lines:
                         # Skip empty lines
