@@ -44,9 +44,14 @@ export default function PlaygroundChat() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [modelType, setModelType] = useState<ModelType | undefined>(undefined);
+  const [initLoading, setInitLoading] = useState<boolean>(true);
 
   const originPrompt = useMemo(() => {
     const name = loadInfo?.name || 'user';
+
+    if (modelType === 'chat') {
+      return `You are ${name}'s "Second Me", which is a personalized AI created by ${name}. You can help ${name} answer questions based on your understanding of ${name}'s background information and past records.`;
+    }
 
     if (modelType === 'thinking') {
       return `You are ${name}'s "Second Me", and you are currently in conversation with ${name}.
@@ -68,7 +73,7 @@ export default function PlaygroundChat() {
             </answer>`;
     }
 
-    return `You are ${name}'s "Second Me", which is a personalized AI created by ${name}. You can help ${name} answer questions based on your understanding of ${name}'s background information and past records.`;
+    return '';
   }, [loadInfo, modelType]);
   const originSettings = useMemo(() => {
     return {
@@ -85,8 +90,8 @@ export default function PlaygroundChat() {
   const [settings, setSettings] = useState<PlaygroundSettings>(originSettings);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    getTrainingParams()
+  const fetchModelType = () => {
+    return getTrainingParams()
       .then((res) => {
         if (res.data.code === 0) {
           const data = res.data.data;
@@ -100,7 +105,7 @@ export default function PlaygroundChat() {
       .catch((error) => {
         console.error(error.message);
       });
-  }, []);
+  };
 
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
@@ -123,13 +128,7 @@ export default function PlaygroundChat() {
     }
   };
 
-  // When messages are updated, scroll to the bottom
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, streamContent]);
-
-  // First initialization
-  useEffect(() => {
+  const firstLoadSessions = () => {
     const storedSessions = chatStorage.getSessions();
 
     setSessions(storedSessions);
@@ -141,7 +140,25 @@ export default function PlaygroundChat() {
       setMessages(storedSessions[0].messages);
       setSettings(storedSessions[0].setting);
     }
+  };
+
+  // When messages are updated, scroll to the bottom
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, streamContent]);
+
+  // First initialization
+  useEffect(() => {
+    fetchModelType().then(() => {
+      setInitLoading(false);
+    });
   }, []);
+
+  useEffect(() => {
+    if (!initLoading) {
+      firstLoadSessions();
+    }
+  }, [initLoading]);
 
   const handleNewChat = () => {
     const newSession = chatStorage.createSession({ originPrompt: originPrompt });
@@ -296,6 +313,26 @@ export default function PlaygroundChat() {
       setMessages(storedSessions[0]?.messages);
     }
   };
+
+  if (initLoading) {
+    return (
+      <div className="h-full w-full flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="relative w-16 h-16">
+            <div className="absolute w-16 h-16 rounded-full border-4 border-gray-200" />
+            <div
+              className="absolute w-16 h-16 rounded-full border-4 border-t-blue-500 animate-spin"
+              style={{
+                animationTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+                animationDuration: '1.5s'
+              }}
+            />
+          </div>
+          <p className="text-gray-600 font-medium">Loading Chat...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full w-full flex">
