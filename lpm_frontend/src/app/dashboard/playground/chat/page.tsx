@@ -48,10 +48,6 @@ export default function PlaygroundChat() {
   const originPrompt = useMemo(() => {
     const name = loadInfo?.name || 'user';
 
-    if (modelType === 'chat') {
-      return `You are ${name}'s "Second Me", which is a personalized AI created by ${name}. You can help ${name} answer questions based on your understanding of ${name}'s background information and past records.`;
-    }
-
     if (modelType === 'thinking') {
       return `You are ${name}'s "Second Me", and you are currently in conversation with ${name}.
             Your task is to help ${name} answer relevant questions based on your understanding of ${name}'s background information and past records.
@@ -72,7 +68,7 @@ export default function PlaygroundChat() {
             </answer>`;
     }
 
-    return '';
+    return `You are ${name}'s "Second Me", which is a personalized AI created by ${name}. You can help ${name} answer questions based on your understanding of ${name}'s background information and past records.`;
   }, [loadInfo, modelType]);
   const originSettings = useMemo(() => {
     return {
