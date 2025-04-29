@@ -17,24 +17,47 @@ interface IProps {
 const TrainExposureModel = (props: IProps) => {
   const { handleClose, stepOutputInfo } = props;
   const [outputContent, setOutputContent] = useState<TrainStepOutput | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     if (!stepOutputInfo?.stepName) return;
 
     setOutputContent(null);
+    setLoading(true);
 
-    getStepOutputContent(stepOutputInfo.stepName).then((res) => {
-      if (res.data.code == 0) {
-        const data = res.data.data;
+    getStepOutputContent(stepOutputInfo.stepName)
+      .then((res) => {
+        if (res.data.code == 0) {
+          const data = res.data.data;
 
-        setOutputContent(data);
-      } else {
-        console.error(res.data.message);
-      }
-    });
+          setOutputContent(data);
+        } else {
+          console.error(res.data.message);
+        }
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [stepOutputInfo?.stepName]);
 
   const renderOutputContent = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center w-full py-12">
+          <div className="flex flex-col items-center space-y-4">
+            <div className="relative w-12 h-12">
+              <div className="absolute w-12 h-12 rounded-full border-2 border-gray-200" />
+              <div
+                className="absolute w-12 h-12 rounded-full border-2 border-t-blue-500 animate-spin"
+                style={{ animationDuration: '1.2s' }}
+              />
+            </div>
+            <p className="text-gray-500 text-sm">loading...</p>
+          </div>
+        </div>
+      );
+    }
+
     if (!outputContent) return 'There are no resources for this step at this time';
 
     if (outputContent.file_type == 'json') {
