@@ -1,3 +1,5 @@
+import type { PlaygroundSettings } from '@/app/dashboard/playground/chat/page';
+
 // Storage keys for different chat types
 const STORAGE_KEYS = {
   PLAYGROUND: 'playgroundChat',
@@ -18,6 +20,7 @@ export interface ChatSession {
   lastMessage: string;
   timestamp: string;
   messages: ChatMessage[];
+  setting: PlaygroundSettings;
 }
 
 // Type for playground chat which only stores messages
@@ -136,13 +139,24 @@ export const chatWithUploadStorage = {
     return data.sessions;
   },
 
-  createSession: (title: string = 'New Conversation'): ChatSession => {
+  createSession: (props: { title?: string; originPrompt?: string }): ChatSession => {
+    const { title = 'New Conversation', originPrompt = "You are User's Second Me" } = props;
+
     const newSession: ChatSession = {
       id: Date.now().toString(),
       title,
       lastMessage: '',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      messages: []
+      messages: [],
+      setting: {
+        enableL0Retrieval: true,
+        enableL1Retrieval: true,
+        enableHelperModel: false,
+        selectedModel: 'ollama',
+        apiKey: 'http://localhost:11434',
+        systemPrompt: originPrompt,
+        temperature: 0.3
+      }
     };
 
     const sessions = chatWithUploadStorage.getSessions();
@@ -218,7 +232,7 @@ export const roleplayChatStorage = {
   getMessages: (role_id: string): ChatMessage[] => {
     const data = getStorageData<RoleplayChatData>(STORAGE_KEYS.ROLEPLAY, {});
 
-    return data[role_id]?.messages || [];
+    return data[role_id].messages || [];
   },
 
   saveMessages: (role_id: string, messages: ChatMessage[]) => {
