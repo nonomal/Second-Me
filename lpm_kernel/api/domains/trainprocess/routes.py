@@ -148,6 +148,8 @@ def stream_logs():
                         yield f"data: {line.strip()}\n\n"
                             
                     last_position = log_file.tell()
+                    if not new_lines:
+                        yield f":heartbeat\n\n"
             except Exception as e:
                 # If file reading fails, record error and continue
                 yield f"data: Error reading log file: {str(e)}\n\n"
