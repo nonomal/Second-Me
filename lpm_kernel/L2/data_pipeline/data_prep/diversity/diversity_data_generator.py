@@ -79,23 +79,22 @@ class DiversityDataGenerator:
                 raise
 
 
-    def _preprocess(self, entities_path: str, note_list: list, config_path: str, graph_path: str, user_name: str):
+    def _preprocess(self, entities_path: str, note_list: list, config_path: str, wiki_path: str, user_name: str):
         """Preprocess the input data for diversity generation.
         
         Args:
             entities_path: Path to entities data file.
             note_list: List of note objects.
             config_path: Path to configuration file.
-            graph_path: Path to graph data file.
+            wiki_path: Path to wiki data file.
             user_name: Name of the user.
             
         Returns:
             Tuple containing entity descriptions, entity types, and QA configuration.
         """
-        entity_df = pd.read_parquet(graph_path)
-        entity2type = {
-            item["title"]: item["type"] for item in entity_df.to_dict(orient="records")
-        }
+        with open(wiki_path, 'r', encoding='utf-8') as file:
+            wiki = json.load(file)
+        entity2type = {item['entityName']: item['entityType'] for item in wiki}
 
         # read entity2desc
         try:
@@ -225,14 +224,14 @@ class DiversityDataGenerator:
 
 
     def generate_data(self, entities_path: str, note_list: list, config_path: str, 
-                     graph_path: str, user_name: str, global_bio: str, output_path: str):
+                     wiki_path: str, user_name: str, global_bio: str, output_path: str):
         """Generate diversity data based on user notes and entities.
         
         Args:
             entities_path: Path to entities data file.
             note_list: List of note objects.
             config_path: Path to configuration file.
-            graph_path: Path to graph data file.
+            wiki_path: Path to wiki data file.
             user_name: Name of the user.
             global_bio: User biography text.
             output_path: Path to save the generated data.
@@ -240,7 +239,7 @@ class DiversityDataGenerator:
         language_desc = f"Keep your response in {self.preference_language}"
 
         entity2desc, entity2type, QA_config = self._preprocess(
-            entities_path, note_list, config_path, graph_path, user_name
+            entities_path, note_list, config_path, wiki_path, user_name
         )
 
         if entity2desc is None:
@@ -303,7 +302,7 @@ class DiversityDataGenerator:
             d
             for d in tiny_clusters
             if entity2type.get(d["entity_name"], "")
-            in ["PERSON", "人", "组织", "ORGANIZATION", "人物"]
+            in ['PERSON', 'LOCATION', 'CONCEPT', 'NORMAL_ENTITY']
         ]
 
         logger.info(f"Filtered tiny clusters: {len(filtered_tiny_clusters)}")

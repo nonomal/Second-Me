@@ -5,7 +5,7 @@ processing, and organization for training L2 models, including conversion betwee
 different formats and extraction of information from notes.
 """
 
-import graphrag
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import os
 import pandas as pd
@@ -29,6 +29,8 @@ from lpm_kernel.L2.data_pipeline.data_prep.context_data.context_generator import
 from lpm_kernel.L2.data_pipeline.data_prep.diversity.diversity_data_generator import DiversityDataGenerator
 from lpm_kernel.L2.data_pipeline.data_prep.preference.preference_QA_generate import PreferenceQAGenerator
 from lpm_kernel.L2.data_pipeline.data_prep.selfqa.selfqa_generator import SelfQA
+from lpm_kernel.L2.data_pipeline.data_prep.wiki.base import EntityExtractor,PersonalWiki
+from lpm_kernel.L2.data_pipeline.data_prep.wiki.build_relation import RelationBuilder
 from lpm_kernel.L2.note_templates import OBJECTIVE_TEMPLATES, SUBJECTIVE_TEMPLATES
 from lpm_kernel.L2.utils import format_timestr
 from lpm_kernel.api.services.user_llm_config_service import UserLLMConfigService
@@ -66,7 +68,7 @@ class L2DataProcessor:
         """Process a list of notes with basic user information.
         
         This method coordinates the overall data processing workflow, including
-        splitting notes by type, refining data, converting to text, and extracting
+        splitting notes by type, refining data, and extracting
         entities and relationships.
         
         Args:
@@ -79,7 +81,7 @@ class L2DataProcessor:
         user_info, subjective_memory_notes, objective_memory_notes = self.split_notes_by_type(
             note_list, basic_info
         )
-
+        # clean note data
         subjective_notes_remade = self.refine_notes_data_subjective(
             subjective_memory_notes, user_info, self.data_path + "/L1/processed_data/subjective/note_remade.json"
         )
@@ -88,39 +90,160 @@ class L2DataProcessor:
             objective_memory_notes, user_info, self.data_path + "/L1/processed_data/objective/note_remade.json"
         )
 
-        self.json_to_txt_each(
-            subjective_notes_remade,
-            self.data_path + "/L1/processed_data/subjective",
-            file_type="note",
-        )
-
-        self.json_to_txt_each(
-            objective_notes_remade,
-            self.data_path + "/L1/processed_data/objective",
-            file_type="note",
-        )
-
         logger.info("Data refinement completed, preparing to extract entities and relations")
 
         lang = user_info.get("lang", "English")
 
         if len(subjective_notes_remade) > 0:
-            self.graphrag_indexing(
-                subjective_notes_remade,
-                self.data_path + "/L1/processed_data/subjective",
-                self.data_path + "/L1/graphrag_indexing_output/subjective",
-                lang,
+            self.wiki_gen(
+                note_remade=subjective_notes_remade,
+                user_name=user_info["username"],
+                global_bio=user_info["globalBio"],
+                preferred_language=self.preferred_lang,
+                about_me=user_info["aboutMe"],
+                entity_res_path=self.data_path + "/L1/processed_data/subjective",
+                relation_path=self.data_path + "/L1/processed_data/subjective/relation.json",
+                wiki_path=self.data_path + "/L1/processed_data/subjective/wiki_res.json",
+                mapping_output_path=os.path.join(
+                os.getcwd(),
+                "resources/L2/data_pipeline/raw_data/id_entity_mapping_subjective_v2.json",
+            ),
             )
 
         if len(objective_notes_remade) > 0:
-            self.graphrag_indexing(
-                objective_notes_remade,
-                self.data_path + "/L1/processed_data/objective",
-                self.data_path + "/L1/graphrag_indexing_output/objective",
-                lang,
+            self.wiki_gen(
+                note_remade=objective_notes_remade,
+                user_name=user_info["username"],
+                global_bio=user_info["globalBio"],
+                preferred_language=self.preferred_lang,
+                about_me=user_info["aboutMe"],
+                entity_res_path=self.data_path + "/L1/processed_data/objective",
+                relation_path=self.data_path + "/L1/processed_data/objective/relation.json",
+                wiki_path=self.data_path + "/L1/processed_data/objective/wiki_res.json",
+                mapping_output_path=os.path.join(
+                os.getcwd(),
+                "resources/L2/data_pipeline/raw_data/id_entity_mapping_objective_v2.json",
+            ),
             )
+        
         return
+    def wiki_gen(self,note_remade, user_name, global_bio, preferred_language, about_me, entity_res_path, relation_path, wiki_path, mapping_output_path, old_version_data=None):
 
+
+        logger.info(f"Initialization has finished, begin to extract entities from {len(note_remade)} notes")
+        # extract entities, including initialization and update pipeline.
+        input_data = {"notes": note_remade}
+        input_data["userName"] = user_name
+        input_data["globalBio"] = global_bio
+        input_data["preferredLanguage"] = preferred_language
+
+        entity_extractor = EntityExtractor()
+        if old_version_data:
+            old_entity_res_path = f"{old_version_data}/entity_res.json"
+            with open(old_entity_res_path, 'r') as f:
+                old_entity_result = json.load(f)
+            input_data["entities"] = old_entity_result["entities"]
+        entity_result = entity_extractor._call_(input_data)
+
+        # save the extracted entities
+        tmp_entity_path = f"{entity_res_path}/entity_res.json"
+        with open(tmp_entity_path, "w") as f:
+            if old_version_data:
+                flag = "updated_entities"
+            else:
+                flag = "entities"
+            json.dump(entity_result[flag], f, ensure_ascii=False, indent=4)
+            logger.info(f"has extracted {len(entity_result[flag])}entities, begin to build relationship")
+        
+        
+        # merge the new entities with old entities
+        if old_version_data:
+            old_note = f"{old_version_data}/note_remade.json"
+            with open(old_note, 'r') as f:
+                old_data = json.load(f)
+            data = old_data + note_remade # 合并新旧笔记
+            with open(old_note, 'w') as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
+                
+            logger.info(f"After merged new and old notes, there are {len(data)}notes in total.")
+
+        # save total entities list
+        if old_version_data:
+            total_entities_path = f"{entity_res_path}/entities_total.json"
+            with open(total_entities_path, "w") as f:
+                json.dump(entity_result["entities"], f, ensure_ascii=False, indent=4)
+
+        # build mapping
+        if old_version_data:
+            entities = entity_result["updated_entities"]
+        else:
+            entities = entity_result["entities"]
+        
+        entities = [entity for entity in entities if entity["genWiki"]]
+        if not entities:
+            logger.info("no valid entities to build relationships, skip this step.")
+            return
+        logger.info(f"There are {len(entities)} entities to build relationships.")
+        
+        relation = RelationBuilder(entities, note_remade, relation_path)
+        relation.build_relations()
+        logger.info("has built relations, begin to generate wiki")
+
+        # generate wiki for each entity
+        entity_list = entities
+        wiki = PersonalWiki()
+        final_res = []
+
+        def process_entity(entity):
+            input_data = {
+                "userName": user_name,
+                "entityName": entity["name"],
+                "wikiType": entity["entityType"],
+                "timelines": entity["timelines"],
+                "preferredLanguage": preferred_language,
+                "aboutMe": about_me
+            }
+            res = wiki._call(input_data)
+            wiki_text = res["entityWiki"]["wikiText"]
+
+            timelines = entity["timelines"]
+            note_ids = [int(timeline["noteId"]) for timeline in timelines]
+            return {
+                "entityName": entity["name"],
+                "entityType": entity["entityType"],
+                "description": wiki_text,
+                "related_notes": note_ids,
+            }
+
+        with ThreadPoolExecutor() as executor:
+            future_to_entity = {executor.submit(process_entity, entity): entity for entity in entity_list}
+            for future in as_completed(future_to_entity):
+                try:
+                    final_res.append(future.result())
+                except Exception as exc:
+                    logger.info(f'Generated an exception: {exc}')
+        # Add entity_id based on the order
+        for idx, entity in enumerate(final_res):
+            entity["entity_id"] = idx
+
+        logger.info(f"has generated {len(final_res)} wikis, begin to map entity and wiki")
+        mapping_res = []
+        for entity in final_res:
+            map_res = {
+                "entity_name": entity["entityName"],
+                "entity_description": entity["description"],
+                "doc_id": entity["related_notes"],
+                "entity_id": entity["entity_id"]
+            }
+            mapping_res.append(map_res)
+
+        with open(wiki_path, "w") as f:
+            json.dump(final_res, f, indent=4, ensure_ascii=False)
+
+        with open(mapping_output_path, "w") as f:
+            json.dump(mapping_res, f, indent=4, ensure_ascii=False)
+
+        logger.info("all process has been done!")
     def gen_subjective_data(
             self,
             note_list: List[Note],
@@ -131,7 +254,7 @@ class L2DataProcessor:
             global_bio: str,
             topics_path: str,
             entitys_path: str,
-            graph_path: str,
+            wiki_path: str,
             user_name: str,
             config_path: str,
             user_intro: str,
@@ -151,7 +274,7 @@ class L2DataProcessor:
             global_bio: User's global biography.
             topics_path: Path to topics data.
             entitys_path: Path to entities data.
-            graph_path: Path to graph data.
+            wiki_path: Path to wiki data.
             user_name: Name of the user.
             config_path: Path to configuration file.
             user_intro: User's introduction.
@@ -173,7 +296,7 @@ class L2DataProcessor:
         self._gen_diversity_data(
             entitys_path,
             note_list,
-            graph_path,
+            wiki_path,
             diversity_output_path,
             user_name,
             global_bio,
@@ -355,7 +478,7 @@ class L2DataProcessor:
         Returns:
             List of refined Note objects.
         """
-        data_filtered = []
+        data4wiki = []
 
         lang = user_info.get("lang", "English")
 
@@ -380,18 +503,26 @@ class L2DataProcessor:
                 if note.title:
                     note.processed += selected_templates["title_suffix"].format(title=note.title)
 
-                data_filtered.append(note)
+                wiki_item = {
+                    "noteId": note.id,
+                    "createTime": note.create_time,
+                    "memoryType": note.memory_type,
+                    "content": note.processed,
+                    "insight": note.insight,
+                    "title": note.title,
+                    "summary": note.summary,
+                        }
+                data4wiki.append(wiki_item)
 
-        logger.info(f"Refined subjective notes: {len(data_filtered)}")
+        logger.info(f"Refined subjective notes: {len(data4wiki)}")
 
-        json_data_filted = [o.to_json() for o in data_filtered]
         file_dir = os.path.dirname(json_file_remade)
         if not os.path.exists(file_dir):
             os.makedirs(file_dir)
         with open(json_file_remade, "w", encoding="utf-8") as file:
-            json.dump(json_data_filted, file, ensure_ascii=False, indent=4)
+            json.dump(data4wiki, file, ensure_ascii=False, indent=4)
 
-        return data_filtered
+        return data4wiki
 
     def refine_notes_data_objective(self, note_list: List[Note], user_info: Dict, json_file_remade: str):
         """Refine objective notes data and save to JSON.
@@ -424,7 +555,17 @@ class L2DataProcessor:
                     new_item.processed = random.choice(
                         templates["without_content"]
                     ).format(insight=note.insight)
-                new_item_list.append(new_item)
+                    
+                wiki_item = {
+                    "noteId": new_item.id,
+                    "createTime": new_item.create_time,
+                    "memoryType": new_item.memoryType,
+                    "content": new_item.processed,
+                    "insight": new_item.insight,
+                    "title": new_item.title,
+                    "summary": new_item.summary,
+                }
+                new_item_list.append(wiki_item)
 
         logger.info(f"Refined objective notes: {len(new_item_list)}")
 
@@ -436,221 +577,6 @@ class L2DataProcessor:
 
         return new_item_list
 
-    def json_to_txt_each(
-            self, list_processed_notes: List[Note], txt_file_base: str, file_type: str
-    ):
-        """Convert processed notes from JSON to individual text files.
-        
-        Args:
-            list_processed_notes: List of processed Note objects.
-            txt_file_base: Base directory to save text files.
-            file_type: Type of note for naming the output files.
-        """
-        # Ensure the target directory exists
-        if not os.path.exists(txt_file_base):
-            os.makedirs(txt_file_base)
-            logger.warning("Currently running in function json_to_txt_each")
-            logger.warning(f"Specified directory does not exist, created: {txt_file_base}")
-
-        # Clear all existing files in the target directory
-        for existing_file in os.listdir(txt_file_base):
-            file_path = os.path.join(txt_file_base, existing_file)
-            if os.path.isfile(file_path):
-                try:
-                    os.remove(file_path)
-                    logger.info(f"Removed existing file: {file_path}")
-                except Exception as e:
-                    logger.error(f"Error removing file {file_path}: {str(e)}")
-
-        logger.info(f"Cleared all existing files in {txt_file_base}")
-
-        for no, item in enumerate(tqdm(list_processed_notes)):
-            # Build the txt file path
-            txt_file = os.path.join(txt_file_base, f"{file_type}_{no}.txt")
-            try:
-                # Ensure the processed field exists in the item
-                if item.processed:
-                    with open(txt_file, "w", encoding="utf-8") as tf:
-                        tf.write(item.processed)
-                else:
-                    logger.warning(f"Warning: 'processed' key missing for item {no}")
-
-            except Exception as e:
-                logger.error(traceback.format_exc())
-
-    def graphrag_indexing(
-            self, note_list: List[Note], graph_input_dir: str, output_dir: str, lang: str
-    ):
-        """Index notes using GraphRAG.
-        
-        This method configures and runs GraphRAG indexing on the processed notes,
-        creating entity and relation extractions.
-        
-        Args:
-            note_list: List of Note objects to index.
-            graph_input_dir: Directory containing input files for indexing.
-            output_dir: Directory to save indexing results.
-            lang: Language for the prompts.
-        """
-        GRAPH_CONFIG = os.path.join(
-            os.getcwd(), "lpm_kernel/L2/data_pipeline/graphrag_indexing/settings.yaml"
-        )
-
-        ENV_CONFIG = os.path.join(
-            os.getcwd(), "lpm_kernel/L2/data_pipeline/graphrag_indexing/.env"
-        )
-
-        user_llm_config_service = UserLLMConfigService()
-        user_llm_config = user_llm_config_service.get_available_llm()
-
-        chat_api_key = user_llm_config.chat_api_key
-        chat_base_url = user_llm_config.chat_endpoint
-        chat_model_name = user_llm_config.chat_model_name
-
-        embedding_api_key = user_llm_config.embedding_api_key
-        embedding_base_url = user_llm_config.embedding_endpoint
-        embedding_model_name = user_llm_config.embedding_model_name
-
-        with open(GRAPH_CONFIG, "r", encoding="utf-8") as file:
-            settings = yaml.safe_load(file)
-
-        with open(ENV_CONFIG, "w", encoding="utf-8") as file:
-            file.write(f"GRAPHRAG_API_KEY={chat_api_key}")
-
-        settings["input"]["base_dir"] = graph_input_dir
-        settings["output"]["base_dir"] = output_dir
-        settings["reporting"]["base_dir"] = os.path.join(output_dir, "../report")
-
-        settings["models"]["default_chat_model"]["api_base"] = chat_base_url
-        settings["models"]["default_chat_model"]["model"] = chat_model_name
-        settings["models"]["default_chat_model"]["api_key"] = chat_api_key
-
-        if chat_model_name.startswith("openai"):
-            settings["models"]["default_chat_model"]["model"] = chat_model_name.replace("openai/", "")
-
-        if embedding_model_name.startswith("openai"):
-            settings["models"]["default_embedding_model"]["model"] = embedding_model_name.replace("openai/", "")
-        else:
-            settings["models"]["default_embedding_model"]["model"] = embedding_model_name
-
-        settings["models"]["default_embedding_model"]["api_base"] = embedding_base_url
-        settings["models"]["default_embedding_model"]["api_key"] = embedding_api_key
-
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-            logger.warning(f"Specified output directory does not exist, created: {output_dir}.")
-
-        with open(GRAPH_CONFIG, "w", encoding="utf-8") as file:
-            yaml.dump(settings, file, default_flow_style=False, allow_unicode=True)
-
-        logger.info(f"Input base_dir has been updated to {graph_input_dir} and saved.")
-        logger.info(f"Output base_dir has been updated to {output_dir} and saved.")
-        logger.info(
-            f"Report base_dir has been updated to {os.path.join(output_dir, 'report')} and saved."
-        )
-
-        # Read prompts configuration and modify entity_extraction/summarize_descriptions from "in Chinese" to "in {lang}"
-        entity_extraction_path = os.path.join(
-            os.getcwd(),
-            "lpm_kernel/L2/data_pipeline/graphrag_indexing/prompts/extract_graph.txt",
-        )
-        with open(entity_extraction_path, "r", encoding="utf-8") as f1:
-            entity_extraction = f1.read()
-            entity_extraction = entity_extraction.replace("<lang>", lang)
-        with open(entity_extraction_path, "w", encoding="utf-8") as f2:
-            f2.write(entity_extraction)
-
-        summarize_descriptions_path = os.path.join(
-            os.getcwd(),
-            "lpm_kernel/L2/data_pipeline/graphrag_indexing/prompts/summarize_descriptions.txt",
-        )
-        with open(summarize_descriptions_path, "r", encoding="utf-8") as f1:
-            summarize_descriptions = f1.read()
-            summarize_descriptions = summarize_descriptions.replace("<lang>", lang)
-        with open(summarize_descriptions_path, "w", encoding="utf-8") as f2:
-            f2.write(summarize_descriptions)
-
-        # Run GraphRAG indexing
-        try:
-            result = subprocess.run(
-                [
-                    "bash",
-                    os.path.join(
-                        os.getcwd(),
-                        "lpm_kernel/L2/data_pipeline/data_prep/scripts/graphrag_indexing.sh",
-                    ),
-                ],
-                check=True,
-                text=True,
-                capture_output=True,
-            )
-            logger.error(f"subprocess.run graphrag index error: {result.stderr}")
-            if result.stderr:
-                raise RuntimeError("subprocess.run graphrag index error")
-        except Exception as e:
-            raise
-
-        """Post-processing"""
-
-        self.creat_mapping(
-            output_dir,
-            note_list,
-            os.path.join(
-                os.getcwd(),
-                "resources/L2/data_pipeline/raw_data/id_entity_mapping_subjective_v2.json",
-            ),
-        )
-
-    def creat_mapping(self, graph_dir, note_list, mapped_json_file):
-        """Create a mapping between entities and documents.
-        
-        Args:
-            graph_dir: Directory containing GraphRAG output.
-            note_list: List of Note objects.
-            mapped_json_file: Path to save the mapping file.
-        """
-        try:
-            document = pd.read_parquet(
-                os.path.join(graph_dir, "documents.parquet")
-            )
-            entities = pd.read_parquet(
-                os.path.join(graph_dir, "entities.parquet")
-            )
-        except Exception as e:
-            return
-
-        json_data = []
-
-        # show the column names
-        logger.info(f"Entity Column names: {entities.columns}")
-
-        logger.info(f"Document Column names: {document.columns}")
-
-        for e_i, e_r in tqdm(entities.iterrows(), total=len(entities)):
-            json_item = {}
-            json_item["entity_id"] = e_r["id"]
-            json_item["entity_name"] = e_r["title"]
-            json_item["entity_description"] = e_r["description"]
-            json_item["doc_id"] = []
-            text_unit_ids = e_r["text_unit_ids"]
-
-            for text_unit_id in text_unit_ids:
-                for d_i, d_r in document.iterrows():
-                    if text_unit_id in d_r["text_unit_ids"]:
-                        if "note" in d_r["title"]:
-                            json_item["doc_id"].append(
-                                note_list[
-                                    int(
-                                        d_r["title"]
-                                        .replace(".txt", "")
-                                        .replace("note_", "")
-                                    )
-                                ].id
-                            )
-            json_data.append(json_item)
-
-        with open(os.path.join(mapped_json_file), "w", encoding="utf-8") as file:
-            json.dump(json_data, file, ensure_ascii=False, indent=4)
 
     def _gen_preference_data(self, topics_path, preference_output_path, bio):
         """Generate preference data based on user topics and bio.
@@ -669,7 +595,7 @@ class L2DataProcessor:
             self,
             entitys_path,
             note_list: List[Note],
-            graph_path,
+            wiki_path,
             output_path,
             user_name,
             global_bio,
@@ -680,7 +606,7 @@ class L2DataProcessor:
         Args:
             entitys_path: Path to entities data.
             note_list: List of Note objects.
-            graph_path: Path to graph data.
+            wiki_path: Path to wiki data.
             output_path: Path to save diversity data.
             user_name: Name of the user.
             global_bio: User's global biography.
@@ -688,7 +614,7 @@ class L2DataProcessor:
         """
         processor = DiversityDataGenerator(self.preferred_lang)
         processor.generate_data(
-            entitys_path, note_list, config_path, graph_path, user_name, global_bio, output_path
+            entitys_path, note_list, config_path, wiki_path, user_name, global_bio, output_path
         )
 
     def _gen_selfqa_data(self, output_path, user_name, user_intro, bio):

@@ -64,7 +64,7 @@ class TrainProcessService:
                 "data_output_base_dir": None,
                 "topics_path": None,
                 "entitys_path": None,
-                "graph_path": None,
+                "wiki_path": None,
                 "config_path": None
             }
             self.l2_data_prepared = False
@@ -335,7 +335,7 @@ class TrainProcessService:
                     self.l2_data["data_output_base_dir"],
                     self.l2_data["topics_path"],
                     self.l2_data["entitys_path"],
-                    self.l2_data["graph_path"],
+                    self.l2_data["wiki_path"],
                     self.l2_data["config_path"]
                     )
             
@@ -369,7 +369,7 @@ class TrainProcessService:
                     self.l2_data["data_output_base_dir"],
                     self.l2_data["topics_path"],
                     self.l2_data["entitys_path"],
-                    self.l2_data["graph_path"],
+                    self.l2_data["wiki_path"],
                     self.l2_data["config_path"]
                     )
             
@@ -401,7 +401,7 @@ class TrainProcessService:
         logger.info(f"Memory usage after cleanup: {memory_info.rss / 1024 / 1024:.2f} MB")
     
     def augment_content_retention(self) -> bool:
-        """Augment content retention using notes, basic info and graph data"""
+        """Augment content retention using notes, basic info and wiki data"""
         try:
             # Mark step as in progress
             self.progress.mark_step_status(ProcessStep.AUGMENT_CONTENT_RETENTION, Status.IN_PROGRESS)
@@ -419,7 +419,7 @@ class TrainProcessService:
                 self.l2_data["data_output_base_dir"],
                 self.l2_data["topics_path"],
                 self.l2_data["entitys_path"],
-                self.l2_data["graph_path"],
+                self.l2_data["wiki_path"],
                 self.l2_data["config_path"]
             )
             l2_generator.merge_json_files(self.l2_data["data_output_base_dir"])
@@ -449,7 +449,7 @@ class TrainProcessService:
             - data_output_base_dir: Path to output directory
             - topics_path: Path to topics data
             - entitys_path: Path to entity mapping file
-            - graph_path: Path to graph data
+            - wiki_path: Path to wiki data
             - config_path: Path to config file
         """
         # If data is already prepared, return cached data directly
@@ -495,9 +495,9 @@ class TrainProcessService:
             os.getcwd(),
             "resources/L2/data_pipeline/raw_data/id_entity_mapping_subjective_v2.json",
         )
-        self.l2_data["graph_path"] = os.path.join(
+        self.l2_data["wiki_path"] = os.path.join(
             os.getcwd(),
-            "resources/L1/graphrag_indexing_output/subjective/entities.parquet",
+            "resources/L1/processed_data/subjective/wiki_res.json",
         )
         self.l2_data["data_output_base_dir"] = os.path.join(os.getcwd(), "resources/L2/data")
 

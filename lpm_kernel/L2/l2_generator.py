@@ -65,7 +65,7 @@ class L2Generator:
         data_output_base_dir: str,
         topics_path: str,
         entities_path: str,
-        graph_path: str,
+        wiki_path: str,
         config_path: str,
     ):
         """Generate subjective data for personalization.
@@ -79,7 +79,7 @@ class L2Generator:
             data_output_base_dir: Base directory for output data.
             topics_path: Path to topics data.
             entities_path: Path to entity data.
-            graph_path: Path to graph data.
+            wiki_path: Path to wiki data.
             config_path: Path to configuration file.
         """
         if not os.path.exists(data_output_base_dir):
@@ -101,7 +101,7 @@ class L2Generator:
             global_bio=basic_info["globalBio"],
             topics_path=topics_path,
             entitys_path=entities_path,
-            graph_path=graph_path,
+            wiki_path=wiki_path,
             user_name=basic_info["username"],
             config_path=config_path,
             user_intro=basic_info["aboutMe"],
@@ -120,7 +120,7 @@ class L2Generator:
         data_output_base_dir: str,
         topics_path: str,
         entities_path: str,
-        graph_path: str,
+        wiki_path: str,
         config_path: str,
     ):
         global_bio = basic_info["globalBio"]
@@ -138,7 +138,7 @@ class L2Generator:
         data_output_base_dir: str, 
         topics_path: str, 
         entities_path: str, 
-        graph_path: str, 
+        wiki_path: str, 
         config_path: str
     ):
         global_bio = basic_info["globalBio"]
@@ -147,7 +147,7 @@ class L2Generator:
 
         processor = DiversityDataGenerator(self.preferred_lang, is_cot=self.is_cot)
         processor.generate_data(
-            entities_path, note_list, config_path, graph_path, user_name, global_bio, output_path
+            entities_path, note_list, config_path, wiki_path, user_name, global_bio, output_path
         )
 
     def gen_selfqa_data(
@@ -157,7 +157,7 @@ class L2Generator:
         data_output_base_dir: str, 
         topics_path: str, 
         entities_path: str, 
-        graph_path: str, 
+        wiki_path: str, 
         config_path: str
     ):
         global_bio = basic_info["globalBio"]

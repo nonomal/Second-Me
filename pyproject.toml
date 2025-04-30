@@ -34,6 +34,7 @@ jsonlines = "^4.0.0"
 charset-normalizer = "^3.4.1"
 modelscope = "^1.25.0"
 sentence-transformers = "^2.6.0"
+Levenshtein = "^0.25.1"
 
 # Development environment dependencies
 # Use 'poetry install --with dev' to install development dependencies
