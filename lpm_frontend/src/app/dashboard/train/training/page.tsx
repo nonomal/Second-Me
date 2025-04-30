@@ -306,7 +306,7 @@ export default function TrainingPage() {
     // Use EventSource to get logs
     const eventSource = new EventSource(
       // `/api/trainprocess/logs?offset=${String(SSEOffsetRef.current)}`
-      `/api/trainprocess/logs?offset=0`
+      `/api/trainprocess/logs`
     );
 
     eventSource.onmessage = (event) => {
