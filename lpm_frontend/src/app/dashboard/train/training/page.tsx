@@ -96,7 +96,6 @@ export default function TrainingPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const firstLoadRef = useRef<boolean>(true);
   const pollingStopRef = useRef<boolean>(false);
-  // const SSEOffsetRef = useRef<number>(0);
 
   const [cudaAvailable, setCudaAvailable] = useState<boolean>(false);
   const trainSuspended = useTrainingStore((state) => state.trainSuspended);
@@ -217,9 +216,6 @@ export default function TrainingPage() {
     if (trainingProgress.status === 'in_progress') {
       setIsTraining(true);
 
-      // Create EventSource connection to get logs
-      // updateTrainLog();
-
       if (firstLoadRef.current) {
         scrollPageToBottom();
 
@@ -235,17 +231,7 @@ export default function TrainingPage() {
     ) {
       stopPolling();
       setIsTraining(false);
-
-      // Keep EventSource open to preserve received logs
-      // If resource cleanup is needed, EventSource could be closed here
     }
-
-    // Return cleanup function to ensure EventSource is closed when component unmounts or dependencies change
-    // return () => {
-    //   if (cleanupEventSourceRef.current) {
-    //     cleanupEventSourceRef.current();
-    //   }
-    // };
   }, [trainingProgress]);
 
   useEffect(() => {
@@ -304,16 +290,11 @@ export default function TrainingPage() {
 
   const getDetails = () => {
     // Use EventSource to get logs
-    const eventSource = new EventSource(
-      // `/api/trainprocess/logs?offset=${String(SSEOffsetRef.current)}`
-      `/api/trainprocess/logs`
-    );
+    const eventSource = new EventSource(`/api/trainprocess/logs`);
 
     eventSource.onmessage = (event) => {
       // Don't try to parse as JSON, just use the raw text data directly
       const logMessage = event.data;
-
-      // SSEOffsetRef.current += 1;
 
       setTrainingDetails((prev) => {
         const newLogs = [
@@ -399,11 +380,6 @@ export default function TrainingPage() {
     localStorage.removeItem('trainingLogs');
     // Reset training status to initial state
     resetTrainingState();
-
-    //resume dont clear offset
-    // if (!trainSuspended) {
-    //   SSEOffsetRef.current = 0;
-    // }
 
     try {
       console.log('Using startTrain API to train new model:', trainingParams.model_name);
