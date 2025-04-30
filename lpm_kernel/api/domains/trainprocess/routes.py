@@ -127,31 +127,68 @@ def start_process():
         return jsonify(APIResponse.error(message=f"Training process error: {str(e)}"))
 
 
+# @trainprocess_bp.route("/logs", methods=["GET"])
+# def stream_logs():
+#     """Get training logs in real-time with optional offset"""
+#     log_file_path = "logs/train/train.log"  # Log file path
+    
+#     # Get offset parameter from request, default to 0 if not provided
+#     offset = request.args.get('offset', type=int, default=0)
+#     last_position = offset
+    
+#     def generate_logs():
+#         nonlocal last_position
+#         while True:
+#             try:
+#                 encoding = from_path(log_file_path).best().encoding
+#                 with open(log_file_path, 'r', encoding=encoding) as log_file:
+#                     # Get file size to check if offset is valid
+#                     log_file.seek(0, 2)  # Seek to end of file
+#                     file_size = log_file.tell()
+                    
+#                     # If offset is greater than file size, reset to beginning
+#                     if last_position > file_size:
+#                         logger.warning(f"Requested offset {last_position} exceeds file size {file_size}, resetting to 0")
+#                         last_position = 0
+                    
+#                     # Seek to the last position
+#                     log_file.seek(last_position)
+#                     new_lines = log_file.readlines()  # Read new lines
+
+#                     for line in new_lines:
+#                         # Skip empty lines
+#                         if not line.strip():
+#                             continue
+                        
+#                         yield f"data: {line.strip()}\n\n"                    
+#             except Exception as e:
+#                 # If file reading fails, record error and continue
+#                 logger.error(f"Error reading log file: {str(e)}", exc_info=True)
+#                 yield f"event: error\ndata: {str(e)}\n\n"
+                
+#             time.sleep(1)  # Check for new logs every second
+
+#     return Response(
+#         generate_logs(),
+#         mimetype='text/event-stream',
+#         headers={
+#             'Cache-Control': 'no-cache, no-transform',
+#             'X-Accel-Buffering': 'no',
+#             'Connection': 'keep-alive',
+#             'Transfer-Encoding': 'chunked'
+#         }
+#     )
 @trainprocess_bp.route("/logs", methods=["GET"])
 def stream_logs():
-    """Get training logs in real-time with optional offset"""
+    """Get training logs in real-time"""
     log_file_path = "logs/train/train.log"  # Log file path
-    
-    # Get offset parameter from request, default to 0 if not provided
-    offset = request.args.get('offset', type=int, default=0)
-    last_position = offset
-    
+    last_position = 0
     def generate_logs():
         nonlocal last_position
         while True:
             try:
                 encoding = from_path(log_file_path).best().encoding
                 with open(log_file_path, 'r', encoding=encoding) as log_file:
-                    # Get file size to check if offset is valid
-                    log_file.seek(0, 2)  # Seek to end of file
-                    file_size = log_file.tell()
-                    
-                    # If offset is greater than file size, reset to beginning
-                    if last_position > file_size:
-                        logger.warning(f"Requested offset {last_position} exceeds file size {file_size}, resetting to 0")
-                        last_position = 0
-                    
-                    # Seek to the last position
                     log_file.seek(last_position)
                     new_lines = log_file.readlines()  # Read new lines
 
@@ -160,11 +197,12 @@ def stream_logs():
                         if not line.strip():
                             continue
                         
-                        yield f"data: {line.strip()}\n\n"                    
+                        yield f"data: {line.strip()}\n\n"
+                            
+                    last_position = log_file.tell()
             except Exception as e:
                 # If file reading fails, record error and continue
-                logger.error(f"Error reading log file: {str(e)}", exc_info=True)
-                yield f"event: error\ndata: {str(e)}\n\n"
+                yield f"data: Error reading log file: {str(e)}\n\n"
                 
             time.sleep(1)  # Check for new logs every second
 
