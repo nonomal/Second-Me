@@ -42,8 +42,6 @@ const trainInfo: TrainInfo = {
 
 const POLLING_INTERVAL = 3000;
 
-const STORAGE_KEY_LOG_OFFSET = 'trainLogOffset';
-
 interface TrainingDetail {
   message: string;
   timestamp: string;
@@ -284,19 +282,6 @@ export default function TrainingPage() {
     setTrainingDetails(savedLogs ? JSON.parse(savedLogs) : []);
   }, []);
 
-  useEffect(() => {
-    setTrainOffset(getLocalOffset());
-  }, []);
-
-  const setTrainOffset = (offset: number) => {
-    SSEOffsetRef.current = offset;
-    localStorage.setItem(STORAGE_KEY_LOG_OFFSET, String(offset));
-  };
-
-  const getLocalOffset = () => {
-    return Number(localStorage.getItem(STORAGE_KEY_LOG_OFFSET) || 0);
-  };
-
   // Scroll to the bottom of the page
   const scrollPageToBottom = () => {
     window.scrollTo({
@@ -321,8 +306,7 @@ export default function TrainingPage() {
       // Don't try to parse as JSON, just use the raw text data directly
       const logMessage = event.data;
 
-      console.log('11111111number', SSEOffsetRef.current);
-      setTrainOffset(SSEOffsetRef.current + 1);
+      SSEOffsetRef.current += 1;
 
       setTrainingDetails((prev) => {
         const newLogs = [
@@ -411,7 +395,7 @@ export default function TrainingPage() {
 
     //resume dont clear offset
     if (!trainSuspended) {
-      setTrainOffset(0);
+      SSEOffsetRef.current = 0;
     }
 
     try {
