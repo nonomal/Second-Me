@@ -280,18 +280,6 @@ class LoadService:
             # Continue with deletion even if unregistration fails
 
     @staticmethod
-    def _clean_graphrag_keys() -> None:
-        """Clean GraphRAG keys"""
-        try:
-            from lpm_kernel.L2.l2_generator import L2Generator
-            l2_generator = L2Generator()
-            l2_generator.clean_graphrag_keys()
-            logger.info("Successfully cleaned GraphRAG keys")
-        except Exception as e:
-            logger.error(f"Failed to clean GraphRAG keys: {str(e)}")
-            # Continue with deletion even if cleaning GraphRAG keys fails
-
-    @staticmethod
     def _reinitialize_database(session, load, load_name: str) -> Tuple[Optional[str], int]:
         """Reinitialize database by deleting all tables and recreating them
         
@@ -482,8 +470,6 @@ class LoadService:
                 if load.instance_id:
                     LoadService._unregister_from_registry(load_name, load.instance_id)
                 
-                # 3. Clean GraphRAG keys
-                LoadService._clean_graphrag_keys()
                 
                 # 4. Reinitialize database
                 error, status_code = LoadService._reinitialize_database(session, load, load_name)

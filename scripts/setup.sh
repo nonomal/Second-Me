@@ -195,36 +195,6 @@ EOF
     log_info "Created Poetry environment activation script at: $activate_script"
 }
 
-install_graphrag() {
-    log_step "Installing graphrag"
-    
-    # Check the current graphrag version in Poetry environment
-    log_step "Checking graphrag version in Poetry environment"
-    GRAPHRAG_VERSION=$(poetry run pip show graphrag 2>/dev/null | grep "Version:" | cut -d " " -f2)
-    GRAPHRAG_TARGET="1.2.1.dev27"
-    GRAPHRAG_LOCAL_PATH="dependencies/graphrag-${GRAPHRAG_TARGET}.tar.gz"
-
-    if [ "$GRAPHRAG_VERSION" != "$GRAPHRAG_TARGET" ]; then
-        log_info "Installing correct version of graphrag in Poetry environment..."
-        if [ -f "$GRAPHRAG_LOCAL_PATH" ]; then
-            log_info "Installing graphrag from local file using Poetry..."
-            if ! poetry run pip install --force-reinstall "$GRAPHRAG_LOCAL_PATH"; then
-                log_error "Failed to install graphrag from local file"
-                return 1
-            fi
-        else
-            log_error "Local graphrag package not found at: $GRAPHRAG_LOCAL_PATH"
-            log_error "Please ensure the graphrag package exists in the dependencies directory"
-            return 1
-        fi
-        log_success "Graphrag installed successfully"
-    else
-        log_success "Graphrag version is correct, skipping installation"
-    fi
-    
-    return 0
-}
-
 # Build llama.cpp
 build_llama() {
     log_section "BUILDING LLAMA.CPP"
@@ -633,11 +603,6 @@ main() {
     
     if ! install_python_dependency; then
         log_error "Failed to install python dependencies"
-        exit 1
-    fi
-
-    if ! install_graphrag; then
-        log_error "Failed to install graphrag"
         exit 1
     fi
 

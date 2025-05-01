@@ -221,25 +221,3 @@ class L2Generator:
             logging = logging.getLogger(__name__)
             logging.warning(f"Failed to release Ollama models: {str(e)}")
 
-    def clean_graphrag_keys(self):
-        GRAPH_CONFIG = os.path.join(
-            os.getcwd(), "lpm_kernel/L2/data_pipeline/graphrag_indexing/settings.yaml"
-        )
-
-        with open(GRAPH_CONFIG, "r", encoding="utf-8") as file:
-            settings = yaml.safe_load(file)
-        
-        settings["input"]["base_dir"] = "/your_dir"
-        settings["output"]["base_dir"] = "/your_dir"
-        settings["reporting"]["base_dir"] = "/your_dir"
-        settings["models"]["default_chat_model"]["api_key"] = "sk-xxxxxx"
-        
-        ENV_CONFIG = os.path.join(
-            os.getcwd(), "lpm_kernel/L2/data_pipeline/graphrag_indexing/.env"
-        )
-        with open(ENV_CONFIG, "w", encoding="utf-8") as file:
-            file.write("GRAPHRAG_API_KEY=sk-xxxxxx")
-        
-        with open(GRAPH_CONFIG, "w", encoding="utf-8") as file:
-            yaml.dump(settings, file, default_flow_style=False, allow_unicode=True)
-        logging.info("Graphrag config updated successfully")

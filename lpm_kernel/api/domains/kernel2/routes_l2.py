@@ -191,9 +191,9 @@ def all():
                 os.getcwd(),
                 "resources/L2/data_pipeline/raw_data/id_entity_mapping_subjective_v2.json",
             )
-            graph_path = os.path.join(
+            wiki_path = os.path.join(
                 os.getcwd(),
-                "resources/L1/graphrag_indexing_output/subjective/entities.parquet",
+                "resources/L1/processed_data/subjective/wiki_res.json",
             )
 
             data_output_base_dir = os.path.join(os.getcwd(), "resources/L2/data")
@@ -239,7 +239,7 @@ def all():
             progress_data = {
                 "stage": "Generating Data",
                 "progress": 95,
-                "message": "Generating subjective data： Preference QA Self QA Diversity QA graphrag_indexing"
+                "message": "Generating subjective data： Preference QA Self QA Diversity QA WiKi Building"
             }
             yield f"data: {json.dumps(progress_data)}\n\n"
 
@@ -249,7 +249,7 @@ def all():
                 data_output_base_dir,
                 storage.topics_path,
                 entitys_path,
-                graph_path,
+                wiki_path,
                 config_path,
             )
 
