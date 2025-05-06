@@ -445,14 +445,6 @@ class LoadService:
             
             logger.info("Reset default training progress")
             
-            # Reset global training process variables
-            from lpm_kernel.api.domains.kernel2.routes_l2 import _training_process, _training_thread, _stopping_training
-            if _training_process is not None:
-                logger.info("Resetting global training process variables")
-                _training_process = None 
-                _training_thread = None
-                _stopping_training = False
-            
         except Exception as e:
             logger.error(f"Failed to reset training progress objects: {str(e)}")
 
