@@ -87,7 +87,7 @@ body:
       attributes:
           label: "Current Behavior"
           description: "What actually happened?\n\n
-                        Please include full errors, uncaught exceptions, stack traces, screenshots and other relevant logs."
+                        Please include full errors, uncaught exceptions, stack traces, screenshots, and other relevant logs (e.g., from `log/backend.log` if applicable)."
       validations:
           required: true
 
