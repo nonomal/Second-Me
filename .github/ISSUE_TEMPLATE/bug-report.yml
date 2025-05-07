@@ -1,4 +1,4 @@
-name: " Bug Report"
+name: "🪲 Bug Report"
 description: "File a bug report to help us improve"
 labels: ["fix"]
 body:
@@ -9,7 +9,7 @@ body:
               > [!IMPORTANT]
               > To save time for both you and us, try follow these guidelines before submitting a new issue:
               > 1. Check if there is an existing issue tracking your bug on our Github.
-              > 2. When unsure if your issue is an actual bug, first discuss it on a [Github discussion](https://github.com/baofangyi/Second-Me/discussions/new?category=q-a) or other project communication channels.
+              > 2. When unsure if your issue is an actual bug, first discuss it on a [Github discussion](https://github.com/mindverse/Second-Me/discussions/new?category=q-a) or other project communication channels.
               > These steps avoid opening issues which are duplicate or not actual bugs.
 
     - type: "checkboxes"
