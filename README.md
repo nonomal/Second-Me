@@ -110,11 +110,9 @@ check the full [Deployment Guide on GitBook](https://secondme.gitbook.io/secondm
 Second Me continues to evolve as the open-source identity infrastructure for AI. Here's what's on deck for May:
 
 - 🗂️ **Version Control**: Smarter versioning of memory and identity states  
-
 - 🧠 **Continuous Training Pipelines**: Keep your AI self evolving over time, with ongoing updates based on new memory inputs.
-
 - ⚙️ **Performance & Stability Improvements**: Enhancements across inference ability, model alignment,  and base model upgrades
-
+- ☁️ **Cloud Solutions**: Explore cloud-based solutions for both model training (fine-tuning) and model deployment, to reduce the hardware burden on users' local machines.
 
 ## Contributing
 
