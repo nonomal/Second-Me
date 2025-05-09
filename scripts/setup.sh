@@ -6,6 +6,7 @@ source "$SCRIPT_DIR/utils/logging.sh"
 source "$SCRIPT_DIR/utils/os_detection.sh"
 source "$SCRIPT_DIR/utils/install_config.sh"
 source "$SCRIPT_DIR/utils/python_tools.sh"
+source "$SCRIPT_DIR/utils/header_display.sh"
 
 # Version
 VERSION="1.0.0"
@@ -24,27 +25,7 @@ cleanup() {
     exit 1
 }
 
-# Display title and logo
-display_header() {
-    local title="$1"
-    
-    echo ""
-    echo -e "${CYAN}"
-    echo ' ███████╗███████╗ ██████╗ ██████╗ ███╗   ██╗██████╗       ███╗   ███╗███████╗'
-    echo ' ██╔════╝██╔════╝██╔════╝██╔═══██╗████╗  ██║██╔══██╗      ████╗ ████║██╔════╝'
-    echo ' ███████╗█████╗  ██║     ██║   ██║██╔██╗ ██║██║  ██║█████╗██╔████╔██║█████╗  '
-    echo ' ╚════██║██╔══╝  ██║     ██║   ██║██║╚██╗██║██║  ██║╚════╝██║╚██╔╝██║██╔══╝  '
-    echo ' ███████║███████╗╚██████╗╚██████╔╝██║ ╚████║██████╔╝      ██║ ╚═╝ ██║███████╗'
-    echo ' ╚══════╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═════╝       ╚═╝     ╚═╝╚══════╝'
-    echo -e "${NC}"
-    echo -e "${BOLD}Second-Me Setup Script v${VERSION}${NC}"
-    echo -e "${GRAY}$(date)${NC}\n"
-    
-    if [ -n "$title" ]; then
-        echo -e "${CYAN}====== $title ======${NC}"
-        echo ""
-    fi
-}
+
 
 # Display stage start
 display_stage() {
