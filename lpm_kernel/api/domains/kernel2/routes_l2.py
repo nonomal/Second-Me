@@ -552,9 +552,28 @@ def convert_model():
         gguf_dir = paths["gguf_dir"]
         logger.info(f"GGUF output directory: {gguf_dir}")
 
+        # Generate timestamp for the filename
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        gguf_filename = f"{timestamp}.gguf"
+        
         script_path = os.path.join(os.getcwd(), "lpm_kernel/L2/convert_hf_to_gguf.py")
-        gguf_path = os.path.join(gguf_dir, "model.gguf")
+        gguf_path = os.path.join(gguf_dir, gguf_filename)
         logger.info(f"GGUF output path: {gguf_path}")
+
+        # Get training parameters from TrainingParamsManager
+        from ..trainprocess.training_params_manager import TrainingParamsManager
+        training_params = TrainingParamsManager.get_latest_training_params()
+        logger.info(f"Retrieved training parameters: {training_params}")
+        
+        # Save training parameters to a JSON file in the GGUF directory
+        training_params_path = os.path.join(gguf_dir, f"{timestamp}.json")
+        try:
+            with open(training_params_path, 'w', encoding='utf-8') as f:
+                json.dump(training_params, f, indent=2)
+            logger.info(f"Training parameters saved to {training_params_path}")
+        except Exception as e:
+            logger.error(f"Failed to save training parameters: {str(e)}")
 
         # Build parameters
         args = [
@@ -570,13 +589,34 @@ def convert_model():
             script_path=script_path, script_type="convert_model", args=args
         )
 
+        # Model conversion completed
+
+        # 更新所有Memory记录的is_trained状态为"yes"
+        try:
+            db = DatabaseSession()
+            with db._session_factory() as session:
+                # 查询所有状态为active的Memory记录
+                memories = session.query(Memory).filter(Memory.status == "active").all()
+                
+                # 更新每个Memory记录的is_trained状态
+                for memory in memories:
+                    memory.is_trained = "yes"
+                
+                # 提交更改
+                session.commit()
+                logger.info(f"Updated training status for {len(memories)} memory records")
+        except Exception as e:
+            logger.error(f"Failed to update memory training status: {str(e)}", exc_info=True)
+
         logger.info(f"Model conversion successful: {result}")
         return jsonify(APIResponse.success(
             data={
                 **result,
                 "model_name": model_name,
                 "merged_dir": merged_model_dir,
-                "gguf_path": gguf_path
+                "gguf_path": gguf_path,
+                "training_params_path": training_params_path,
+                "training_params": training_params
             },
             message="Model conversion task started"
         ))
@@ -593,15 +633,16 @@ def start_llama_server():
     try:
         # Get request parameters
         data = request.get_json()
-        if not data or "model_name" not in data:
+        if not data or "model_path" not in data:
             return jsonify(APIResponse.error(message="Missing required parameter: model_name", code=400))
 
-        model_name = data["model_name"]
+        model_name = data["model_path"]
         # Get optional use_gpu parameter with default value of True
         use_gpu = data.get("use_gpu", True)
         
-        paths = get_model_paths(model_name)
-        gguf_path = os.path.join(paths["gguf_dir"], "model.gguf")
+        # paths = get_model_paths(model_name)
+        # gguf_path = os.path.join(paths["gguf_dir"], "model.gguf")
+        gguf_path = data["full_path"]
 
         server_path = os.path.join(os.getcwd(), "llama.cpp/build/bin")
         if os.path.exists(os.path.join(os.getcwd(), "llama.cpp/build/bin/Release")):
@@ -705,6 +746,72 @@ def get_llama_server_status():
     except Exception as e:
         logger.error(f"Error getting llama-server status: {str(e)}", exc_info=True)
         return APIResponse.error(f"Error getting llama-server status: {str(e)}")
+
+
+@kernel2_bp.route("/list_gguf_models", methods=["GET"])
+def list_gguf_models():
+    """List all GGUF models and their training parameters"""
+    try:
+        base_dir = os.getcwd()
+        gguf_base_dir = os.path.join(base_dir, "resources/model/output/gguf")
+        
+        # Check if the directory exists
+        if not os.path.exists(gguf_base_dir):
+            return jsonify(APIResponse.error(message="GGUF directory does not exist", code=404))
+        
+        # Get all model folders
+        model_folders = [f for f in os.listdir(gguf_base_dir) if os.path.isdir(os.path.join(gguf_base_dir, f))]
+        
+        result = []
+        for model_name in model_folders:
+            model_dir = os.path.join(gguf_base_dir, model_name)
+            
+            # Get all GGUF files in this model directory
+            gguf_files = [f for f in os.listdir(model_dir) if f.endswith(".gguf")]
+            
+            for gguf_file in gguf_files:
+                gguf_path = os.path.join(model_dir, gguf_file)
+                model_path = f"{model_name}/{gguf_file}"
+                
+                # Look for corresponding JSON file with training parameters
+                json_file = gguf_file.replace(".gguf", ".json")
+                json_path = os.path.join(model_dir, json_file)
+                training_params = {}
+                
+                if os.path.exists(json_path):
+                    try:
+                        with open(json_path, 'r', encoding='utf-8') as f:
+                            training_params = json.load(f)
+                    except Exception as e:
+                        logger.error(f"Failed to load training parameters for {model_path}: {str(e)}")
+                
+                # Get file information
+                file_stats = os.stat(gguf_path)
+                file_size = file_stats.st_size
+                created_time = file_stats.st_ctime
+                
+                model_info = {
+                    "model_path": model_path,
+                    "full_path": gguf_path,
+                    "file_size": file_size,
+                    "created_time": created_time,
+                    "training_params": training_params
+                }
+                
+                result.append(model_info)
+        
+        # Sort by creation time (newest first)
+        result.sort(key=lambda x: x["created_time"], reverse=True)
+        
+        return jsonify(APIResponse.success(
+            data=result,
+            message=f"Found {len(result)} GGUF model(s)"
+        ))
+
+    except Exception as e:
+        error_msg = f"Failed to list GGUF models: {str(e)}"
+        logger.error(error_msg)
+        return jsonify(APIResponse.error(message=error_msg, code=500))
 
 
 @kernel2_bp.route("/test/version", methods=["GET"])

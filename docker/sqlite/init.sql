@@ -136,6 +136,7 @@ CREATE TABLE IF NOT EXISTS memories (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     status TEXT CHECK(status IN ('active', 'deleted')) NOT NULL DEFAULT 'active',
+    is_trained TEXT CHECK(is_trained IN ('yes', 'no')) NOT NULL DEFAULT 'no',
     PRIMARY KEY (id)
 );
 
