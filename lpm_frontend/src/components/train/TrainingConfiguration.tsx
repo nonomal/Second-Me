@@ -173,7 +173,7 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                       e.stopPropagation();
 
                       if (disabledChangeParams) {
-                        message.warning('Cancel the current train in order to configure the model');
+                        message.warning('Cancel the current training run to configure the model');
 
                         return;
                       }
@@ -461,10 +461,10 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                 }}
               >
                 Thinking Model 
-                <Tooltip title="Chain of Thought (CoT) enables the model to perform step-by-step reasoning during training. This improves the quality of responses by allowing the model to 'think' through complex questions before answering, resulting in more accurate and logically coherent outputs.">
-                    <QuestionCircleOutlined className="cursor-pointer ml-2" />
-                </Tooltip>
               </div>
+              <Tooltip title="Chain of Thought (CoT) enables the model to perform step-by-step reasoning during training. This improves the quality of responses by allowing the model to 'think' through complex questions before answering, resulting in more accurate and logically coherent outputs.">
+                    <QuestionCircleOutlined className="cursor-pointer ml-2" />
+              </Tooltip>
             </div>
           </div>
         </div>
