@@ -71,8 +71,8 @@ Star and join us, and you will receive all release notifications from GitHub wit
 
 | Memory (GB) | Docker Deployment (Windows/Linux) | Docker Deployment (Mac) | Integrated Setup (Windows/Linux) | Integrated Setup (Mac) |
 |--------------|-----------------------------|-------------------|--------------------------|----------------|
-| 8            | ~0.7B                | ~0.7B       | ~1.5B              | ~0.7B    |
-| 16           | 1.5B                 | 0.7B        | ~3.0B              | ~0.7B    |
+| 8            | ~0.5B                | ~0.5B       | ~1.5B              | ~0.5B    |
+| 16           | 1.5B                 | 0.5B        | ~3.0B              | ~0.5B    |
 | 32           | ~3B                | ~1.5B       | ~3B              | ~1.5B    |
 
 > **Note**: Models below 0.5B may not provide satisfactory performance for complex tasks. And we're continuously improving cross-platform support - please [submit an issue](https://github.com/mindverse/Second-Me/issues/new) for feedback or compatibility problems on different operating systems.
