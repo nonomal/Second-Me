@@ -348,7 +348,7 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                   value={trainingParams.number_of_epochs}
                 />
                 <div className="text-xs text-gray-500">
-                  Enter an integer between 1 and 10 (recommended: 2)
+                  Enter an integer between 1 and 10 (recommended: 3)
                 </div>
               </div>
               <div className="flex flex-col gap-2">
