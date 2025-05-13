@@ -75,13 +75,14 @@ const ThinkingModelModal = (props: IProps) => {
             <Input
               autoComplete="off"
               className="w-full"
+              disabled
               onChange={(e) =>
                 setThinkingModelParams({
                   ...thinkingModelParams,
                   thinking_model_name: e.target.value
                 })
               }
-              value={thinkingModelParams.thinking_model_name}
+              value={thinkingModelParams.thinking_model_name || "deepseek-reasoner"}
             />
           </div>
 
@@ -109,13 +110,14 @@ const ThinkingModelModal = (props: IProps) => {
           <Input
             autoComplete="off"
             className="w-full"
+            disabled
             onChange={(e) =>
               setThinkingModelParams({
                 ...thinkingModelParams,
                 thinking_endpoint: e.target.value
               })
             }
-            value={thinkingModelParams.thinking_endpoint}
+            value={thinkingModelParams.thinking_endpoint || "https://api.deepseek.com"}
           />
         </div>
       </div>
