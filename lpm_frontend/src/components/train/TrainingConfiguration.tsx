@@ -173,7 +173,7 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                       e.stopPropagation();
 
                       if (disabledChangeParams) {
-                        message.warning('Cancel the current train in order to configure the model');
+                        message.warning('Cancel the current training run to configure the model');
 
                         return;
                       }
@@ -348,7 +348,7 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                   value={trainingParams.number_of_epochs}
                 />
                 <div className="text-xs text-gray-500">
-                  Enter an integer between 1 and 10 (recommended: 2)
+                  Enter an integer between 1 and 10 (recommended: 3)
                 </div>
               </div>
               <div className="flex flex-col gap-2">
@@ -460,8 +460,11 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
                   setOpenThinkingModel(true);
                 }}
               >
-                Thinking Model
+                Thinking Model 
               </div>
+              <Tooltip title="Chain of Thought (CoT) enables the model to perform step-by-step reasoning during training. This improves the quality of responses by allowing the model to 'think' through complex questions before answering, resulting in more accurate and logically coherent outputs.">
+                    <QuestionCircleOutlined className="cursor-pointer ml-2" />
+              </Tooltip>
             </div>
           </div>
         </div>
