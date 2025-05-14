@@ -41,6 +41,41 @@ def list_documents():
         return jsonify(APIResponse.error(message=f"Error listing documents: {str(e)}"))
 
 
+@document_bp.route("/documents/page", methods=["GET"])
+def page_documents():
+    """
+    List documents with pagination
+    Query Parameters:
+        page (int): Page number
+        page_size (int): Number of items per page
+        include_l0 (bool): Whether to include L0 data (chunks and embeddings)
+    """
+    try:
+        page = int(request.args.get("page", 1))
+        page_size = int(request.args.get("page_size", 100))
+        include_l0 = request.args.get("include_l0", "").lower() == "true"
+        if include_l0:
+            documents = document_service.page_documents_with_l0(page, page_size)
+            if not documents:
+                return jsonify(
+                    APIResponse.error(message="No documents found for the given page")
+                )
+            return jsonify(APIResponse.success(data=documents))
+        else:
+            documents = document_service.page_documents(page, page_size)
+            if not documents:
+                return jsonify(
+                    APIResponse.error(message="No documents found for the given page")
+                )
+            return jsonify(
+                APIResponse.success(data=[doc.to_dict() for doc in documents])
+            )
+
+    except Exception as e:
+        logger.error(f"Error listing documents: {str(e)}", exc_info=True)
+        return jsonify(APIResponse.error(message=f"Error listing documents: {str(e)}"))
+
+
 @document_bp.route("/documents/scan", methods=["POST"])
 @validate()
 def scan_documents():
@@ -251,16 +286,20 @@ def get_document_embeddings(document_id: int):
         chunks_info = [
             {
                 "id": chunk.id,
-                "content": chunk.content[:100] + "..."
-                if len(chunk.content) > 100
-                else chunk.content,
+                "content": (
+                    chunk.content[:100] + "..."
+                    if len(chunk.content) > 100
+                    else chunk.content
+                ),
                 "has_embedding": chunk.has_embedding,
-                "embedding_length": len(chunk_embeddings.get(chunk.id, []))
-                if chunk_embeddings.get(chunk.id)
-                else 0,
-                "embedding_vector": chunk_embeddings.get(chunk.id)
-                if include_vectors
-                else None,  # Decide whether to include vectors based on parameters
+                "embedding_length": (
+                    len(chunk_embeddings.get(chunk.id, []))
+                    if chunk_embeddings.get(chunk.id)
+                    else 0
+                ),
+                "embedding_vector": (
+                    chunk_embeddings.get(chunk.id) if include_vectors else None
+                ),  # Decide whether to include vectors based on parameters
                 "tags": chunk.tags,
                 "topic": chunk.topic,
             }
@@ -329,11 +368,14 @@ def get_document_embedding(document_id: int):
 
         embedding = document_service.get_document_embedding(document_id)
         if embedding is None:
-            return jsonify(
-                APIResponse.error(
-                    message=f"No embedding found for document {document_id}"
-                )
-            ), 404
+            return (
+                jsonify(
+                    APIResponse.error(
+                        message=f"No embedding found for document {document_id}"
+                    )
+                ),
+                404,
+            )
         return jsonify(
             APIResponse.success(
                 data={
@@ -361,7 +403,9 @@ def verify_document_embeddings():
 
     except Exception as e:
         logger.error(f"Error verifying document embeddings: {str(e)}", exc_info=True)
-        return jsonify(APIResponse.error(message=f"Error verifying document embeddings: {str(e)}"))
+        return jsonify(
+            APIResponse.error(message=f"Error verifying document embeddings: {str(e)}")
+        )
 
 
 @document_bp.route("/documents/repair", methods=["POST"])
@@ -370,10 +414,12 @@ def repair_documents():
     try:
         # First, fix missing document analysis (summaries and insights)
         fixed_analysis_count = document_service.fix_missing_document_analysis()
-        
+
         # Get verification results after fixing analysis
-        verification_results = document_service.verify_document_embeddings(verbose=False)
-        
+        verification_results = document_service.verify_document_embeddings(
+            verbose=False
+        )
+
         # Process documents with missing embeddings
         documents_fixed = 0
         for doc in document_service._repository.list():
@@ -385,20 +431,26 @@ def repair_documents():
                     document_service.generate_document_chunk_embeddings(doc.id)
                     documents_fixed += 1
                 except Exception as e:
-                    logger.error(f"Error processing document {doc.id} embedding: {str(e)}")
-        
+                    logger.error(
+                        f"Error processing document {doc.id} embedding: {str(e)}"
+                    )
+
         # Get final verification results
         final_results = document_service.verify_document_embeddings(verbose=False)
-        
-        return jsonify(APIResponse.success(
-            data={
-                "analysis_fixed": fixed_analysis_count,
-                "embeddings_fixed": documents_fixed,
-                "initial_state": verification_results,
-                "final_state": final_results
-            }
-        ))
+
+        return jsonify(
+            APIResponse.success(
+                data={
+                    "analysis_fixed": fixed_analysis_count,
+                    "embeddings_fixed": documents_fixed,
+                    "initial_state": verification_results,
+                    "final_state": final_results,
+                }
+            )
+        )
 
     except Exception as e:
         logger.error(f"Error repairing documents: {str(e)}", exc_info=True)
-        return jsonify(APIResponse.error(message=f"Error repairing documents: {str(e)}"))
+        return jsonify(
+            APIResponse.error(message=f"Error repairing documents: {str(e)}")
+        )
