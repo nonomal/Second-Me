@@ -676,7 +676,8 @@ def save_hf_model(model_name=None, log_file_path=None) -> str:
             
             try:
                 # Build the download URL
-                url = f"https://huggingface.co/{hf_model_name}/resolve/main/{filename}"
+                hf_endpoint = os.environ.get("HF_ENDPOINT", "https://huggingface.co")
+                url = f"{hf_endpoint}/{hf_model_name}/resolve/main/{filename}"
                 
                 # Get file size
                 response = requests.head(url)
