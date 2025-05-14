@@ -18,7 +18,6 @@ from .process_factory import ProcessorFactory
 from .process_status import ProcessStatus
 
 from lpm_kernel.configs.logging import get_train_process_logger
-
 logger = get_train_process_logger()
 
 
@@ -561,56 +560,69 @@ class DocumentService:
             logger.error(f"Error getting document embedding: {str(e)}")
             raise
 
-    def delete_file_by_id(self, document_id: int) -> bool:
+ def delete_file_by_name(self, filename: str) -> bool:
         """
-        Delete a document by its ID
-
         Args:
-            document_id (int): The ID of the document to delete
+            filename (str): name to delete
 
         Returns:
-            bool: True if deletion successful, False otherwise
+            bool: if success
 
         Raises:
             Exception: error occurred
         """
-        logger.info(f"Starting to delete file with ID: {document_id}")
+        logger.info(f"Starting to delete file: {filename}")
 
         try:
-            # 1. 获取文档对象
-            document = self._repository.get_by_id(document_id)
-            logger.info(f"Document found: {document}")
-
-            if not document:
-                logger.warning(f"Document with ID {document_id} not found")
-                return False
-
-            # 2. 搜索相关的 memory 记录
+            # 1. search memories
             db = DatabaseSession()
             memory = None
-            file_path = None
+            document_id = None
 
             with db._session_factory() as session:
-                query = select(Memory).where(Memory.document_id == document_id)
-                logger.info(f"Querying memory for document ID: {document_id}")
+                query = select(Memory).where(Memory.name == filename)
                 result = session.execute(query)
                 memory = result.scalar_one_or_none()
 
-                if memory:
-                    # 获取文件路径
-                    file_path = memory.path
+                if not memory:
+                    logger.warning(f"File record not found: {filename}")
+                    return False
 
-                    # 删除 memory 记录
-                    session.delete(memory)
-                    session.commit()
-                    logger.info(
-                        f"Deleted record from memories table for document ID: {document_id}"
-                    )
+                # get related document_id
+                document_id = memory.document_id
 
-            # 3. 获取所有 chunks
+                # get filepath
+                file_path = memory.path
+
+                # 2. delete memory
+                session.delete(memory)
+                session.commit()
+                logger.info(f"Deleted record from memories table: {filename}")
+
+            # if no related document, only delete physical file
+            if not document_id:
+                # delete physical file
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    logger.info(f"Deleted physical file: {file_path}")
+                return True
+
+            # 3. get doc obj
+            document = self._repository.get_by_id(document_id)
+            if not document:
+                logger.warning(
+                    f"Corresponding document record not found, ID: {document_id}"
+                )
+                # if no document record, delete physical file
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    logger.info(f"Deleted physical file: {file_path}")
+                return True
+
+            # 4. get all chunks
             chunks = self._repository.find_chunks(document_id)
 
-            # 4. 从 ChromaDB 删除文档嵌入
+            # 5. delete doc embedding from ChromaDB
             try:
                 self.embedding_service.document_collection.delete(
                     ids=[str(document_id)]
@@ -621,7 +633,7 @@ class DocumentService:
             except Exception as e:
                 logger.error(f"Error deleting document embedding: {str(e)}")
 
-            # 5. 从 ChromaDB 删除所有 chunk 嵌入
+            # 6. delete all chunk embedding from ChromaDB
             if chunks:
                 try:
                     chunk_ids = [str(chunk.id) for chunk in chunks]
@@ -632,7 +644,7 @@ class DocumentService:
                 except Exception as e:
                     logger.error(f"Error deleting chunk embeddings: {str(e)}")
 
-            # 6. 从数据库删除所有 chunks
+            # 7. delete all chunks embedding from ChromaDB
             with db._session_factory() as session:
                 from lpm_kernel.file_data.models import ChunkModel
 
@@ -640,11 +652,9 @@ class DocumentService:
                     ChunkModel.document_id == document_id
                 ).delete()
                 session.commit()
-                logger.info(
-                    f"Deleted all related chunks for document ID: {document_id}"
-                )
+                logger.info(f"Deleted all related chunks")
 
-                # 7. 删除文档记录
+                # delete doc record
                 doc_entity = session.get(Document, document_id)
                 if doc_entity:
                     session.delete(doc_entity)
@@ -653,18 +663,16 @@ class DocumentService:
                         f"Deleted document record from database, ID: {document_id}"
                     )
 
-            # 8. 删除物理文件
-            if file_path and os.path.exists(file_path):
+            # 8. delete physical file
+            if os.path.exists(file_path):
                 os.remove(file_path)
                 logger.info(f"Deleted physical file: {file_path}")
 
             return True
 
         except Exception as e:
-            logger.error(
-                f"Error deleting file with ID {document_id}: {str(e)}", exc_info=True
-            )
-            return False
+            logger.error(f"Error deleting file: {str(e)}", exc_info=True)
+            raise
 
     def fix_missing_document_analysis(self) -> int:
         """Fix documents with missing insights or summaries
