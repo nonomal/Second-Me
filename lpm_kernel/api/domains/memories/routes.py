@@ -69,15 +69,17 @@ def upload_file():
                 "title": document.title,
                 "mime_type": document.mime_type,
                 "document_size": document.document_size,
-                "extract_status": document.extract_status.value
-                if document.extract_status
-                else None,
-                "embedding_status": document.embedding_status.value
-                if document.embedding_status
-                else None,
-                "create_time": document.create_time.isoformat()
-                if document.create_time
-                else None,
+                "extract_status": (
+                    document.extract_status.value if document.extract_status else None
+                ),
+                "embedding_status": (
+                    document.embedding_status.value
+                    if document.embedding_status
+                    else None
+                ),
+                "create_time": (
+                    document.create_time.isoformat() if document.create_time else None
+                ),
             }
 
         logger.info("File upload processing completed")
@@ -91,25 +93,34 @@ def upload_file():
         return APIResponse.error(message=f"Internal server error: {str(e)}", code=500)
 
 
-@memories_bp.route("/api/memories/file/<filename>", methods=["DELETE"])
-def delete_file(filename):
+@memories_bp.route("/api/memories/file/id/<document_id>", methods=["DELETE"])
+def delete_file_by_id(document_id):
     """
-    File deletion API
+    File deletion API by document ID
     """
     try:
-        logger.info(f"Starting to process file deletion request: {filename}")
-        
-        # Call DocumentService to delete file
+        logger.info(f"Starting to process file deletion request by ID: {document_id}")
+
+        # Call DocumentService to delete file by ID
         document_service = DocumentService()
-        result = document_service.delete_file_by_name(filename)
-        
+        result = document_service.delete_file_by_id(document_id)
+
         if result:
-            logger.info(f"File deleted successfully: {filename}")
-            return APIResponse.success(message=f"File '{filename}' has been successfully deleted")
+            logger.info(f"File with ID {document_id} deleted successfully")
+            return APIResponse.success(
+                message=f"File with ID {document_id} has been successfully deleted"
+            )
         else:
-            logger.warning(f"File does not exist or deletion failed: {filename}")
-            return APIResponse.error(message=f"File '{filename}' does not exist or cannot be deleted", code=404)
-            
+            logger.warning(
+                f"File with ID {document_id} does not exist or deletion failed"
+            )
+            return APIResponse.error(
+                message=f"File with ID {document_id} does not exist or cannot be deleted",
+                code=404,
+            )
+
     except Exception as e:
-        logger.error(f"Error occurred while deleting file: {str(e)}", exc_info=True)
+        logger.error(
+            f"Error occurred while deleting file by ID: {str(e)}", exc_info=True
+        )
         return APIResponse.error(message=f"Internal server error: {str(e)}", code=500)
