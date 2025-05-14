@@ -18,6 +18,7 @@ from .process_factory import ProcessorFactory
 from .process_status import ProcessStatus
 
 from lpm_kernel.configs.logging import get_train_process_logger
+
 logger = get_train_process_logger()
 
 
@@ -57,6 +58,17 @@ class DocumentService:
             List[Document]: doc object list
         """
         return self._repository.list()
+
+    def page_documents(self, page: int, page_size: int) -> List[Document]:
+        """
+        get paginated doc list
+        Args:
+            page (int): page number
+            page_size (int): page size
+        Returns:
+            List[Document]: doc object list
+        """
+        return self._repository.page(limit=page_size, offset=(page - 1) * page_size)
 
     def scan_directory(
         self, directory_path: str, recursive: bool = False
@@ -108,9 +120,7 @@ class DocumentService:
 
                 except Exception as e:
                     # add detailed error log
-                    logger.exception(
-                        f"Error processing file {file_path}"
-                    )
+                    logger.exception(f"Error processing file {file_path}")
                     continue
 
         logger.info(f"Total documents processed and saved: {len(documents_dtos)}")
@@ -151,13 +161,13 @@ class DocumentService:
     def analyze_document(self, document_id: int) -> DocumentDTO:
         """
         Analyze a single document by ID
-        
+
         Args:
             document_id (int): ID of document to analyze
-            
+
         Returns:
             DocumentDTO: The analyzed document
-            
+
         Raises:
             ValueError: If document not found
             Exception: If analysis fails
@@ -167,15 +177,17 @@ class DocumentService:
             document = self._repository.find_one(document_id)
             if not document:
                 raise ValueError(f"Document not found with id: {document_id}")
-                
+
             # Perform analysis
             return self._analyze_document(document)
-            
+
         except ValueError as e:
             logger.error(f"Document {document_id} not found: {str(e)}")
             raise
         except Exception as e:
-            logger.error(f"Error analyzing document {document_id}: {str(e)}", exc_info=True)
+            logger.error(
+                f"Error analyzing document {document_id}: {str(e)}", exc_info=True
+            )
             self._update_analyze_status_failed(document_id)
             raise
 
@@ -187,7 +199,9 @@ class DocumentService:
                 if document:
                     document.analyze_status = ProcessStatus.FAILED
                     session.commit()
-                    logger.debug(f"Updated analyze status for document {doc_id} to FAILED")
+                    logger.debug(
+                        f"Updated analyze status for document {doc_id} to FAILED"
+                    )
                 else:
                     logger.warning(f"Document not found with id: {doc_id}")
         except Exception as e:
@@ -203,7 +217,9 @@ class DocumentService:
             unembedding_docs = self._repository.find_unembedding()
             return len(unembedding_docs) > 0
         except Exception as e:
-            logger.error(f"Error checking documents embedding status: {str(e)}", exc_info=True)
+            logger.error(
+                f"Error checking documents embedding status: {str(e)}", exc_info=True
+            )
             raise
 
     def analyze_all_documents(self) -> List[DocumentDTO]:
@@ -235,7 +251,9 @@ class DocumentService:
             return analyzed_docs
 
         except Exception as e:
-            logger.error(f"Error occurred during batch analysis: {str(e)}", exc_info=True)
+            logger.error(
+                f"Error occurred during batch analysis: {str(e)}", exc_info=True
+            )
             raise
 
     def get_document_l0(self, document_id: int) -> Dict:
@@ -355,6 +373,32 @@ class DocumentService:
         logger.info(f"list_documents len: {len(documents)}")
 
         # 2. each doc L0
+        documents_with_l0 = []
+        for doc in documents:
+            doc_dict = doc.to_dict()
+            try:
+                l0_data = self.get_document_l0(doc.id)
+                doc_dict["l0_data"] = l0_data
+                logger.info(f"success getting L0 data for document {doc.id} success")
+            except Exception as e:
+                logger.error(f"Error getting L0 data for document {doc.id}: {str(e)}")
+                doc_dict["l0_data"] = None
+            documents_with_l0.append(doc_dict)
+
+        return documents_with_l0
+
+    def page_documents_with_l0(self, page: int, page_size: int) -> List[Dict]:
+        """
+        get paginated docs' L0 data
+        Args:
+            page (int): page number
+            page_size (int): page size
+        Returns:
+            List[Dict]: list of dict of docs with L0 data
+        """
+        documents = self.page_documents(page, page_size)
+        logger.info(f"page_documents len: {len(documents)}")
+
         documents_with_l0 = []
         for doc in documents:
             doc_dict = doc.to_dict()
@@ -517,116 +561,114 @@ class DocumentService:
             logger.error(f"Error getting document embedding: {str(e)}")
             raise
 
-    def delete_file_by_name(self, filename: str) -> bool:
+    def delete_file_by_id(self, document_id: int) -> bool:
         """
+        Delete a document by its ID
+
         Args:
-            filename (str): name to delete
-            
+            document_id (int): The ID of the document to delete
+
         Returns:
-            bool: if success
-            
+            bool: True if deletion successful, False otherwise
+
         Raises:
             Exception: error occurred
         """
-        logger.info(f"Starting to delete file: {filename}")
-        
+        logger.info(f"Starting to delete file with ID: {document_id}")
+
         try:
-            # 1. search memories
+            # 1. 获取文档对象
+            document = self._repository.get_by_id(document_id)
+            logger.info(f"Document found: {document}")
+
+            if not document:
+                logger.warning(f"Document with ID {document_id} not found")
+                return False
+
+            # 2. 搜索相关的 memory 记录
             db = DatabaseSession()
             memory = None
-            document_id = None
-            
+            file_path = None
+
             with db._session_factory() as session:
-                query = select(Memory).where(Memory.name == filename)
+                query = select(Memory).where(Memory.document_id == document_id)
+                logger.info(f"Querying memory for document ID: {document_id}")
                 result = session.execute(query)
                 memory = result.scalar_one_or_none()
-                
-                if not memory:
-                    logger.warning(f"File record not found: {filename}")
-                    return False
-                
-                # get related document_id
-                document_id = memory.document_id
-                
-                # get filepath
-                file_path = memory.path
-                
-                # 2. delete memory
-                session.delete(memory)
-                session.commit()
-                logger.info(f"Deleted record from memories table: {filename}")
-            
-            # if no related document, only delete physical file
-            if not document_id:
-                # delete physical file
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                    logger.info(f"Deleted physical file: {file_path}")
-                return True
-            
-            # 3. get doc obj
-            document = self._repository.get_by_id(document_id)
-            if not document:
-                logger.warning(f"Corresponding document record not found, ID: {document_id}")
-                # if no document record, delete physical file
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                    logger.info(f"Deleted physical file: {file_path}")
-                return True
-            
-            # 4. get all chunks
+
+                if memory:
+                    # 获取文件路径
+                    file_path = memory.path
+
+                    # 删除 memory 记录
+                    session.delete(memory)
+                    session.commit()
+                    logger.info(
+                        f"Deleted record from memories table for document ID: {document_id}"
+                    )
+
+            # 3. 获取所有 chunks
             chunks = self._repository.find_chunks(document_id)
-            
-            # 5. delete doc embedding from ChromaDB
+
+            # 4. 从 ChromaDB 删除文档嵌入
             try:
                 self.embedding_service.document_collection.delete(
                     ids=[str(document_id)]
                 )
-                logger.info(f"Deleted document embedding from ChromaDB, ID: {document_id}")
+                logger.info(
+                    f"Deleted document embedding from ChromaDB, ID: {document_id}"
+                )
             except Exception as e:
                 logger.error(f"Error deleting document embedding: {str(e)}")
-            
-            # 6. delete all chunk embedding from ChromaDB
+
+            # 5. 从 ChromaDB 删除所有 chunk 嵌入
             if chunks:
                 try:
                     chunk_ids = [str(chunk.id) for chunk in chunks]
-                    self.embedding_service.chunk_collection.delete(
-                        ids=chunk_ids
+                    self.embedding_service.chunk_collection.delete(ids=chunk_ids)
+                    logger.info(
+                        f"Deleted {len(chunk_ids)} chunk embeddings from ChromaDB"
                     )
-                    logger.info(f"Deleted {len(chunk_ids)} chunk embeddings from ChromaDB")
                 except Exception as e:
                     logger.error(f"Error deleting chunk embeddings: {str(e)}")
-            
-            # 7. delete all chunks embedding from ChromaDB
+
+            # 6. 从数据库删除所有 chunks
             with db._session_factory() as session:
                 from lpm_kernel.file_data.models import ChunkModel
+
                 session.query(ChunkModel).filter(
                     ChunkModel.document_id == document_id
                 ).delete()
                 session.commit()
-                logger.info(f"Deleted all related chunks")
-                
-                # delete doc record
+                logger.info(
+                    f"Deleted all related chunks for document ID: {document_id}"
+                )
+
+                # 7. 删除文档记录
                 doc_entity = session.get(Document, document_id)
                 if doc_entity:
                     session.delete(doc_entity)
                     session.commit()
-                    logger.info(f"Deleted document record from database, ID: {document_id}")
-            
-            # 8. delete physical file
-            if os.path.exists(file_path):
+                    logger.info(
+                        f"Deleted document record from database, ID: {document_id}"
+                    )
+
+            # 8. 删除物理文件
+            if file_path and os.path.exists(file_path):
                 os.remove(file_path)
                 logger.info(f"Deleted physical file: {file_path}")
-            
+
             return True
-            
+
         except Exception as e:
-            logger.error(f"Error deleting file: {str(e)}", exc_info=True)
-            raise
+            logger.error(
+                f"Error deleting file with ID {document_id}: {str(e)}", exc_info=True
+            )
+            return False
 
     def fix_missing_document_analysis(self) -> int:
         """Fix documents with missing insights or summaries
-        
+
         Returns:
             int: Number of documents fixed
         """
@@ -634,20 +676,25 @@ class DocumentService:
             # Find all documents that have analysis issues
             docs = self._repository.list()
             fixed_count = 0
-            
+
             for doc in docs:
                 needs_fixing = False
-                
+
                 # Check if document needs analysis
-                if not doc.analyze_status or doc.analyze_status != ProcessStatus.SUCCESS:
+                if (
+                    not doc.analyze_status
+                    or doc.analyze_status != ProcessStatus.SUCCESS
+                ):
                     needs_fixing = True
-                    logger.info(f"Document {doc.id} needs analysis (status: {doc.analyze_status})")
-                
+                    logger.info(
+                        f"Document {doc.id} needs analysis (status: {doc.analyze_status})"
+                    )
+
                 # Check if document has missing insights or summaries
                 elif not doc.insight or not doc.summary:
                     needs_fixing = True
                     logger.info(f"Document {doc.id} has missing insight or summary")
-                
+
                 # Process documents that need fixing
                 if needs_fixing:
                     try:
@@ -656,11 +703,13 @@ class DocumentService:
                         fixed_count += 1
                         logger.info(f"Fixed document {doc.id} analysis")
                     except Exception as e:
-                        logger.error(f"Error fixing document {doc.id} analysis: {str(e)}")
-                
+                        logger.error(
+                            f"Error fixing document {doc.id} analysis: {str(e)}"
+                        )
+
             logger.info(f"Fixed {fixed_count} documents with missing analysis")
             return fixed_count
-            
+
         except Exception as e:
             logger.error(f"Error in fix_missing_document_analysis: {str(e)}")
             raise FileProcessingError(f"Failed to fix document analysis: {str(e)}")
@@ -668,10 +717,10 @@ class DocumentService:
     def verify_document_embeddings(self, verbose=True) -> Dict:
         """
         Verify all document embeddings and return statistics
-        
+
         Args:
             verbose (bool): Whether to log detailed information
-            
+
         Returns:
             Dict: Statistics about document embeddings
         """
@@ -689,53 +738,61 @@ class DocumentService:
                 "documents_without_insight": 0,
                 "documents_needing_repair": 0,
             }
-            
+
             documents_needing_repair = []
-            
+
             for doc in docs:
                 # Check if document has content
                 if doc.raw_content:
                     results["documents_with_content"] += 1
                 else:
                     results["documents_without_content"] += 1
-                    
+
                 # Check if document has summary
                 if doc.summary:
                     results["documents_with_summary"] += 1
                 else:
                     results["documents_without_summary"] += 1
-                    
+
                 # Check if document has insight
                 if doc.insight:
                     results["documents_with_insight"] += 1
                 else:
                     results["documents_without_insight"] += 1
-                
+
                 # Check if embeddings exist in ChromaDB
                 embedding = self.get_document_embedding(doc.id)
                 if embedding is not None:
                     results["documents_with_embedding"] += 1
                     if verbose:
-                        logger.info(f"Document {doc.id}: '{doc.name}' has embedding of dimension {len(embedding)}")
+                        logger.info(
+                            f"Document {doc.id}: '{doc.name}' has embedding of dimension {len(embedding)}"
+                        )
                 else:
                     results["documents_without_embedding"] += 1
                     if verbose:
-                        logger.warning(f"Document {doc.id}: '{doc.name}' missing embedding")
-                    
+                        logger.warning(
+                            f"Document {doc.id}: '{doc.name}' missing embedding"
+                        )
+
                 # Check if document needs repair (has content but missing embedding or analysis)
-                if doc.raw_content and (embedding is None or not doc.summary or not doc.insight):
+                if doc.raw_content and (
+                    embedding is None or not doc.summary or not doc.insight
+                ):
                     documents_needing_repair.append(doc.id)
                     results["documents_needing_repair"] += 1
-                    
+
             # Log statistics
             logger.info(f"Document embedding verification results: {results}")
             if documents_needing_repair and verbose:
                 logger.info(f"Documents needing repair: {documents_needing_repair}")
-                
+
             return results
-            
+
         except Exception as e:
-            logger.error(f"Error verifying document embeddings: {str(e)}", exc_info=True)
+            logger.error(
+                f"Error verifying document embeddings: {str(e)}", exc_info=True
+            )
             raise
 
 
