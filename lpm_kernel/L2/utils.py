@@ -38,6 +38,8 @@ from .memory_manager import get_memory_manager
 import gc
 import requests
 
+progress_file = os.path.join(os.path.dirname(TRAIN_LOG_FILE), "train_progress.json")
+
 # Initialize the logger
 logger = logging.getLogger(__name__)
 
@@ -656,7 +658,6 @@ def save_hf_model(model_name=None, log_file_path=None) -> str:
     logger.info(f"Will be saved to: {save_path}")
     
     hf_model_name = f"Qwen/{model_name}"
-    progress_file = os.path.join(os.path.dirname(TRAIN_LOG_FILE), "train_progress.json")
     def _write_progress_to_file(progress_data,progress_file):
                         try:
                             import json

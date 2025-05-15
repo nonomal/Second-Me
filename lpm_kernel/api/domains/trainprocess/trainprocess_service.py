@@ -34,6 +34,7 @@ import gc
 import subprocess
 from lpm_kernel.configs.logging import get_train_process_logger, TRAIN_LOG_FILE
 logger = get_train_process_logger()
+progress_file = os.path.join(os.path.dirname(TRAIN_LOG_FILE), "train_progress.json")
 
 class TrainProcessService:
     """Training process service (singleton pattern)"""
@@ -841,7 +842,6 @@ class TrainProcessService:
             completed = False
             
             while True:
-                progress_file = os.path.join(os.path.dirname(TRAIN_LOG_FILE), "train_progress.json")
                 if os.path.exists(progress_file):
                     try:
                         import json
