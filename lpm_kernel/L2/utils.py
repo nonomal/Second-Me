@@ -597,6 +597,15 @@ def setup_logger(log_path, logger_name="download_logger"):
     
     return logger
 
+def _write_progress_to_file(progress_data,progress_file):
+    try:
+        import json
+        with open(progress_file, 'w', encoding='utf-8') as f:
+            json_str = json.dumps(progress_data)
+            f.write(json_str)
+    except Exception as e:
+        logger.error(f"Error writing progress to file: {str(e)}")
+
 
 def save_hf_model(model_name=None, log_file_path=None) -> str:
     """Saves a Hugging Face model locally.
@@ -658,14 +667,6 @@ def save_hf_model(model_name=None, log_file_path=None) -> str:
     logger.info(f"Will be saved to: {save_path}")
     
     hf_model_name = f"Qwen/{model_name}"
-    def _write_progress_to_file(progress_data,progress_file):
-                        try:
-                            import json
-                            with open(progress_file, 'w', encoding='utf-8') as f:
-                                json_str = json.dumps(progress_data)
-                                f.write(json_str)
-                        except Exception as e:
-                            logger.error(f"Error writing progress to file: {str(e)}")
     
     try:
         # Get list of files to download
@@ -731,7 +732,6 @@ def save_hf_model(model_name=None, log_file_path=None) -> str:
                             else:
                                 logger.info(f"File {filename}: Downloaded {current/1024/1024:.2f} MB (total size unknown)")
 
-                    
 
                     # Download file with progress tracking
                     response = requests.get(url, stream=True)
