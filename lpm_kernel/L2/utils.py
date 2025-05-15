@@ -703,8 +703,8 @@ def save_hf_model(model_name=None, log_file_path=None) -> str:
                     def progress_callback(current, total):
                         progress_bar.update(current - progress_bar.n)
                         
-                        # Log progress every ~1MB
-                        if current % (1024 * 1024) < 8192:
+                        # Log progress every ~10MB
+                        if current % (1024 * 1024 * 10) < 8192:
                             if total and total > 0:
                                 percent = current / total * 100
                                 logger.info(f"File {filename}: Downloaded {current/1024/1024:.2f} MB / {total/1024/1024:.2f} MB ({percent:.2f}%)")
