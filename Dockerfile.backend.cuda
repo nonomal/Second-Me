@@ -48,11 +48,10 @@ RUN if [ "$SKIP_LLAMA_BUILD" = "false" ]; then \
         mkdir -p build && \
         cd build && \
         echo "Starting CMake configuration with CUDA support..." && \
-        cmake -DGGML_CUDA=ON \
+        cmake -DGGML_CUDA=OFF  -DLLAMA_CUBLAS=OFF \
               -DCMAKE_BUILD_TYPE=Release \
               -DBUILD_SHARED_LIBS=OFF \
-              -DLLAMA_NATIVE=OFF \
-              -DCMAKE_CUDA_FLAGS="-Wno-deprecated-gpu-targets" \
+              -DLLAMA_NATIVE=ON \
               .. && \
         echo "Starting build process (this will take several minutes)..." && \
         cmake --build . --config Release -j --verbose && \

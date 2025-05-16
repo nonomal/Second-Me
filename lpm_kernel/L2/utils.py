@@ -445,35 +445,10 @@ def create_and_prepare_model(args, data_args, training_args, model_kwargs=None):
             if args.lora_target_modules != "all-linear"
             else args.lora_target_modules,
         )
-
-    # Load tokenizer - tokenizers are usually small and don't need memory management
-    special_tokens = None
-    chat_template = None
-    if args.chat_template_format == "chatml":
-        special_tokens = ChatmlSpecialTokens
-        chat_template = DEFAULT_CHATML_CHAT_TEMPLATE
-    elif args.chat_template_format == "zephyr":
-        special_tokens = ZephyrSpecialTokens
-        chat_template = DEFAULT_ZEPHYR_CHAT_TEMPLATE
-
-    if special_tokens is not None:
-        tokenizer = AutoTokenizer.from_pretrained(
-            args.model_name_or_path,
-            pad_token=special_tokens.pad_token.value,
-            bos_token=special_tokens.bos_token.value,
-            eos_token=special_tokens.eos_token.value,
-            additional_special_tokens=special_tokens.list(),
-            trust_remote_code=True,
-            padding_side="right",
-        )
-        tokenizer.chat_template = chat_template
-    else:
-        tokenizer = AutoTokenizer.from_pretrained(
-            args.model_name_or_path, trust_remote_code=True
-        )
-        # Make sure pad_token is set
-        if tokenizer.pad_token is None:
-            tokenizer.pad_token = tokenizer.eos_token
+    
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.model_name_or_path, trust_remote_code=True, padding_side="right"
+    )
 
     # Apply Unsloth LoRA if requested and check memory status
     if args.use_unsloth:
@@ -728,8 +703,8 @@ def save_hf_model(model_name=None, log_file_path=None) -> str:
                     def progress_callback(current, total):
                         progress_bar.update(current - progress_bar.n)
                         
-                        # Log progress every ~1MB
-                        if current % (1024 * 1024) < 8192:
+                        # Log progress every ~10MB
+                        if current % (1024 * 1024 * 10) < 8192:
                             if total and total > 0:
                                 percent = current / total * 100
                                 logger.info(f"File {filename}: Downloaded {current/1024/1024:.2f} MB / {total/1024/1024:.2f} MB ({percent:.2f}%)")

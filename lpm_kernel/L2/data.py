@@ -584,8 +584,8 @@ class L2DataProcessor:
                 text=True,
                 capture_output=True,
             )
-            logger.error(f"subprocess.run graphrag index error: {result.stderr}")
             if result.stderr:
+                logger.error(f"subprocess.run graphrag index error: {result.stderr}")
                 raise RuntimeError("subprocess.run graphrag index error")
         except Exception as e:
             raise
