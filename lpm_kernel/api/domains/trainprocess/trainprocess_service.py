@@ -803,14 +803,15 @@ class TrainProcessService:
             self.progress.mark_step_status(ProcessStep.TRAIN, Status.FAILED)
             return False
 
-    def _update_progress(self, stage: str, step: str, percentage: float, message: str):
+    def _update_progress(self, stage: str, step: str, percentage: float, message: str, file_name: Optional[str] = None):
         """Update progress for any stage and step"""
         try:
             self.progress.progress.update_progress(
                 stage,  # stage
                 step,   # step
                 Status.IN_PROGRESS,
-                percentage
+                percentage,
+                file_name  # Pass file name to update_progress method
             )
             logger.info(f"Progress updated: {percentage}% - {message}")
         except Exception as e:
@@ -895,7 +896,8 @@ class TrainProcessService:
                                             "downloading_the_base_model", 
                                             "model_download", 
                                             current_progress, 
-                                            f"Overall: {current_progress:.1f}% - Downloading {file_name}: {percentage}% ({downloaded_mb:.1f}/{total_mb:.1f} MB)"
+                                            f"Overall: {current_progress:.1f}% - Downloading {file_name}: {percentage}% ({downloaded_mb:.1f}/{total_mb:.1f} MB)",
+                                            file_name
                                         )
                                         last_update_time = current_time
 
