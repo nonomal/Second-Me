@@ -405,17 +405,30 @@ configure_china_mirrors() {
     fi
     
     # 3. Configure Poetry
-    log_step "Configuring Poetry to use Tsinghua and Aliyun mirrors"
+    log_step "Configuring Poetry to use Aliyun and Tsinghua mirrors"
     if command -v poetry &>/dev/null; then
-        log_info "Adding Aliyun and Tsinghua mirrors to Poetry configuration..."
+        log_info "Checking and setting up Poetry mirrors..."
         
-        # Add Tsinghua mirror as primary source
-        poetry source add --priority=primary aliyun https://mirrors.aliyun.com/pypi/simple/
+        # Get current sources
+        CURRENT_SOURCES=$(poetry source list 2>/dev/null)
         
-        # Add Aliyun mirror as supplemental source
-        poetry source add --priority=supplemental tsinghua https://pypi.tuna.tsinghua.edu.cn/simple
+        # Check and add Aliyun mirror if it doesn't exist
+        if ! echo "$CURRENT_SOURCES" | grep -q "aliyun"; then
+            log_info "Adding Aliyun mirror as primary source..."
+            poetry source add --priority=primary aliyun https://mirrors.aliyun.com/pypi/simple/
+        else
+            log_info "Aliyun mirror already configured, skipping..."
+        fi
+        
+        # Check and add Tsinghua mirror if it doesn't exist
+        if ! echo "$CURRENT_SOURCES" | grep -q "tsinghua"; then
+            log_info "Adding Tsinghua mirror as supplemental source..."
+            poetry source add --priority=supplemental tsinghua https://pypi.tuna.tsinghua.edu.cn/simple
+        else
+            log_info "Tsinghua mirror already configured, skipping..."
+        fi
 
-        log_success "Poetry configured to use Aliyun (primary) and Tsinghua (supplemental) mirrors"
+        log_success "Poetry mirror configuration complete"
     else
         log_warning "poetry not found, skipping Poetry mirror configuration"
     fi
