@@ -1,4 +1,4 @@
-.PHONY: install test format lint all setup start stop restart restart-backend restart-force help docker-build docker-up docker-down docker-build-backend docker-build-frontend docker-restart-backend docker-restart-backend-fast docker-restart-backend-smart docker-restart-frontend docker-restart-all docker-check-cuda docker-use-gpu docker-use-cpu
+.PHONY: install test format lint all setup setup-china start stop restart restart-backend restart-force help docker-build docker-up docker-down docker-build-backend docker-build-frontend docker-restart-backend docker-restart-backend-fast docker-restart-backend-smart docker-restart-frontend docker-restart-all docker-check-cuda docker-use-gpu docker-use-cpu
 
 # Colors for output
 COLOR_CYAN=\033[0;36m
@@ -116,7 +116,8 @@ else
 	@echo "$(COLOR_CYAN)"
 	@echo ""
 	@echo "$(COLOR_GREEN)▶ LOCAL COMMANDS:$(COLOR_RESET)"
-	@echo "  make setup                 - Complete installation"
+	@echo "  make setup                 - Complete installation (global mirrors)"
+	@echo "  make setup-china           - Complete installation (China mirrors)"
 	@echo "  make start                 - Start all services"
 	@echo "  make stop                  - Stop all services"
 	@echo "  make restart               - Restart all services"
@@ -180,6 +181,12 @@ setup:
 	@$(call display_ascii)
 	@printf "\n$(COLOR_CYAN)==================== [ $(COLOR_BOLD)Setup $(COLOR_CYAN)] ====================$(COLOR_RESET)\n\n"
 	@./scripts/setup.sh
+
+# Setup with China mirrors (for users behind the Great Firewall)
+setup-china:
+	@$(call display_ascii)
+	@printf "\n$(COLOR_CYAN)==================== [ $(COLOR_BOLD)Setup (China) $(COLOR_CYAN)] ====================$(COLOR_RESET)\n\n"
+	@./scripts/setup.sh --china
 
 start:
 	@$(call display_ascii)

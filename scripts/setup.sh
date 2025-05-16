@@ -11,6 +11,9 @@ source "$SCRIPT_DIR/utils/header_display.sh"
 # Version
 VERSION="1.0.0"
 
+# Use China mirrors
+USE_CHINA_MIRROR=false
+
 # Total number of stages
 TOTAL_STAGES=6
 CURRENT_STAGE=0
@@ -359,14 +362,49 @@ show_help() {
     echo -e "Options:"
     echo -e "  --help\t\tShow this help information"
     echo -e "  --require-confirmation\tRequire confirmation when warnings are present"
+    echo -e "  --china\t\tUse China mirrors for npm, pip and Poetry packages"
     echo
     echo -e "Examples:"
     echo -e "  $0 \t\t\tPerform full installation"
     echo -e "  $0 python\t\tSetup Python environment only"
-    echo -e "  $0 --require-confirmation\tRequire confirmation when warnings are present"
+    echo -e "  $0 --china\t\tPerform full installation with China mirrors"
     echo
     echo -e "For a complete list of all available commands, run:"
     echo -e "  make help"
+}
+
+# Configure China mirrors for all package managers
+configure_china_mirrors() {
+    log_section "CONFIGURING CHINA MIRRORS"
+    
+    # 1. Configure npm
+    log_step "Configuring npm to use Taobao mirror"
+    if command -v npm &>/dev/null; then
+        log_info "Setting npm registry to Taobao mirror..."
+        npm config set registry https://registry.npmmirror.com
+        log_success "npm configured to use Taobao mirror"
+    else
+        log_warning "npm not found, skipping npm mirror configuration"
+    fi
+    
+    # 2. Configure pip
+    log_step "Configuring pip to use Tsinghua mirror (for current session)"
+    local python_cmd=$(get_python_command)
+    if [ -n "$python_cmd" ]; then
+        # Set environment variables for current session
+        export PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+        export PIP_TRUSTED_HOST=mirrors.aliyun.com
+        
+        # Add these exports to the active .bashrc or .zshrc to persist across sessions
+        log_info "Environment variables set for current session:"
+        log_info "  PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/"
+        log_info "  PIP_TRUSTED_HOST=mirrors.aliyun.com"
+        log_success "pip configured to use Tsinghua mirror for current session"
+    else
+        log_warning "python not found, skipping pip mirror configuration"
+    fi
+    
+    log_section "CHINA MIRRORS CONFIGURATION COMPLETE"
 }
 
 # Check system requirements
@@ -572,6 +610,11 @@ parse_args() {
                 REQUIRE_CONFIRMATION=true
                 shift
                 ;;
+            --china)
+                USE_CHINA_MIRROR=true
+                log_info "Using China mirrors for package installations"
+                shift
+                ;;
             python|llama|frontend)
                 COMPONENT="$1"
                 shift
@@ -593,6 +636,11 @@ main() {
     
     # Parse command line arguments
     parse_args "$@"
+    
+    # Configure China mirrors if specified
+    if [ "$USE_CHINA_MIRROR" = true ]; then
+        configure_china_mirrors
+    fi
     
     # All pre-installation checks
     log_section "Running pre-installation checks"
