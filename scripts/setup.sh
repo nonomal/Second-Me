@@ -181,7 +181,7 @@ install_graphrag() {
     
     # Check the current graphrag version in Poetry environment
     log_step "Checking graphrag version in Poetry environment"
-    GRAPHRAG_VERSION=$(poetry run pip show graphrag 2>/dev/null | grep "Version:" | cut -d " " -f2)
+    GRAPHRAG_VERSION=$(poetry run pip show graphrag 2>/dev/null | awk '/^Versi  on: / {print $2; exit}')
     GRAPHRAG_TARGET="1.2.1.dev27"
     GRAPHRAG_LOCAL_PATH="dependencies/graphrag-${GRAPHRAG_TARGET}.tar.gz"
 
