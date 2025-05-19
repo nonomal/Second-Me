@@ -182,8 +182,7 @@ setup:
 	@printf "\n$(COLOR_CYAN)==================== [ $(COLOR_BOLD)Setup $(COLOR_CYAN)] ====================$(COLOR_RESET)\n\n"
 	@./scripts/setup.sh
 
-# Setup with China mirrors (for users behind the Great Firewall)
-setup-china:
+setup-cn:
 	@$(call display_ascii)
 	@printf "\n$(COLOR_CYAN)==================== [ $(COLOR_BOLD)Setup (China) $(COLOR_CYAN)] ====================$(COLOR_RESET)\n\n"
 	@./scripts/setup.sh --china

@@ -388,18 +388,18 @@ configure_china_mirrors() {
     fi
     
     # 2. Configure pip
-    log_step "Configuring pip to use Tsinghua mirror (for current session)"
+    log_step "Configuring pip to use Aliyun mirror (for current session)"
     local python_cmd=$(get_python_command)
     if [ -n "$python_cmd" ]; then
         # Set environment variables for current session
-        export PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
-        export PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
+        export PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+        export PIP_TRUSTED_HOST=mirrors.aliyun.com
         
         # Add these exports to the active .bashrc or .zshrc to persist across sessions
         log_info "Environment variables set for current session:"
-        log_info "  PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple"
-        log_info "  PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn"
-        log_success "pip configured to use Tsinghua mirror for current session"
+        log_info "  PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/"
+        log_info "  PIP_TRUSTED_HOST=mirrors.aliyun.com"
+        log_success "pip configured to use Aliyun mirror for current session"
     else
         log_warning "python not found, skipping pip mirror configuration"
     fi
