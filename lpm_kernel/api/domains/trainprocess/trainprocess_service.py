@@ -122,9 +122,17 @@ class TrainProcessService:
         try:
             # Mark step as in progress
             self.progress.mark_step_status(ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS, Status.IN_PROGRESS)
-            documents = self.list_documents() 
-            for doc in documents:
-                doc_id = doc.get("id")
+            
+            unembedding_docs = document_service._repository.find_unembedding()
+            logger.info(f"Found {len(unembedding_docs)} documents that need embedding generation")
+            
+            if not unembedding_docs:
+                logger.info("No documents need embedding generation, marking step as completed")
+                self.progress.mark_step_status(ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS, Status.COMPLETED)
+                return True
+                
+            for doc in unembedding_docs:
+                doc_id = doc.id
 
                 # Directly call document service instead of API
                 embedding = document_service.process_document_embedding(doc_id)
@@ -134,8 +142,9 @@ class TrainProcessService:
                     )
                     self.progress.mark_step_status(ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS, Status.FAILED)
                     return False
-                self.progress.mark_step_status(ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS, Status.COMPLETED)
-                logger.info(f"Successfully generated embedding for document {doc_id}") 
+                logger.info(f"Successfully generated embedding for document {doc_id}")
+            
+            self.progress.mark_step_status(ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS, Status.COMPLETED)
             return True
         except Exception as e:
             logger.error(f"Generate document embeddings failed: {str(e)}")
@@ -520,7 +529,7 @@ class TrainProcessService:
         # Mark data as prepared
         self.l2_data_prepared = True
 
-        return self.l2_data
+        return self.l2_data   
     def train(self) -> bool:
         """Start model training"""
         try:
