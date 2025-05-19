@@ -737,65 +737,39 @@ class TrainProcessService:
     def _monitor_training_progress(self, log_file) -> bool:
         """Monitor training progress"""
         try:
-            # Initialize last_position to the end of file to only process new content
-            try:
-                with open(log_file, 'r') as f:
-                    f.seek(0, 2)  # Move to the end of file
-                    last_position = f.tell()
-            except FileNotFoundError:
-                # If file doesn't exist yet, start from beginning when it's created
-                last_position = 0
-            
-            # variable to track training status
-            total_steps = None
-            current_step = 0
             last_update_time = time.time()
-            training_started = False
-            
+            progress_file = os.path.join(os.path.dirname(TRAIN_LOG_FILE), "train_progress.json")
             while True:
                 try:
-                    # read new log content
-                    with open(log_file, 'r') as f:
-                        f.seek(last_position)
-                        new_lines = f.readlines()
-                        last_position = f.tell()
-                        
-                    for line in new_lines:
-                        line = line.strip()
-                        # Check if training has started
-                        if not training_started:
-                            if "***** Running training *****" in line:
-                                training_started = True
-                                logger.info("Training started")
-                            continue  # Skip progress matching until training starts
-                        
-                        progress_match = re.search(r"(\d+)%\|[^|]+\| (\d+)/(\d+)", line)
-                        if progress_match and len(progress_match.groups()) == 3:
-                            percentage = int(progress_match.group(1))
-                            current_step = int(progress_match.group(2))
-                            total_steps = int(progress_match.group(3))
-                            
-                            # Update progress at most once per second
-                            current_time = time.time()
-                            if current_time - last_update_time >= 1.0:
-                                # logger.info(f"Training progress: {percentage}% ({current_step}/{total_steps})")
-                                if percentage == 100.0:
-                                    self.progress.mark_step_status(ProcessStep.TRAIN, Status.COMPLETED)
-                                    return True
-                                self._update_progress("training_to_create_second_me", "train", percentage, f"Current step: {current_step}/{total_steps}")
-                                last_update_time = current_time
+                    percentage = 0.0
+                    current_step = 0
+                    total_steps = 100
                     
-                        # Check if we have exited the training record interval
-                        if "=== Training Ended ===" in line:
-                            # in_training_section = False  # Exit training record interval
-                            logger.info("Exited training record interval")
-                        
-                    # Briefly pause to avoid excessive CPU usage
-                    time.sleep(0.1)  
+                    if os.path.exists(progress_file):
+                        try:
+                            import json
+                            with open(progress_file, 'r') as f:
+                                progress_data = json.load(f)
+                                percentage = progress_data.get("percentage", 0.0)
+                                current_step = progress_data.get("current_step", 0)
+                                total_steps = progress_data.get("total_steps", 100)
+                        except Exception as e:
+                            logger.error(f"Error reading progress file: {str(e)}")
                     
-                except IOError as e:
-                    logger.error(f"Failed to read log file: {str(e)}")
-                    time.sleep(0.1)
+                    current_time = time.time()
+                    if current_time - last_update_time >= 1.0:
+                        if percentage == 100.0:
+                            self.progress.mark_step_status(ProcessStep.TRAIN, Status.COMPLETED)
+                            return True
+                        
+                        self._update_progress("training_to_create_second_me", "train", int(percentage / 3), f"Current step: {current_step}/{total_steps}")
+                        last_update_time = current_time
+            
+                    time.sleep(1)
+                    
+                except Exception as e:
+                    logger.error(f"Error in progress monitoring: {str(e)}")
+                    time.sleep(1)
                     continue
                     
         except Exception as e:
