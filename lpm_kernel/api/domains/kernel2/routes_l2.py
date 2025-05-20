@@ -574,6 +574,9 @@ def convert_model():
         # Save training parameters to a JSON file in the GGUF directory
         training_params_path = os.path.join(gguf_dir, f"{timestamp}.json")
         try:
+            # 添加模型路径到训练参数
+            training_params["model_path"] = gguf_path
+            
             with open(training_params_path, 'w', encoding='utf-8') as f:
                 json.dump(training_params, f, indent=2)
             logger.info(f"Training parameters saved to {training_params_path}")

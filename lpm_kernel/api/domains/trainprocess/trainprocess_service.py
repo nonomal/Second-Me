@@ -1017,6 +1017,9 @@ class TrainProcessService:
             # Save training parameters to a JSON file in the GGUF directory
             training_params_path = os.path.join(gguf_dir, f"{timestamp}.json")
             try:
+                # 添加模型路径到训练参数
+                training_params["model_path"] = gguf_path
+                
                 with open(training_params_path, 'w', encoding='utf-8') as f:
                     json.dump(training_params, f, indent=2)
                 logger.info(f"Training parameters saved to {training_params_path}")
@@ -1104,9 +1107,10 @@ class TrainProcessService:
         except Exception as e:
             logger.error(f"Error checking training conditions: {str(e)}", exc_info=True)
             if self.progress.progress.current_stage:
-                current_step = self.progress.progress.stages[self.progress.progress.current_stage].current_step
-                if current_step:
-                    step = ProcessStep(current_step)
+                current_step = self.progress.progress.data["current_stage"]
+                current_stage = next((s for s in self.progress.progress.data["stages"] if s["name"] == current_stage), None)
+                if current_stage and current_stage["current_step"]:
+                    step = ProcessStep(current_stage["current_step"].lower().replace(" ", "_"))
                     self.progress.mark_step_status(step, Status.FAILED)
             return False
 
