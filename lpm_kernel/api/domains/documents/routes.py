@@ -53,7 +53,7 @@ def list_documents():
             doc_list = []
             for doc in documents:
                 doc_data = doc.to_dict()
-                doc_data['is_trained'] = doc_id_to_is_trained.get(str(doc.id), 'no')
+                doc_data['is_trained'] = doc_id_to_is_trained.get(str(doc.id), False)
                 doc_list.append(doc_data)
             
             return jsonify(APIResponse.success(data=doc_list))

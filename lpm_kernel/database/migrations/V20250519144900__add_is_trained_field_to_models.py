@@ -21,7 +21,7 @@ def upgrade(conn):
     # Add is_trained field if it doesn't exist
     if 'is_trained' not in columns:
         cursor.execute("ALTER TABLE memories ADD COLUMN is_trained BOOLEAN NOT NULL DEFAULT 0")
-        print("Added is_trained column to memories table")
+        print("Added is_trained column to memories table as boolean type")
     
     # No need to commit, the migration manager handles transactions
 

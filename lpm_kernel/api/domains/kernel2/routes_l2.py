@@ -10,6 +10,8 @@ from dataclasses import asdict
 from flask import Blueprint, jsonify, Response, request
 from flask_pydantic import validate
 
+from lpm_kernel.models.memory import Memory
+from lpm_kernel.common.repository.database_session import DatabaseSession
 from lpm_kernel.L1.serializers import NotesStorage
 from lpm_kernel.L1.utils import save_true_topics
 from lpm_kernel.L2.l2_generator import L2Generator
@@ -34,6 +36,7 @@ from lpm_kernel.kernel.l1.l1_manager import (
     get_latest_status_bio,
     get_latest_global_bio,
 )
+
 from ...common.script_executor import ScriptExecutor
 from ...common.script_runner import ScriptRunner
 from ....configs.config import Config
@@ -590,21 +593,18 @@ def convert_model():
         )
 
         # Model conversion completed
-
-        # 更新所有Memory记录的is_trained状态为"yes"
         try:
-            db = DatabaseSession()
-            with db._session_factory() as session:
-                # 查询所有状态为active的Memory记录
-                memories = session.query(Memory).filter(Memory.status == "active").all()
-                
-                # 更新每个Memory记录的is_trained状态
-                for memory in memories:
-                    memory.is_trained = "yes"
+            logger.info("开始开始")
+            with DatabaseSession.session() as session:
+                update_count = session.query(Memory).filter(Memory.status == "active").update(
+                    {"is_trained": True},
+                    synchronize_session=False  # 不同步会话状态，提高性能
+                )
                 
                 # 提交更改
                 session.commit()
-                logger.info(f"Updated training status for {len(memories)} memory records")
+            logger.info("结束结束")
+            logger.info(f"Updated training status for {update_count} memory records")
         except Exception as e:
             logger.error(f"Failed to update memory training status: {str(e)}", exc_info=True)
 
