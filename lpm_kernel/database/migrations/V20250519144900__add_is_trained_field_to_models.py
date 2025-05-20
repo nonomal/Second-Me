@@ -1,9 +1,9 @@
 """
-Migration: Add is_trained field to memory table
+Migration: Add is_trained field to memories table
 Version: 20250519144900
 """
 
-description = "Add is_trained field to memory table"
+description = "Add is_trained field to memories table"
 
 def upgrade(conn):
     """
@@ -14,14 +14,14 @@ def upgrade(conn):
     """
     cursor = conn.cursor()
     
-    # Check if is_trained column already exists in memory table
-    cursor.execute("PRAGMA table_info(memory)")
+    # Check if is_trained column already exists in memories table
+    cursor.execute("PRAGMA table_info(memories)")
     columns = [row[1] for row in cursor.fetchall()]
     
     # Add is_trained field if it doesn't exist
     if 'is_trained' not in columns:
-        cursor.execute("ALTER TABLE memory ADD COLUMN is_trained TEXT CHECK(is_trained IN ('yes', 'no')) NOT NULL DEFAULT 'no'")
-        print("Added is_trained column to memory table")
+        cursor.execute("ALTER TABLE memories ADD COLUMN is_trained BOOLEAN NOT NULL DEFAULT 0")
+        print("Added is_trained column to memories table")
     
     # No need to commit, the migration manager handles transactions
 
@@ -39,14 +39,18 @@ def downgrade(conn):
     
     # Create a temporary table without is_trained field
     cursor.execute("""
-    CREATE TABLE memory_temp (
+    CREATE TABLE memories_temp (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        content TEXT NOT NULL,
+        name TEXT NOT NULL,
+        size INTEGER,
+        type TEXT,
+        path TEXT,
+        meta_data TEXT,
         document_id TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        -- Add other original columns here, but exclude is_trained
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        status TEXT
+        -- Exclude is_trained field
     )
     """)
     
