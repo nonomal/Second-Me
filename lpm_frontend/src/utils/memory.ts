@@ -9,6 +9,6 @@ export const fileTransformToMemory: (file: MemoryFile) => Memory = (file: Memory
     content: file.raw_content,
     size: `${(file.document_size / 1024).toFixed(1)} KB`,
     uploadedAt: file.create_time,
-    isTrained: file.embedding_status === 'SUCCESS'
+    isTrained: file.is_trained
   };
 };

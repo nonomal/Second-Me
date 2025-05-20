@@ -550,6 +550,8 @@ def convert_model():
                 message=f"Model '{model_name}' merged output does not exist, please merge model first",
                 code=400
             ))
+            
+        logger.info("开始开始开始12312")
 
         # Get GGUF output directory
         gguf_dir = paths["gguf_dir"]
@@ -594,7 +596,6 @@ def convert_model():
 
         # Model conversion completed
         try:
-            logger.info("开始开始")
             with DatabaseSession.session() as session:
                 update_count = session.query(Memory).filter(Memory.status == "active").update(
                     {"is_trained": True},
