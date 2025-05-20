@@ -1,4 +1,4 @@
-# Project Configuration Guide for Environments in China
+# Project Configuration Guide for Environments in mainland China
 
 This document provides methods to configure the project using domestic network resources in mainland China, applicable for both Docker and non-Docker users.
 
