@@ -98,7 +98,10 @@ export default function MemoryList({ memories, onDelete }: MemoryListProps) {
               <th className="w-[12%] px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                 Size
               </th>
-              <th className="w-[20%] px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+              <th className="w-[5%] px-6 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">
+                Trained
+              </th>
+              <th className="w-[19%] px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                 Uploaded
               </th>
               <th className="w-[10%] px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
@@ -127,6 +130,15 @@ export default function MemoryList({ memories, onDelete }: MemoryListProps) {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 truncate">
                   {memory.size}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex justify-center items-center h-full">
+                    {memory.isTrained ? (
+                      <span className="w-3 h-3 bg-green-500 rounded-full" />
+                    ) : (
+                      <span className="w-3 h-3 bg-gray-300 rounded-full" />
+                    )}
+                  </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 truncate">
                   {memory.uploadedAt}

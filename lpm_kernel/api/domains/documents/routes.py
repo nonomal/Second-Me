@@ -10,6 +10,8 @@ from lpm_kernel.configs.config import Config
 from lpm_kernel.file_data.chunker import DocumentChunker
 from lpm_kernel.file_data.document_service import document_service
 from lpm_kernel.kernel.chunk_service import ChunkService
+from lpm_kernel.models.memory import Memory
+from lpm_kernel.common.repository.database_session import DatabaseSession
 
 logger = logging.getLogger(__name__)
 document_bp = Blueprint("documents", __name__, url_prefix="/api")
@@ -33,9 +35,28 @@ def list_documents():
             return jsonify(APIResponse.success(data=documents))
         else:
             documents = document_service.list_documents()
-            return jsonify(
-                APIResponse.success(data=[doc.to_dict() for doc in documents])
-            )
+            
+            # 获取所有文档的ID
+            doc_ids = [doc.id for doc in documents]
+            
+            # 查询关联的Memory记录
+            doc_id_to_is_trained = {}
+            db = DatabaseSession()
+            with db._session_factory() as session:
+                memories = session.query(Memory).filter(Memory.document_id.in_([str(doc_id) for doc_id in doc_ids])).all()
+                # 创建文档ID到is_trained的映射
+                for memory in memories:
+                    if memory.document_id:
+                        doc_id_to_is_trained[memory.document_id] = memory.is_trained
+            
+            # 将原始文档列表转换为字典列表，并添加is_trained字段
+            doc_list = []
+            for doc in documents:
+                doc_data = doc.to_dict()
+                doc_data['is_trained'] = doc_id_to_is_trained.get(str(doc.id), False)
+                doc_list.append(doc_data)
+            
+            return jsonify(APIResponse.success(data=doc_list))
     except Exception as e:
         logger.error(f"Error listing documents: {str(e)}", exc_info=True)
         return jsonify(APIResponse.error(message=f"Error listing documents: {str(e)}"))

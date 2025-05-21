@@ -44,6 +44,16 @@ export interface BioVersion {
   version: number;
 }
 
+export interface ModelInfo {
+  model_path: string;
+  full_path: string;
+  file_size: number;
+  created_time: number;
+  training_params: {
+    [key: string]: any;
+  };
+}
+
 export const getGlobalBioVersion = () => {
   return Request<CommonResponse<BioVersion[]>>({
     method: 'get',
@@ -62,5 +72,12 @@ export const getStatusBio = () => {
   return Request<CommonResponse<StatusBioResponse>>({
     method: 'get',
     url: '/api/kernel/l1/status_bio/get'
+  });
+};
+
+export const getModelList = () => {
+  return Request<CommonResponse<ModelInfo[]>>({
+    method: 'get',
+    url: '/api/kernel2/list_gguf_models'
   });
 };

@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import time
@@ -9,6 +10,12 @@ from dataclasses import asdict
 from flask import Blueprint, jsonify, request
 from flask_pydantic import validate
 
+from lpm_kernel.models.memory import Memory
+from lpm_kernel.common.repository.database_session import DatabaseSession
+from lpm_kernel.L1.serializers import NotesStorage
+from lpm_kernel.L1.utils import save_true_topics
+from lpm_kernel.L2.l2_generator import L2Generator
+from lpm_kernel.L2.utils import save_hf_model
 from lpm_kernel.api.common.responses import APIResponse
 from lpm_kernel.api.domains.kernel2.dto.chat_dto import (
     ChatRequest,
@@ -19,11 +26,21 @@ from lpm_kernel.api.domains.kernel2.services.prompt_builder import (
     RoleBasedStrategy,
     KnowledgeEnhancedStrategy,
 )
+from lpm_kernel.api.domains.kernel2.services.role_service import role_service
 from lpm_kernel.api.domains.loads.services import LoadService
 from lpm_kernel.api.services.local_llm_service import local_llm_service
+from lpm_kernel.kernel.chunk_service import ChunkService
+from lpm_kernel.kernel.l1.l1_manager import (
+    extract_notes_from_documents,
+    document_service,
+    get_latest_status_bio,
+    get_latest_global_bio,
+)
 
 from ...common.script_executor import ScriptExecutor
+from ...common.script_runner import ScriptRunner
 from ....configs.config import Config
+from ....kernel.note_service import NoteService
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +73,45 @@ def health_check():
         return jsonify(APIResponse.success(data={"status": "stopped"}))
 
 
+@kernel2_bp.route("/model/download", methods=["POST"])
+def downloadModel():
+    """Download base model
+    
+    Request body:
+    {
+        "model_name": str  # Model name, e.g. "Qwen/Qwen2.5-0.5B-Instruct"
+    }
+    
+    Returns:
+    {
+        "code": int,
+        "message": str,
+        "data": {
+            "model_path": str  # Model save path
+        }
+    }
+    """
+    try:
+        data = request.get_json()
+        if not data or "model_name" not in data:
+            return jsonify(APIResponse.error(message="Missing required parameter: model_name", code=400))
+
+        model_name = data["model_name"]
+
+        # Download and save model
+        model_path = save_hf_model(model_name)
+
+        return jsonify(APIResponse.success(
+            data={"model_path": model_path},
+            message="Model download completed"
+        ))
+
+    except Exception as e:
+        error_msg = f"Failed to download model: {str(e)}"
+        logger.error(error_msg)
+        return jsonify(APIResponse.error(message=error_msg, code=500))
+
+
 @kernel2_bp.route("/username", methods=["GET"])
 def username():
     return jsonify(APIResponse.success(data={"username": LoadService.get_current_upload_name()}))
@@ -64,10 +120,234 @@ def username():
 @kernel2_bp.route("/docker/env", methods=["GET"])
 def docker_env():
     return jsonify(APIResponse.success(data={"in_docker_env": os.getenv("IN_DOCKER_ENV")}))
+    
 
-@kernel2_bp.route("/llama/start", methods=["POST"])
-def start_llama_server():
-    """Start llama-server service"""
+
+@kernel2_bp.route("/data/prepare", methods=["POST"])
+def all():
+    def generate():
+        try:
+            # 1. Initialize configuration and directories (5%)
+            progress_data = {
+                "stage": "Initializing",
+                "progress": 5,
+                "message": "Initializing configuration and directories"
+            }
+            yield f"data: {json.dumps(progress_data)}\n\n"
+
+            config = Config.from_env()
+            base_dir = os.path.join(
+                os.getcwd(), config.get("USER_DATA_PIPELINE_DIR") + "/raw_data"
+            )
+            os.makedirs(base_dir, exist_ok=True)
+
+            # 2. Process topics data (15%)
+            progress_data = {
+                "stage": "Processing Topics",
+                "progress": 15,
+                "message": "Saving topics data"
+            }
+            yield f"data: {json.dumps(progress_data)}\n\n"
+
+            chunk_service = ChunkService()
+            topics_data = chunk_service.query_topics_data()
+            save_true_topics(topics_data, os.path.join(base_dir, "topics.json"))
+
+            # 3. Process documents and notes (35%)
+            progress_data = {
+                "stage": "Processing Documents",
+                "progress": 35,
+                "message": "Extracting and preparing document notes"
+            }
+            yield f"data: {json.dumps(progress_data)}\n\n"
+
+            documents = document_service.list_documents_with_l0()
+            notes_list, _ = extract_notes_from_documents(documents)
+            if not notes_list:
+                error_data = {
+                    "stage": "Error",
+                    "progress": -1,
+                    "message": "No notes found"
+                }
+                yield f"data: {json.dumps(error_data)}\n\n"
+                return
+
+            note_service = NoteService()
+            note_service.prepareNotes(notes_list)
+
+            storage = NotesStorage()
+            result = storage.save_notes(notes_list)
+
+            # 4. Prepare configuration files and paths (50%)
+            progress_data = {
+                "stage": "Preparing Configuration",
+                "progress": 50,
+                "message": "Preparing L2 generator configuration "
+            }
+            yield f"data: {json.dumps(progress_data)}\n\n"
+
+            config_path = os.path.join(
+                os.getcwd(),
+                "resources/L2/data_pipeline/data_prep/subjective/config/config.json",
+            )
+            entitys_path = os.path.join(
+                os.getcwd(),
+                "resources/L2/data_pipeline/raw_data/id_entity_mapping_subjective_v2.json",
+            )
+            graph_path = os.path.join(
+                os.getcwd(),
+                "resources/L1/graphrag_indexing_output/subjective/entities.parquet",
+            )
+
+            data_output_base_dir = os.path.join(os.getcwd(), "resources/L2/data")
+            notes = storage.load_notes()
+
+            # 5. Prepare basic information (65%)
+            progress_data = {
+                "stage": "Preparing Basic Info",
+                "progress": 65,
+                "message": "Getting user information and bio"
+            }
+            yield f"data: {json.dumps(progress_data)}\n\n"
+
+            status_bio = get_latest_status_bio()
+            global_bio = get_latest_global_bio()
+
+            basic_info = {
+                "username": LoadService.get_current_upload_name(),
+                "aboutMe": LoadService.get_current_upload_description(),
+                "statusBio": status_bio.content
+                if status_bio
+                else "Currently working on an AI project.",
+                "globalBio": global_bio.content_third_view
+                if global_bio
+                else "The User is a software engineer who loves programming and learning new technologies.",
+                "lang": "English",
+            }
+
+            # 6. Data preprocessing (80%)
+            progress_data = {
+                "stage": "Data Preprocessing",
+                "progress": 80,
+                "message": "Executing data preprocessing"
+            }
+            yield f"data: {json.dumps(progress_data)}\n\n"
+
+            l2_generator = L2Generator(
+                data_path=os.path.join(os.getcwd(), "resources")
+            )
+            l2_generator.data_preprocess(notes, basic_info)
+
+            # 7. Generate subjective data (95%)
+            progress_data = {
+                "stage": "Generating Data",
+                "progress": 95,
+                "message": "Generating subjective data： Preference QA Self QA Diversity QA graphrag_indexing"
+            }
+            yield f"data: {json.dumps(progress_data)}\n\n"
+
+            l2_generator.gen_subjective_data(
+                notes,
+                basic_info,
+                data_output_base_dir,
+                storage.topics_path,
+                entitys_path,
+                graph_path,
+                config_path,
+            )
+
+            # 8. Complete (100%)
+            progress_data = {
+                "stage": "Complete",
+                "progress": 100,
+                "message": "Data preparation completed",
+                "result": {
+                    "bio": basic_info["globalBio"],
+                    "document_clusters": "Generated document clusters",
+                    "chunk_topics": "Generated chunk topics"
+                }
+            }
+            yield f"data: {json.dumps(progress_data)}\n\n"
+
+        except Exception as e:
+            logger.error(f"Data preparation failed: {str(e)}", exc_info=True)
+            error_data = {
+                "stage": "Error",
+                "progress": -1,
+                "message": f"Data preparation failed: {str(e)}"
+            }
+            yield f"data: {json.dumps(error_data)}\n\n"
+
+    return Response(
+        generate(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no'  # Disable Nginx buffering
+        }
+    )
+
+
+# Global variables for tracking training process
+_training_process = None
+_training_thread = None
+_stopping_training = False
+
+
+def get_model_paths(model_name: str) -> dict:
+    """
+    Get all paths related to the model
+    
+    Args:
+        model_name: Model name
+        
+    Returns:
+        Dictionary containing all related paths:
+        - base_path: Base model path
+        - personal_dir: Personal trained model output directory
+        - merged_dir: Merged model output directory
+    """
+    base_dir = os.getcwd()
+    paths = {
+        "base_path": os.path.join(base_dir, "resources/L2/base_models", model_name),
+        "personal_dir": os.path.join(base_dir, "resources/model/output/personal_model", model_name),
+        "merged_dir": os.path.join(base_dir, "resources/model/output/merged_model", model_name),
+        "gguf_dir": os.path.join(base_dir, "resources/model/output/gguf", model_name)
+    }
+
+    # Ensure all directories exist
+    for path in paths.values():
+        os.makedirs(path, exist_ok=True)
+
+    return paths
+
+
+def start_training(script_path: str, log_path: str) -> None:
+    """Start training in a new thread"""
+    global _training_process
+    try:
+        # Use ScriptRunner to execute the script
+        runner = ScriptRunner(log_path=log_path)
+        _training_process = runner.execute_script(
+            script_path=script_path,
+            script_type="training",
+            is_python=False,  # This is a bash script
+        )
+
+        logger.info(f"Training process started: {_training_process}")
+
+    except Exception as e:
+        logger.error(f"Failed to start training process: {str(e)}")
+        _training_process = None
+        raise
+
+
+@kernel2_bp.route("/train2", methods=["POST"])
+def train2():
+    """Start model training"""
+    global _training_thread, _training_process, _stopping_training
+
     try:
         # Get request parameters
         data = request.get_json()
@@ -75,11 +355,305 @@ def start_llama_server():
             return jsonify(APIResponse.error(message="Missing required parameter: model_name", code=400))
 
         model_name = data["model_name"]
+        paths = get_model_paths(model_name)
+
+        # Get optional parameters with defaults
+        learning_rate = data.get("learning_rate", 2e-4)
+        num_train_epochs = data.get("number_of_epochs", 3)
+        concurrency_threads = data.get("concurrency_threads", 2)
+        data_synthesis_mode = data.get("data_synthesis_mode", "low")
+        use_cuda = data.get("use_cuda", False)
+        
+        # Convert use_cuda to string "True" or "False" for the shell script
+        use_cuda_str = "True" if use_cuda else "False"
+        
+        logger.info(f"Training configuration: learning_rate={learning_rate}, epochs={num_train_epochs}, "
+                   f"threads={concurrency_threads}, mode={data_synthesis_mode}, use_cuda={use_cuda} ({use_cuda_str})")
+
+        # Check if model exists
+        if not os.path.exists(paths["base_path"]):
+            return jsonify(APIResponse.error(
+                message=f"Model '{model_name}' does not exist, please download first",
+                code=400
+            ))
+
+        # Check if training is already running
+        if _training_thread and _training_thread.is_alive():
+            return jsonify(APIResponse.error("Training task is already running"))
+
+        # Reset stopping flag
+        _stopping_training = False
+
+        # Prepare log directory and file
+        log_dir = os.path.join(os.getcwd(), "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        log_path = os.path.join(log_dir, "train.log")
+        logger.info(f"Log file path: {log_path}")
+
+        # Ensure output directory exists
+        os.makedirs(paths["personal_dir"], exist_ok=True)
+
+        # Set environment variables
+        os.environ["MODEL_BASE_PATH"] = paths["base_path"]
+        os.environ["MODEL_PERSONAL_DIR"] = paths["personal_dir"]
+        # Assign
+        os.environ["USER_NAME"] = LoadService.get_current_upload_name()
+
+        logger.info(f"Environment variables set: {os.environ}")
+
+        script_path = os.path.join(os.getcwd(), "lpm_kernel/L2/train_for_user.sh")
+
+        # Build command arguments
+        cmd_args = [
+            "--lr", str(learning_rate),
+            "--epochs", str(num_train_epochs),
+            "--threads", str(concurrency_threads),
+            "--mode", str(data_synthesis_mode),
+            "--cuda", use_cuda_str  # Use the properly formatted string
+        ]
+
+        # Start training
+        import threading
+        _training_thread = threading.Thread(
+            target=start_training_with_args,
+            args=(script_path, log_path, cmd_args),
+            daemon=True
+        )
+        _training_thread.start()
+
+        return jsonify(APIResponse.success(
+            data={
+                "status": "training_started",
+                "model_name": model_name,
+                "log_path": log_path,
+            },
+            message="Training task started successfully"
+        ))
+
+    except Exception as e:
+        logger.error(f"Error starting training task: {str(e)}")
+        traceback.print_exc()
+        return jsonify(APIResponse.error(message=f"Failed to start training: {str(e)}"))
+
+
+def start_training_with_args(script_path: str, log_path: str, args: list) -> None:
+    """Start training with additional arguments"""
+    global _training_process
+    try:
+        # Convert script path and args to a command
+        cmd = [script_path] + args
+        
+        # Use ScriptRunner to execute the script
+        runner = ScriptRunner(log_path=log_path)
+        _training_process = runner.execute_script(
+            script_path=script_path,
+            script_type="training",
+            is_python=False,  # This is a bash script
+            args=args
+        )
+
+        logger.info(f"Training process started with args: {args}, process: {_training_process}")
+
+    except Exception as e:
+        logger.error(f"Failed to start training process: {str(e)}")
+        _training_process = None
+        raise
+
+
+@kernel2_bp.route("/merge_weights", methods=["POST"])
+def merge_weights():
+    """Merge model weights"""
+    try:
+        # Get request parameters
+        data = request.get_json()
+        if not data or "model_name" not in data:
+            return jsonify(APIResponse.error(message="Missing required parameter: model_name", code=400))
+
+        model_name = data["model_name"]
+        paths = get_model_paths(model_name)
+
+        # Check if model exists
+        if not os.path.exists(paths["base_path"]):
+            return jsonify(APIResponse.error(
+                message=f"Model '{model_name}' does not exist, please download first",
+                code=400
+            ))
+
+        # Check if training output exists
+        if not os.path.exists(paths["personal_dir"]):
+            return jsonify(APIResponse.error(
+                message=f"Model '{model_name}' training output does not exist, please train model first",
+                code=400
+            ))
+
+        # Ensure merged output directory exists
+        os.makedirs(paths["merged_dir"], exist_ok=True)
+
+        # Set environment variables
+        os.environ["MODEL_BASE_PATH"] = paths["base_path"]
+        os.environ["MODEL_PERSONAL_DIR"] = paths["personal_dir"]
+        os.environ["MODEL_MERGED_DIR"] = paths["merged_dir"]
+
+        logger.info(f"Environment variables set: MODEL_BASE_PATH :  {os.environ}")
+
+        script_path = os.path.join(
+            os.getcwd(), "lpm_kernel/L2/merge_weights_for_user.sh"
+        )
+        log_path = os.path.join(os.getcwd(), "logs", f"merge_weights_{model_name}.log")
+
+        # Ensure log directory exists
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+
+        # Use script executor to execute merge script
+        result = script_executor.execute(
+            script_path=script_path, script_type="merge_weights", log_file=log_path
+        )
+
+        return jsonify(
+            APIResponse.success(
+                data={
+                    **result,
+                    "model_name": model_name,
+                    "log_path": log_path,
+                    "personal_dir": paths["personal_dir"],
+                    "merged_dir": paths["merged_dir"]
+                },
+                message="Weight merge task started"
+            )
+        )
+
+    except Exception as e:
+        error_msg = f"Failed to start weight merge: {str(e)}"
+        logger.error(error_msg)
+        return jsonify(APIResponse.error(message=error_msg, code=500))
+
+
+@kernel2_bp.route("/convert_model", methods=["POST"])
+def convert_model():
+    """Convert model to GGUF format"""
+    try:
+        # Get request parameters
+        data = request.get_json()
+        logger.info(f"Request parameters: {data}")
+        if not data or "model_name" not in data:
+            return jsonify(APIResponse.error(message="Missing required parameter: model_name", code=400))
+
+        model_name = data["model_name"]
+        logger.info(f"Converting model: {model_name}")
+        paths = get_model_paths(model_name)
+
+        # Check if merged model exists
+        merged_model_dir = paths["merged_dir"]
+        logger.info(f"Merged model path: {merged_model_dir}")
+        if not os.path.exists(merged_model_dir):
+            return jsonify(APIResponse.error(
+                message=f"Model '{model_name}' merged output does not exist, please merge model first",
+                code=400
+            ))
+
+        logger.info("开始开始开始12312")
+
+        # Get GGUF output directory
+        gguf_dir = paths["gguf_dir"]
+        logger.info(f"GGUF output directory: {gguf_dir}")
+
+        # Generate timestamp for the filename
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        gguf_filename = f"{timestamp}.gguf"
+
+        script_path = os.path.join(os.getcwd(), "lpm_kernel/L2/convert_hf_to_gguf.py")
+        gguf_path = os.path.join(gguf_dir, gguf_filename)
+        logger.info(f"GGUF output path: {gguf_path}")
+
+        # Get training parameters from TrainingParamsManager
+        from ..trainprocess.training_params_manager import TrainingParamsManager
+        training_params = TrainingParamsManager.get_latest_training_params()
+        logger.info(f"Retrieved training parameters: {training_params}")
+
+        # Save training parameters to a JSON file in the GGUF directory
+        training_params_path = os.path.join(gguf_dir, f"{timestamp}.json")
+        try:
+            # 添加模型路径到训练参数
+            training_params["model_path"] = gguf_path
+
+            with open(training_params_path, 'w', encoding='utf-8') as f:
+                json.dump(training_params, f, indent=2)
+            logger.info(f"Training parameters saved to {training_params_path}")
+        except Exception as e:
+            logger.error(f"Failed to save training parameters: {str(e)}")
+
+        # Build parameters
+        args = [
+            merged_model_dir,
+            "--outfile",
+            gguf_path,
+            "--outtype",
+            "f16",
+        ]
+        logger.info(f"Parameters: {args}")
+        # Use script executor to execute conversion script
+        result = script_executor.execute(
+            script_path=script_path, script_type="convert_model", args=args
+        )
+
+        # Model conversion completed
+        try:
+            with DatabaseSession.session() as session:
+                update_count = session.query(Memory).filter(Memory.status == "active").update(
+                    {"is_trained": True},
+                    synchronize_session=False  # 不同步会话状态，提高性能
+                )
+
+                # 提交更改
+                session.commit()
+            logger.info("结束结束")
+            logger.info(f"Updated training status for {update_count} memory records")
+        except Exception as e:
+            logger.error(f"Failed to update memory training status: {str(e)}", exc_info=True)
+
+        logger.info(f"Model conversion successful: {result}")
+        return jsonify(APIResponse.success(
+            data={
+                **result,
+                "model_name": model_name,
+                "merged_dir": merged_model_dir,
+                "gguf_path": gguf_path,
+                "training_params_path": training_params_path,
+                "training_params": training_params
+            },
+            message="Model conversion task started"
+        ))
+
+    except Exception as e:
+        error_msg = f"Failed to start model conversion: {str(e)}"
+        logger.error(error_msg)
+        return jsonify(APIResponse.error(message=error_msg, code=500))
+
+
+@kernel2_bp.route("/llama/start", methods=["POST"])
+def start_llama_server():
+    """Start llama-server service"""
+    try:
+        # Get request parameters
+        data = request.get_json()
+        if not data:
+            return jsonify(APIResponse.error(message="Missing request data", code=400))
+
+        if "model_path" not in data and "full_path" not in data:
+            return jsonify(APIResponse.error(message="Missing required parameter: model_path or full_path", code=400))
+
+        # Get model path from appropriate field
+        model_path = data.get("model_path") or data.get("full_path")
+
+        # Extract model_name from path (directory name)
+        model_name = os.path.basename(os.path.dirname(model_path)) if "/" in model_path else model_path
         # Get optional use_gpu parameter with default value of True
         use_gpu = data.get("use_gpu", True)
-        base_dir = os.getcwd()
-        model_dir = os.path.join(base_dir, "resources/model/output/gguf", model_name)
-        gguf_path = os.path.join(model_dir, "model.gguf")
+        
+        # paths = get_model_paths(model_name)
+        # gguf_path = os.path.join(paths["gguf_dir"], "model.gguf")
+        gguf_path = data["full_path"]
 
         server_path = os.path.join(os.getcwd(), "llama.cpp/build/bin")
         if os.path.exists(os.path.join(os.getcwd(), "llama.cpp/build/bin/Release")):
@@ -132,6 +706,7 @@ def start_llama_server():
 # Flag to track if service is stopping
 _stopping_server = False
 
+
 @kernel2_bp.route("/llama/stop", methods=["POST"])
 def stop_llama_server():
     """Stop llama-server service - Force immediate termination of the process"""
@@ -182,6 +757,94 @@ def get_llama_server_status():
     except Exception as e:
         logger.error(f"Error getting llama-server status: {str(e)}", exc_info=True)
         return APIResponse.error(f"Error getting llama-server status: {str(e)}")
+
+
+@kernel2_bp.route("/list_gguf_models", methods=["GET"])
+def list_gguf_models():
+    """List all GGUF models and their training parameters"""
+    try:
+        base_dir = os.getcwd()
+        gguf_base_dir = os.path.join(base_dir, "resources/model/output/gguf")
+
+        # Check if the directory exists
+        if not os.path.exists(gguf_base_dir):
+            return jsonify(APIResponse.error(message="GGUF directory does not exist", code=404))
+
+        # Get all model folders
+        model_folders = [f for f in os.listdir(gguf_base_dir) if os.path.isdir(os.path.join(gguf_base_dir, f))]
+
+        result = []
+        for model_name in model_folders:
+            model_dir = os.path.join(gguf_base_dir, model_name)
+
+            # Get all GGUF files in this model directory
+            gguf_files = [f for f in os.listdir(model_dir) if f.endswith(".gguf")]
+
+            for gguf_file in gguf_files:
+                gguf_path = os.path.join(model_dir, gguf_file)
+                model_path = f"{model_name}/{gguf_file}"
+
+                # Look for corresponding JSON file with training parameters
+                json_file = gguf_file.replace(".gguf", ".json")
+                json_path = os.path.join(model_dir, json_file)
+                training_params = {}
+
+                if os.path.exists(json_path):
+                    try:
+                        with open(json_path, 'r', encoding='utf-8') as f:
+                            training_params = json.load(f)
+                    except Exception as e:
+                        logger.error(f"Failed to load training parameters for {model_path}: {str(e)}")
+
+                # Get file information
+                file_stats = os.stat(gguf_path)
+                file_size = file_stats.st_size
+                created_time = file_stats.st_ctime
+
+                model_info = {
+                    "model_path": model_path,
+                    "full_path": gguf_path,
+                    "file_size": file_size,
+                    "created_time": created_time,
+                    "training_params": training_params
+                }
+
+                result.append(model_info)
+
+        # Sort by creation time (newest first)
+        result.sort(key=lambda x: x["created_time"], reverse=True)
+
+        return jsonify(APIResponse.success(
+            data=result,
+            message=f"Found {len(result)} GGUF model(s)"
+        ))
+
+    except Exception as e:
+        error_msg = f"Failed to list GGUF models: {str(e)}"
+        logger.error(error_msg)
+        return jsonify(APIResponse.error(message=error_msg, code=500))
+
+
+@kernel2_bp.route("/test/version", methods=["GET"])
+def test_version():
+    """Test environment version"""
+    try:
+        # Execute python command directly to get version
+        result = script_executor.execute(
+            script_path="python", script_type="version_check", args=["--version"]
+        )
+
+        return jsonify(
+            APIResponse.success(
+                data={"python_version": result}, message="Version information obtained successfully"
+            )
+        )
+
+    except Exception as e:
+        error_msg = f"Failed to get version information: {str(e)}"
+        logger.error(error_msg)
+        return jsonify(APIResponse.error(error_msg))
+
 
 @kernel2_bp.route("/chat", methods=["POST"])
 @validate()
@@ -245,7 +908,7 @@ def chat(body: ChatRequest):
             }
             # Return as regular JSON response for non-stream or stream-compatible error
             if not body.stream:
-                return APIResponse.error(message="Service temporarily unavailable", code=503), 503
+                return APIResponse.error(message="服务暂时不可用", code=503), 503
             return local_llm_service.handle_stream_response(iter([error_response]))
 
         try:

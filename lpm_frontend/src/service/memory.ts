@@ -20,6 +20,7 @@ export interface MemoryFile {
   summary: string | null;
   url: string;
   user_description: string;
+  is_trained: boolean;
 }
 
 interface MetaData {
