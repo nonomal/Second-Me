@@ -4,6 +4,8 @@ from ...common.errors import APIError, ErrorCodes
 import logging
 import os
 import time
+import json
+import tempfile
 from pathlib import Path
 from ....configs.config import Config
 from .service import CloudService
@@ -12,10 +14,75 @@ from lpm_kernel.configs.logging import get_train_process_logger
 logger = get_train_process_logger()
 cloud_bp = Blueprint("cloud_service", __name__)
 
+# 全局变量，用于存储用户提供的API密钥创建的CloudService实例
+service = None
 
-# Create service instance with API key from environment variable
-api_key = os.environ.get('AL_API_KEY')
-cloud_service = CloudService(api_key=api_key)
+@cloud_bp.route("/create_fine_tune_job", methods=["POST"])
+def create_fine_tune_job():
+    """
+    Create model tuning tasks (one-stop interface)
+    
+    Request: JSON object, containing:
+    - api_key: str, Cloud Service API Key
+    - file_path: str, Training data file path
+    - base_model: str
+    - training_type: str, Training type, default is' efficient_ft '
+    - Hyperparameters: Object, optional hyperparameters
+    - description: str, Optional file description
+    """
+    try:
+        # 获取请求数据
+        data = request.json
+            
+        # 提取参数
+        api_key = data.get('api_key')
+        file_path = data.get('file_path')
+        base_model = data.get('base_model')
+        training_type = data.get('training_type', "efficient_sft")
+        description = data.get('description', "")
+        hyper_parameters = data.get('hyper_parameters', {})
+        
+        # 检查必要参数
+        if not api_key:
+            return jsonify(APIResponse.error("需要提供API密钥"))
+        
+        if not file_path:
+            return jsonify(APIResponse.error("需要提供训练文件路径"))
+            
+        # 检查文件是否存在
+        file_path = Path(file_path)
+        if not file_path.exists():
+            return jsonify(APIResponse.error(f"训练文件不存在: {file_path}"))
+        
+        service = CloudService(api_key=api_key)
+        
+        # 上传文件
+        upload_result = service.upload_training_file(
+            file_path=str(file_path),
+            description=description
+        )
+        
+        if not upload_result:
+            return jsonify(APIResponse.error("上传训练文件失败"))
+        
+        # 创建调优任务
+        result = service.create_fine_tune_job(
+            base_model=base_model,
+            training_type=training_type,
+            hyper_parameters=hyper_parameters
+        )
+        
+        if not result:
+            return jsonify(APIResponse.error("创建调优任务失败"))
+        
+        return jsonify(APIResponse.success(data={
+            "job_id": service.job_id,
+            "file_id": service.file_id
+        }))
+    
+    except Exception as e:
+        logger.error(f"创建调优任务失败: {str(e)}", exc_info=True)
+        return jsonify(APIResponse.error(f"创建调优任务失败: {str(e)}"))
 
 
 @cloud_bp.route("/upload", methods=["POST"])

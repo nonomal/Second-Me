@@ -1,26 +1,18 @@
 import os
-import logging
 import requests
 import time
 from typing import Dict, Any, Iterator, Optional
-from pydantic import BaseModel
 from pathlib import Path
-from ....configs.config import Config
+import json
+
 
 from lpm_kernel.configs.logging import get_train_process_logger
 logger = get_train_process_logger()
 
 
-class CloudServiceRequest(BaseModel):
-    query: str
-    parameters: Optional[Dict[str, Any]] = None
-    model: Optional[str] = "default"
-    stream: Optional[bool] = False
-
-
 class CloudService:
     def __init__(self, api_key=None):
-        self.api_key = api_key
+        self.api_key = os.environ.get('AL_API_KEY')
 
         self.base_url = os.environ.get('AL_Base_URL')
         self.headers = {
@@ -32,12 +24,13 @@ class CloudService:
         self.model_id = None
         self.deployment_id = None
 
-    def upload_training_file(self, file_path, description=None):
+    def upload_training_file(self, file_path = "resources/L2/data/merged.json", description=None):
         """上传训练数据文件"""
-
         url = f"{self.base_url}/files"
 
-        file_path = Path(file_path)
+        project_root = Path(__file__).resolve().parent.parent.parent.parent.parent
+        file_path = project_root / file_path
+
         if not file_path.exists():
             raise FileNotFoundError(f"The training data file does not exist: {file_path}")
 
@@ -280,8 +273,7 @@ class CloudService:
             for model in response_data.get('data', {}).get('models', []):
                 model_id = model.get('model', '')
                 capabilities = model.get('capabilities', [])
-
-                # 检查模型是否支持调优
+                
                 if 'fine-tuning' in capabilities:
                     models.append({
                         'id': model_id,
@@ -295,4 +287,48 @@ class CloudService:
             logger.warning("No models found that support fine-tuning")
 
         return models
+
+    @staticmethod
+    def convert_to_jsonl(file_path):
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            output_file = file_path + "l"
+
+            conversations = []
+            for item in data:
+                if 'user' in item and 'assistant' in item:
+                    conversation = {
+                        "messages": [
+                            {"role": "user", "content": item['user']},
+                            {"role": "assistant", "content": item['assistant']}
+                        ]
+                    }
+
+                    for key, value in item.items():
+                        if key not in ['user', 'assistant']:
+                            conversation[key] = value
+
+                    conversations.append(conversation)
+
+            original_count = len(conversations)
+            logger.info(f"Original conversation count: {original_count}")
+
+            if original_count < 40:
+                copies_needed = (40 + original_count - 1) // original_count
+                conversations = conversations * copies_needed
+                logger.info(f"Data duplicated {copies_needed} times to reach at least 40 samples")
+
+            with open(output_file, 'w', encoding='utf-8') as f:
+                for conversation in conversations:
+                    f.write(json.dumps(conversation, ensure_ascii=False) + '\n')
+
+            final_count = len(conversations)
+            logger.info(f"Successfully converted JSON data to JSONL format in {output_file}. Final sample count: {final_count}")
+            return output_file
+
+        except Exception as e:
+            logger.error(f"Error converting data: {e}")
+            return None
 
