@@ -223,18 +223,29 @@ export function ModelStatus() {
           console.error('Error checking service status:', error);
         });
     }, 3000);
-  };  const handleStartService = () => {
+  };
+  const handleStartService = () => {
     // Use selected model or get from local storage
     const config = JSON.parse(localStorage.getItem('trainingParams') || '{}');
     const modelPath = selectedModel || config.model_name;
 
     if (!modelPath) {
       message.error('Please select a model to start');
+
+      return;
+    }
+
+    // 查找选中模型的完整ModelInfo信息
+    const selectedModelInfo = modelList.find(model => model.model_path === modelPath);
+
+    if (!selectedModelInfo) {
+      message.error('Selected model information not found');
+
       return;
     }
 
     setServiceStarting(true);
-    startService({ model_name: modelPath })
+    startService(selectedModelInfo)
       .then((res) => {
         if (res.data.code === 0) {
           messageApi.success({ content: 'Service starting...', duration: 1 });
@@ -312,6 +323,7 @@ export function ModelStatus() {
                   const fileName = model.model_path.split('/')[1];
                   const timeStamp = fileName?.replace('.gguf', '') || 'Unknown version';
                   const modelName = model.model_path.split('/')[0];
+
                   return {
                     label: timeStamp,
                     value: model.model_path,
@@ -326,6 +338,7 @@ export function ModelStatus() {
                   if (open) {
                     // Hide any currently visible tooltips when dropdown opens
                     const tooltipElements = document.querySelectorAll('.ant-tooltip');
+
                     tooltipElements.forEach(el => {
                       if (window.getComputedStyle(el).display !== 'none') {
                         (el as HTMLElement).style.display = 'none';

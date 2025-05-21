@@ -1,5 +1,6 @@
 import { Request } from '../utils/request';
 import type { CommonResponse, EmptyResponse } from '../types/responseModal';
+import type { ModelInfo } from './model';
 
 interface ProcessInfo {
   cmdline: string[];
@@ -111,11 +112,11 @@ export const retrain = (config: TrainingConfig) => {
   });
 };
 
-export const startService = (config: TrainingConfig) => {
+export const startService = (info: ModelInfo) => {
   return Request<CommonResponse<EmptyResponse>>({
     method: 'post',
     url: `/api/kernel2/llama/start`,
-    data: config
+    data: info
   });
 };
 

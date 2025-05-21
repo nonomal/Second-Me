@@ -637,10 +637,17 @@ def start_llama_server():
     try:
         # Get request parameters
         data = request.get_json()
-        if not data or "model_path" not in data:
-            return jsonify(APIResponse.error(message="Missing required parameter: model_name", code=400))
+        if not data:
+            return jsonify(APIResponse.error(message="Missing request data", code=400))
+                    
+        if "model_path" not in data and "full_path" not in data:
+            return jsonify(APIResponse.error(message="Missing required parameter: model_path or full_path", code=400))
 
-        model_name = data["model_path"]
+        # Get model path from appropriate field
+        model_path = data.get("model_path") or data.get("full_path")
+
+        # Extract model_name from path (directory name)
+        model_name = os.path.basename(os.path.dirname(model_path)) if "/" in model_path else model_path
         # Get optional use_gpu parameter with default value of True
         use_gpu = data.get("use_gpu", True)
         
