@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useState, useEffect } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import { Checkbox, InputNumber, message, Radio, Tooltip } from 'antd';
@@ -55,6 +55,49 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
   const [openThinkingModel, setOpenThinkingModel] = useState<boolean>(false);
   const [showThinkingWarning, setShowThinkingWarning] = useState<boolean>(false);
   const thinkingModelConfig = useModelConfigStore((state) => state.thinkingModelConfig);
+
+  useEffect(() => {
+    // 当有可用的基础模型选项时，确保设置第一个为默认选中
+    // 只有在LocalTrainingConfig中才设置本地模型
+    if (baseModelOptions.length > 0) {
+      // 检查当前选择的模型是否在可用选项中
+      const currentModelIsValid = baseModelOptions.some(
+        (m) => m.value === trainingParams.model_name
+      );
+      
+      // 只有在没有有效选择时才设置默认值
+      if (!trainingParams.model_name || !currentModelIsValid) {
+        const defaultModel = baseModelOptions[0].value;
+        // 避免不必要的更新
+        if (trainingParams.model_name !== defaultModel || 
+            trainingParams.local_model_name !== defaultModel) {
+          updateTrainingParams({ 
+            ...trainingParams, 
+            model_name: defaultModel,
+            local_model_name: defaultModel 
+          });
+        }
+      } else {
+        // 确保 local_model_name 与当前的 model_name 同步，但只在需要时更新
+        if (trainingParams.local_model_name !== trainingParams.model_name) {
+          // 此处只更新 local_model_name，不改变 model_name
+          updateTrainingParams({
+            ...trainingParams,
+            local_model_name: trainingParams.model_name
+          });
+        }
+      }
+    } else {
+      // 如果没有可用的模型选项，清空当前选择，但只在需要时更新
+      if (trainingParams.model_name !== '' || trainingParams.local_model_name !== '') {
+        updateTrainingParams({ 
+          ...trainingParams, 
+          model_name: '',
+          local_model_name: '' 
+        });
+      }
+    }
+  }, [baseModelOptions, trainingParams, updateTrainingParams]);
 
   const disabledChangeParams = useMemo(() => {
     return isTraining || trainSuspended;
@@ -150,14 +193,13 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
             />
 
             <span className="text-xs text-gray-500">
-              Low: Fast data synthesis. Medium: Balanced synthesis and speed. High: Rich
-              synthesis, slower speed.
+              Low: Fast data synthesis. Medium: Balanced synthesis and speed. High: Rich speed.
             </span>
           </div>
         </div>
 
         <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
+          <div className="flex justify-between items-center">
             <h4 className="text-base font-semibold text-gray-800 mb-1">
               Step 2: Choose Base Model for Training Second Me
             </h4>
@@ -168,7 +210,16 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
           </div>
           <Listbox
             disabled={disabledChangeParams}
-            onChange={(value) => updateTrainingParams({ model_name: value })}
+            onChange={(value) => {
+              // 检查是否真的发生了变化，避免不必要的更新
+              if (value !== trainingParams.model_name) {
+                updateTrainingParams({ 
+                  ...trainingParams, 
+                  model_name: value,
+                  local_model_name: value 
+                });
+              }
+            }}
             value={trainingParams.model_name}
           >
             <div className="relative mt-1">
@@ -180,7 +231,10 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
               >
                 <span className="block truncate">
                   {baseModelOptions.find((option) => option.value === trainingParams.model_name)
-                    ?.label || 'Select a model...'}
+                    ?.label || 
+                    (baseModelOptions.length > 0 
+                      ? baseModelOptions[0].label 
+                      : 'Select a model...')}
                 </span>
                 <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                   <ColumnArrowIcon className="h-5 w-5 text-gray-400" />
@@ -193,30 +247,36 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
                 leaveTo="opacity-0"
               >
                 <Listbox.Options className="absolute mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 z-[1] focus:outline-none">
-                  {baseModelOptions.map((option) => (
-                    <Listbox.Option
-                      key={option.value}
-                      className={({ active }) =>
-                        `relative cursor-pointer select-none py-2 pl-10 pr-4 ${active ? 'bg-blue-100 text-blue-900' : 'text-gray-900'}`
-                      }
-                      value={option.value}
-                    >
-                      {({ selected }) => (
-                        <>
-                          <span
-                            className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}
-                          >
-                            {option.label}
-                          </span>
-                          {selected ? (
-                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-blue-600">
-                              <DoneIcon className="h-5 w-5" />
+                  {baseModelOptions.length === 0 ? (
+                    <div className="py-2 px-4 text-center text-sm text-gray-500">
+                      No models available.
+                    </div>
+                  ) : (
+                    baseModelOptions.map((option) => (
+                      <Listbox.Option
+                        key={option.value}
+                        className={({ active }) =>
+                          `relative cursor-pointer select-none py-2 pl-10 pr-4 ${active ? 'bg-blue-100 text-blue-900' : 'text-gray-900'}`
+                        }
+                        value={option.value}
+                      >
+                        {({ selected }) => (
+                          <>
+                            <span
+                              className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}
+                            >
+                              {option.label}
                             </span>
-                          ) : null}
-                        </>
-                      )}
-                    </Listbox.Option>
-                  ))}
+                            {selected ? (
+                              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-blue-600">
+                                <DoneIcon className="h-5 w-5" />
+                              </span>
+                            ) : null}
+                          </>
+                        )}
+                      </Listbox.Option>
+                    ))
+                  )}
                 </Listbox.Options>
               </Transition>
             </div>
@@ -405,10 +465,10 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
                 setOpenThinkingModel(true);
               }}
             >
-              Thinking Model 
+              Thinking Model
             </div>
             <Tooltip title="Chain of Thought (CoT) enables the model to perform step-by-step reasoning during training. This improves the quality of responses by allowing the model to 'think' through complex questions before answering, resulting in more accurate and logically coherent outputs.">
-                  <QuestionCircleOutlined className="cursor-pointer ml-2" />
+              <QuestionCircleOutlined className="cursor-pointer ml-2" />
             </Tooltip>
           </div>
         </div>

@@ -1,7 +1,7 @@
 import { Request } from '../utils/request';
 import type { CommonResponse, EmptyResponse } from '../types/responseModal';
 
-export type IModelConfig = IBaseModelParams & IThinkingModelParams;
+export type IModelConfig = IBaseModelParams & IThinkingModelParams & ICloudServiceParams;
 
 export interface IBaseModelParams {
   id: number;
@@ -23,6 +23,10 @@ export interface IThinkingModelParams {
   thinking_endpoint: string;
 }
 
+export interface ICloudServiceParams {
+  cloud_service_api_key: string;
+}
+
 export const getModelConfig = () => {
   return Request<CommonResponse<IModelConfig>>({
     method: 'get',
@@ -35,21 +39,6 @@ export const updateModelConfig = (data: IModelConfig) => {
     method: 'put',
     url: `/api/user-llm-configs`,
     data
-  });
-};
-
-export const setCloudServiceApiKey = (api_key: string) => {
-  return Request<CommonResponse<EmptyResponse>>({
-    method: 'post',
-    url: `/api/cloud_service/set_api_key`,
-    data: { api_key }
-  });
-};
-
-export const getCloudServiceApiKey = () => {
-  return Request<CommonResponse<{ api_key: string }>>({
-    method: 'get',
-    url: `/api/cloud_service/get_api_key`
   });
 };
 

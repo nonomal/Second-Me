@@ -6,9 +6,9 @@ import { PlayIcon, StopIcon } from '@heroicons/react/24/outline';
 import { Tabs, message, Spin } from 'antd';
 import type { TabsProps } from 'antd';
 import type { TrainingConfig } from '@/service/train';
+import type { IModelConfig } from '@/service/modelConfig';
 import LocalTrainingConfig from './LocalTrainingConfig';
 import CloudTrainingConfig from './CloudTrainingConfig';
-import classNames from 'classnames';
 
 interface BaseModelOption {
   value: string;
@@ -99,8 +99,7 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
       label: 'Cloud Training',
       children: (
         <CloudTrainingConfig
-          baseModelOptions={baseModelOptions}
-          modelConfig={modelConfig}
+          modelConfig={modelConfig as IModelConfig | null}
           isTraining={isTraining}
           updateTrainingParams={updateTrainingParams}
           status={status}
@@ -137,7 +136,37 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
         {`Configure how your Second Me will be trained using your memory data and identity. Then click 'Start Training'.`}
       </p>
 
-      <Tabs activeKey={activeTabKey} onChange={setActiveTabKey} items={tabItems} className="mb-6" />
+      <Tabs 
+        activeKey={activeTabKey}
+        onChange={(key) => {
+          // 首先设置活动标签，这样UI立即响应
+          setActiveTabKey(key);
+          
+          // 当切换标签时，切换到对应环境的模型，但只在必要时更新
+          if (key === 'local') {
+            // 从云端切换到本地，使用 local_model_name（如果存在）
+            if (trainingParams.local_model_name && 
+                trainingParams.model_name !== trainingParams.local_model_name) {
+              updateTrainingParams({ 
+                ...trainingParams, 
+                model_name: trainingParams.local_model_name 
+              });
+            }
+          } else if (key === 'cloud') {
+            // 从本地切换到云端，优先使用 cloud_model_name（如果存在）
+            // 如果 cloud_model_name 存在，并且与 model_name 不同，则使用 cloud_model_name
+            if (trainingParams.cloud_model_name && 
+                trainingParams.model_name !== trainingParams.cloud_model_name) {
+              updateTrainingParams({ 
+                ...trainingParams, 
+                model_name: trainingParams.cloud_model_name 
+              });
+            }
+          }
+        }}
+        items={tabItems}
+        className="mb-6"
+      />
 
       <div className="flex justify-end items-center gap-4 pt-4 border-t mt-4">
         {isTraining && (

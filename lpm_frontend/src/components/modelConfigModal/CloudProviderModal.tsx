@@ -2,11 +2,11 @@ import { Modal, Radio, Input, message } from 'antd';
 import Image from 'next/image';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { setCloudServiceApiKey, getCloudServiceApiKey } from '../../service/modelConfig';
+import { updateModelConfig, getModelConfig } from '../../service/modelConfig';
 
 interface CloudProviderConfig {
   provider_type: string;
-  api_key?: string;
+  cloud_service_api_key?: string;
 }
 
 interface IProps {
@@ -51,21 +51,21 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
       setOriginalConfig({ ...configRef.current });
       setProviderType(configRef.current.provider_type || '');
 
-      // 如果选择了阿里云，请求API密钥
+      // 如果选择了阿里云，请求模型配置
       if (configRef.current.provider_type === 'alibaba') {
         setLoading(true);
-        getCloudServiceApiKey()
+        getModelConfig()
           .then((res) => {
-            if (res.data.data.api_key) {
+            if (res.data.data && res.data.data.cloud_service_api_key) {
               // 更新originalConfig
               setOriginalConfig({
                 ...configRef.current,
-                api_key: res.data.data.api_key
+                cloud_service_api_key: res.data.data.cloud_service_api_key
               });
               // 更新当前显示的值
               updateConfigRef.current({
                 ...configRef.current,
-                api_key: res.data.data.api_key
+                cloud_service_api_key: res.data.data.cloud_service_api_key
               });
             }
           })
@@ -104,10 +104,13 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
             <label className="block text-sm font-medium text-gray-700 mb-1">API Key</label>
             <Input.Password
               onChange={(e) => {
-                updateConfigRef.current({ ...configRef.current, api_key: e.target.value });
+                updateConfigRef.current({
+                  ...configRef.current,
+                  cloud_service_api_key: e.target.value
+                });
               }}
               placeholder="Enter your Alibaba Cloud API Key"
-              value={configRef.current.api_key}
+              value={configRef.current.cloud_service_api_key}
             />
             <div className="mt-2 text-sm text-gray-500">
               You can find your API key in your{' '}
@@ -130,13 +133,41 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
     try {
       setLoading(true);
 
-      // 如果选择了阿里云，并且有API密钥，则调用设置API密钥的接口
-      if (providerType === 'alibaba' && configRef.current.api_key) {
-        await setCloudServiceApiKey(configRef.current.api_key);
-        message.success('API key has been successfully saved');
+      // 如果选择了阿里云，并且有API密钥，则调用更新模型配置接口
+      if (providerType === 'alibaba' && configRef.current.cloud_service_api_key) {
+        // 获取当前配置
+        const modelConfigResponse = await getModelConfig();
+
+        if (modelConfigResponse.data.data) {
+          const currentConfig = modelConfigResponse.data.data;
+
+          // 更新cloud_service_api_key
+          await updateModelConfig({
+            ...currentConfig,
+            cloud_service_api_key: configRef.current.cloud_service_api_key
+          });
+
+          message.success('API key has been successfully saved');
+        }
+      } else if (providerType === '') {
+        // 如果选择了None，清空API密钥
+        const modelConfigResponse = await getModelConfig();
+
+        if (modelConfigResponse.data.data) {
+          const currentConfig = modelConfigResponse.data.data;
+
+          // 清空cloud_service_api_key
+          await updateModelConfig({
+            ...currentConfig,
+            cloud_service_api_key: ''
+          });
+
+          message.success('Cloud provider configuration removed');
+        }
       }
 
       await saveCloudConfig();
+
       onClose();
     } catch (error) {
       console.error('Error saving configuration:', error);
@@ -203,11 +234,11 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
               const newProviderType = e.target.value;
 
               setProviderType(newProviderType);
-              updateConfigRef.current({ 
-                ...configRef.current, 
+              updateConfigRef.current({
+                ...configRef.current,
                 provider_type: newProviderType,
                 // 如果不是阿里云，清空API密钥
-                api_key: newProviderType !== 'alibaba' ? '' : configRef.current.api_key
+                cloud_service_api_key: newProviderType !== 'alibaba' ? '' : configRef.current.cloud_service_api_key
               });
             }}
             optionType="button"
