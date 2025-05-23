@@ -9,6 +9,7 @@ import os
 import time
 import json
 import tempfile
+import threading
 from pathlib import Path
 from ....configs.config import Config
 from .service import CloudService
@@ -53,7 +54,28 @@ def set_api_key():
         return jsonify(APIResponse.error(f"Failed to set API key: {str(e)}"))
 
 
-# 为保持向后兼容，保留原来的check_fine_tune_status接口，但内部实现重定向到新接口
+@cloud_bp.route("/get_api_key", methods=["GET"])
+def get_api_key():
+    try:
+        user_llm_config_service = UserLLMConfigService()
+        config = user_llm_config_service.get_available_llm()
+        
+        api_key = ""
+        if config and hasattr(config, 'cloud_service_api_key'):
+            api_key = config.cloud_service_api_key or ""
+            
+            if api_key:
+                return jsonify(APIResponse.success(data={
+                    "api_key": api_key
+                }))
+        
+        return jsonify(APIResponse.success(data={
+            "api_key": ""
+        }))
+    except Exception as e:
+        logger.error(f"Failed to get API key: {str(e)}", exc_info=True)
+        return jsonify(APIResponse.error(f"Failed to get API key: {str(e)}"))
+
 @cloud_bp.route("/check_fine_tune_status/<job_id>", methods=["GET"])
 def check_fine_tune_status(job_id):
     """
@@ -66,13 +88,9 @@ def check_fine_tune_status(job_id):
         job_id: The ID of the fine-tuning job to check
     """
     try:
-        # 获取API密钥（如果有）
-        api_key = request.args.get("api_key")
-        
-        # 创建CloudService实例
-        cloud_service = CloudService(api_key=api_key)
-        
-        # 检查微调任务状态
+
+        cloud_service = CloudService()
+
         status = cloud_service.check_fine_tune_status(job_id)
         
         if not status:
@@ -83,7 +101,6 @@ def check_fine_tune_status(job_id):
             "details": status
         }
         
-        # 如果任务已完成，包含模型ID
         if status.get("status") == "SUCCEEDED":
             response_data["model_id"] = status.get("model_id")
         
@@ -110,12 +127,10 @@ def list_available_models():
         return jsonify(APIResponse.error(f"Failed to list available models: {str(e)}"))
 
 
-# Debug endpoint to check API configuration
 @cloud_bp.route("/debug_api_config", methods=["GET"])
 def debug_api_config():
     """Debug endpoint to check API configuration"""
     try:
-        # Get API key from database
         user_llm_config_service = UserLLMConfigService()
         config = user_llm_config_service.get_available_llm()
         
@@ -172,26 +187,30 @@ def start_cloud_training():
         training_type = data.get("training_type", "efficient_sft")
         hyper_parameters = data.get("hyper_parameters", {})
         
-        # 创建训练流程服务实例（负责数据处理和训练流程管理）
         train_service = CloudTrainProcessService(current_model_name=model_name, base_model=base_model, training_type=training_type, hyper_parameters=hyper_parameters)
         
-        # 启动训练流程
-        success = train_service.start_process()
-        if not success:
-            return jsonify(APIResponse.error("Failed to start cloud training process"))
+        def async_train_process():
+            try:
+                logger.info(f"Starting async cloud training process for model: {model_name}")
+                success = train_service.start_process()
+                if not success:
+                    logger.error("Async cloud training process failed")
+                else:
+                    logger.info(f"Async cloud training process completed successfully with job_id: {train_service.job_id}")
+            except Exception as e:
+                logger.error(f"Async cloud training process failed with error: {str(e)}", exc_info=True)
         
-        # 确保job_id已设置
-        if not train_service.job_id:
-            return jsonify(APIResponse.error("Cloud training started but job_id was not set"))
-            
-        return jsonify(APIResponse.success(message="Cloud training process started", data={
-            "job_id": train_service.job_id
-        }))
+        thread = threading.Thread(target=async_train_process, daemon=True)
+        thread.start()
+        logger.info(f"Started async thread for cloud training process")
+        
+        return jsonify(APIResponse.success("Cloud training process started successfully"))
     except Exception as e:
         logger.error(f"Start cloud training failed: {str(e)}", exc_info=True)
         return jsonify(APIResponse.error(f"Failed to start cloud training: {str(e)}"))
 
-@cloud_bp.route("/train/status/<job_id>", methods=["GET"])
+
+@cloud_bp.route("/train/status/training/<job_id>", methods=["GET"])
 def get_cloud_training_status(job_id):
     """Get cloud training status"""
     try:
@@ -210,6 +229,30 @@ def get_cloud_training_status(job_id):
         logger.error(f"Get cloud training status failed: {str(e)}", exc_info=True)
         return jsonify(APIResponse.error(f"Failed to get cloud training status: {str(e)}"))
 
+
+@cloud_bp.route("/train/search_job_info", methods=["GET"])
+def search_job_info():
+    try:
+        current_dir = Path(__file__).parent
+        job_file_path = current_dir / "job_id.json"
+        
+        if not job_file_path.exists():
+            return jsonify(APIResponse.success(data={
+                "exists": False,
+                "message": "Job information file not found"
+            }))
+        
+        try:
+            with open(job_file_path, "r") as f:
+                job_info = json.load(f)
+                
+            return jsonify(APIResponse.success(data=job_info))
+        except json.JSONDecodeError:
+            return jsonify(APIResponse.error("Invalid JSON format in job information file"))
+    except Exception as e:
+        logger.error(f"Get job info failed: {str(e)}", exc_info=True)
+        return jsonify(APIResponse.error(f"Failed to get job information: {str(e)}"))
+
 @cloud_bp.route("/train/deploy", methods=["POST"])
 def deploy_cloud_model():
     """Deploy fine-tuned model"""
@@ -221,10 +264,8 @@ def deploy_cloud_model():
         if not model_id:
             return jsonify(APIResponse.error("model_id is required"))
         
-        # 创建云服务实例
         cloud_service = CloudService()
         
-        # 部署模型
         deployment_id = cloud_service.deploy_model( capacity=capacity)
         
         if not deployment_id:
@@ -237,13 +278,10 @@ def deploy_cloud_model():
         logger.error(f"Deploy model failed: {str(e)}", exc_info=True)
         return jsonify(APIResponse.error(f"Failed to deploy model: {str(e)}"))
 
-@cloud_bp.route("/train/deployment_status/<deployment_id>", methods=["GET"])
-def check_cloud_deployment_status():
+@cloud_bp.route("/train/deployment_status/<model_id>", methods=["GET"])
+def check_cloud_deployment_status(model_id):
     """Check deployment status"""
-    # deployment_id就是model id
     try:
-        data = request.json
-        model_id = data.get("model_id")
         cloud_service = CloudService()
 
         status = cloud_service.check_deployment_status(model_id)
@@ -280,6 +318,25 @@ def run_cloud_inference():
     except Exception as e:
         logger.error(f"Run inference failed: {str(e)}", exc_info=True)
         return jsonify(APIResponse.error(f"Failed to run inference: {str(e)}"))
+
+@cloud_bp.route("/train/list_deployments", methods=["GET"])
+def list_deployments():
+    """获取所有已部署的模型列表"""
+    try:
+        cloud_service = CloudService()
+        deployments = cloud_service.list_deployments()
+        
+        if deployments is None:
+            return jsonify(APIResponse.error("Failed to list deployments"))
+        
+        return jsonify(APIResponse.success(data={
+            "deployments": deployments,
+            "count": len(deployments)
+        }))
+    except Exception as e:
+        logger.error(f"List deployments failed: {str(e)}", exc_info=True)
+        return jsonify(APIResponse.error(f"Failed to list deployments: {str(e)}"))
+
 
 @cloud_bp.route("/train/delete_deployment", methods=["POST"])
 def delete_cloud_deployment():

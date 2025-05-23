@@ -102,11 +102,6 @@ class CloudTrainProcessService(TrainProcessService):
         return cls._instance
 
 
-    # 不需要重新实现map_your_entity_network, decode_preference_patterns, reinforce_identity, augment_content_retention等方法
-    # 这些方法在父类TrainProcessService中已经实现，我们可以直接使用
-    # 如果需要更新CloudProgressHolder，可以在start_process方法中处理
-
-    # 不需要重新实现_prepare_l2_data方法，直接使用父类TrainProcessService的实现
             
     def prepare_training_data(self) -> bool:
         """Prepare training data for cloud training"""
@@ -251,6 +246,24 @@ class CloudTrainProcessService(TrainProcessService):
                     training_type=self.training_type,
                     hyper_parameters=self.hyper_parameters
                 )
+                try:
+                    current_dir = Path(__file__).parent
+                    
+                    job_file_path = current_dir / "job_id.json"
+                    
+                    job_info = {
+                        "job_id": success_id,
+                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "status": "completed"
+                    }
+                    
+                    with open(job_file_path, "w") as f:
+                        json.dump(job_info, f, indent=2)
+                        
+                    logger.info(f"Job ID information saved to {job_file_path}")
+                except Exception as e:
+                    logger.error(f"Failed to write job ID to file: {str(e)}", exc_info=True)
+
                 logger.info(f"Create fine-tune job result: {success_id}")
             except Exception as e:
                 logger.error(f"Exception during fine-tune job creation: {str(e)}", exc_info=True)
@@ -262,15 +275,12 @@ class CloudTrainProcessService(TrainProcessService):
                 self.progress.mark_step_status(CloudProcessStep.CREATE_FINE_TUNE_JOB, CloudStatus.FAILED, "Failed to create fine-tune job")
                 return False
             
-            # 获取任务ID
-            self.job_id = success_id  # 保存任务ID以便后续使用
+            self.job_id = success_id
             logger.info(f"Job ID set: {self.job_id}")
             self.progress.mark_step_status(CloudProcessStep.CREATE_FINE_TUNE_JOB, CloudStatus.COMPLETED)
             
-            # 4. 开始异步等待任务完成
             self.progress.mark_step_status(CloudProcessStep.WAIT_FOR_FINE_TUNE_COMPLETION, CloudStatus.IN_PROGRESS)
-            # 启动异步等待任务，不阻塞主流程
-            self._start_async_wait_for_completion(self.cloud_service, self.job_id)
+            self._wait_for_completion_thread(self.cloud_service, self.job_id)
             
             logger.info("Cloud training process completed successfully")
             return True
@@ -280,33 +290,21 @@ class CloudTrainProcessService(TrainProcessService):
                 self.progress.mark_step_status(self.current_step, CloudStatus.FAILED, f"Error: {str(e)}")
             return False
     
-    def _start_async_wait_for_completion(self, cloud_service, job_id):
-        """启动异步线程等待任务完成"""
-        thread = threading.Thread(
-            target=self._wait_for_completion_thread,
-            args=(cloud_service, job_id),
-            daemon=True  
-        )
-        thread.start()
-        logger.info(f"Started async thread to monitor job {job_id}")
-    
     def _wait_for_completion_thread(self, cloud_service, job_id):
-        """在线程中等待任务完成"""
         try:
             logger.info(f"Async thread: waiting for job {job_id} to complete")
             success = cloud_service.wait_for_job_completion(job_id=job_id)
             
             if success:
-                # 任务成功完成
-                self.model_id = cloud_service.model_id  # 保存模型ID
+
+                self.model_id = cloud_service.model_id  
                 logger.info(f"Fine-tuning job completed successfully. Model ID: {self.model_id}")
                 self.progress.mark_step_status(CloudProcessStep.WAIT_FOR_FINE_TUNE_COMPLETION, CloudStatus.COMPLETED)
-                # 更新整体进度为完成
                 self.progress.progress["status"] = CloudStatus.COMPLETED
                 self.progress.progress["message"] = "Cloud training process completed successfully"
                 self.progress.save_progress()
+            
             else:
-                # 任务失败
                 logger.error(f"Fine-tuning job failed")
                 self.progress.mark_step_status(CloudProcessStep.WAIT_FOR_FINE_TUNE_COMPLETION, CloudStatus.FAILED, "Fine-tuning job failed")
         except Exception as e:

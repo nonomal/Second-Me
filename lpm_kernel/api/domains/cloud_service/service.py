@@ -185,6 +185,27 @@ class CloudService:
         status = response_data.get('output', {}).get('status')
         logger.info(f"Model deployment status: {status}")
         return status
+    
+    def list_deployments(self):
+        """获取所有已部署的模型列表"""
+        
+        url = f"{self.base_url}/deployments"
+        headers = {**self.headers, "Content-Type": "application/json"}
+        
+        try:
+            response = requests.get(url, headers=headers)
+            response_data = response.json()
+            
+            if response.status_code != 200:
+                logger.error(f"Failed to list deployments! Error: {response_data}")
+                return None
+            
+            deployments = response_data.get('value', [])
+            logger.info(f"Found {len(deployments)} deployments")
+            return deployments
+        except Exception as e:
+            logger.error(f"Exception when listing deployments: {str(e)}", exc_info=True)
+            return None
 
     def delete_deployment(self, model_id):
         url = f"{self.base_url}/deployments/{model_id}"
@@ -202,14 +223,6 @@ class CloudService:
         return status
         
     def delete_fine_tune_job(self, job_id):
-        """删除微调任务
-        
-        Args:
-            job_id: 微调任务ID
-            
-        Returns:
-            bool: 是否成功删除
-        """
         url = f"{self.base_url}/fine-tunes/{job_id}"
         headers = {**self.headers, "Content-Type": "application/json"}
         
@@ -271,11 +284,11 @@ class CloudService:
             status = self.check_fine_tune_status(job_id=job_id)
             
             if status == "SUCCEEDED":
-                self._fetch_and_print_logs(log_offset)
+                new_offset = self._fetch_and_print_logs(log_offset)
                 logger.info("Fine-tuning job completed successfully!")
                 return True
             elif status in ["FAILED", "CANCELLED"]:
-                self._fetch_and_print_logs(log_offset)
+                new_offset = self._fetch_and_print_logs(log_offset)
                 logger.error(f"Fine-tuning job failed, status: {status}")
                 return False
             
@@ -292,24 +305,28 @@ class CloudService:
 
         try:
             logs = self.get_fine_tune_logs(offset=offset, line=line)
-            if logs:
-                if isinstance(logs, list):
-                    logs_text = '\n'.join(str(log) for log in logs) if logs else ''
-                else:
-                    logs_text = logs
-                
-                if logs_text and logs_text.strip():
-                    new_lines = logs_text.count('\n') + (0 if logs_text.endswith('\n') else 1)
-                    new_offset = offset + new_lines
-                    
-                    for log_line in logs_text.splitlines():
-                        logger.info(f"[Fine-tune Log] {log_line}")
-                    
-                    return new_offset
             
-            return offset
+            if not logs:
+                return offset
+                
+            if isinstance(logs, list):
+                logs_text = '\n'.join(str(log) for log in logs) if logs else ''
+            else:
+                logs_text = str(logs)
+                
+            if not logs_text or not logs_text.strip():
+                return offset
+                
+            log_lines = logs_text.splitlines()
+            new_offset = offset + len(log_lines)
+            
+            for log_line in log_lines:
+                if log_line.strip():
+                    logger.info(f"[Fine-tune Log] {log_line}")
+            
+            return new_offset
         except Exception as e:
-            logger.error(f"Error fetching logs: {str(e)}")
+            logger.error(f"Error fetching logs: {str(e)}", exc_info=True)
             return offset
 
     def wait_for_deployment(self, check_interval=5):
