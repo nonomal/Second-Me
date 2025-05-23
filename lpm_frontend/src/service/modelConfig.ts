@@ -38,6 +38,21 @@ export const updateModelConfig = (data: IModelConfig) => {
   });
 };
 
+export const setCloudServiceApiKey = (api_key: string) => {
+  return Request<CommonResponse<EmptyResponse>>({
+    method: 'post',
+    url: `/api/cloud_service/set_api_key`,
+    data: { api_key }
+  });
+};
+
+export const getCloudServiceApiKey = () => {
+  return Request<CommonResponse<{ api_key: string }>>({
+    method: 'get',
+    url: `/api/cloud_service/get_api_key`
+  });
+};
+
 export const updateThinkingConfig = (data: IThinkingModelParams) => {
   return Request<CommonResponse<IThinkingModelParams>>({
     method: 'put',
