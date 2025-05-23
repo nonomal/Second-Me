@@ -162,11 +162,17 @@ class TrainProcessService:
                 overlap=int(config.get("DOCUMENT_CHUNK_OVERLAP")),
             )
             documents = document_service.list_documents()
-            processed, failed = 0, 0
+            processed, failed, skipped = 0, 0, 0
 
             chunk_service = ChunkService()
             for doc in documents:
                 try:
+                    existing_chunks = document_service._repository.find_chunks(doc.id)
+                    if existing_chunks and len(existing_chunks) > 0:
+                        logger.info(f"Document {doc.id} already has {len(existing_chunks)} chunks, skipping...")
+                        skipped += 1
+                        continue
+                        
                     if not doc.raw_content:
                         logger.warning(f"Document {doc.id} has no content, skipping...")
                         failed += 1
@@ -185,6 +191,8 @@ class TrainProcessService:
                 except Exception as e:
                     logger.error(f"Failed to process document {doc.id}: {str(e)}")
                     failed += 1      
+            
+            logger.info(f"Chunk processing completed: {processed} processed, {skipped} skipped, {failed} failed")
             self.progress.mark_step_status(ProcessStep.CHUNK_DOCUMENT, Status.COMPLETED)
             return True
         except Exception as e:
