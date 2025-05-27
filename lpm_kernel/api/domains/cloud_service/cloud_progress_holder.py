@@ -1,10 +1,12 @@
 import os
 import json
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 from pathlib import Path
+import time
 
 from lpm_kernel.api.domains.cloud_service.cloud_process_step import CloudProcessStep
 from lpm_kernel.configs.logging import get_train_process_logger
+from lpm_kernel.api.domains.trainprocess.process_step import ProcessStep
 
 logger = get_train_process_logger()
 
@@ -15,169 +17,565 @@ class CloudStatus:
     COMPLETED = "completed"
     FAILED = "failed"
     SUSPENDED = "suspended"
+    CANCELLED = "cancelled"
+
+class CloudProgress:
+    """Cloud training progress data structure"""
+    
+    def __init__(self):
+        # Define the complete data structure for cloud training progress
+        self.data = {
+            "stages": [
+                {
+                    "name": "Activating the Memory Matrix",
+                    "progress": 0.0,
+                    "status": CloudStatus.PENDING,
+                    "current_step": None,
+                    "steps": [
+                        {
+                            "name": "list_documents",
+                            "completed": False,
+                            "status": CloudStatus.PENDING,
+                            "have_output": False,
+                            "path": None
+                        },
+                        {
+                            "name": "generate_document_embeddings",
+                            "completed": False,
+                            "status": CloudStatus.PENDING,
+                            "have_output": False,
+                            "path": None
+                        },
+                        {
+                            "name": "process_chunks",
+                            "completed": False,
+                            "status": CloudStatus.PENDING,
+                            "have_output": False,
+                            "path": None
+                        },
+                        {
+                            "name": "chunk_embedding",
+                            "completed": False,
+                            "status": CloudStatus.PENDING,
+                            "have_output": False,
+                            "path": None
+                        }
+                    ]
+                },
+                {
+                    "name": "Synthesize Your Life Narrative",
+                    "progress": 0.0,
+                    "status": CloudStatus.PENDING,
+                    "current_step": None,
+                    "steps": [
+                        {
+                            "name": "extract_dimensional_topics",
+                            "completed": False,
+                            "status": CloudStatus.PENDING,
+                            "have_output": True,
+                            "path": "resources/L2/data_pipeline/raw_data/topics.json"
+                        },
+                        {
+                            "name": "generate_biography",
+                            "completed": False,
+                            "status": CloudStatus.PENDING,
+                            "have_output": True,
+                            "path": "From database"
+                        },
+                        {
+                            "name": "map_your_entity_network",
+                            "completed": False,
+                            "status": CloudStatus.PENDING,
+                            "have_output": True,
+                            "path": "resources/L1/graphrag_indexing_output/subjective/entities.parquet"
+                        }
+                    ]
+                },
+                {
+                    "name": "Prepare Training Data for Deep Comprehension",
+                    "progress": 0.0,
+                    "status": CloudStatus.PENDING,
+                    "current_step": None,
+                    "steps": [
+                        {
+                            "name": "decode_preference_patterns",
+                            "completed": False,
+                            "status": CloudStatus.PENDING,
+                            "have_output": True,
+                            "path": "resources/L2/data/preference.json"
+                        },
+                        {
+                            "name": "reinforce_identity",
+                            "completed": False,
+                            "status": CloudStatus.PENDING,
+                            "have_output": True,
+                            "path": "resources/L2/data/selfqa.json"
+                        },
+                        {
+                            "name": "augment_content_retention",
+                            "completed": False,
+                            "status": CloudStatus.PENDING,
+                            "have_output": True,
+                            "path": "resources/L2/data/diversity.json"
+                        }
+                    ]
+                },
+                {
+                    "name": "Training to create Second Me",
+                    "progress": 0.0,
+                    "status": CloudStatus.PENDING,
+                    "current_step": None,
+                    "steps": [
+                        {
+                            "name": "upload_training_data",
+                            "completed": False,
+                            "status": CloudStatus.PENDING,
+                            "have_output": False,
+                            "path": None
+                        },
+                        {
+                            "name": "create_fine_tune_job",
+                            "completed": False,
+                            "status": CloudStatus.PENDING,
+                            "have_output": True,
+                            "path": "job_id.json"
+                        },
+                        {
+                            "name": "wait_for_fine_tune_completion",
+                            "completed": False,
+                            "status": CloudStatus.PENDING,
+                            "have_output": True,
+                            "path": None
+                        }
+                    ]
+                }
+            ],
+            "overall_progress": 0.0,
+            "current_stage": None,
+            "status": CloudStatus.PENDING,
+            "message": "Initialized",
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "model_name": None,
+            "job_id": None
+        }
+        
+        # Create stage name to stage data mapping
+        self.stage_map = {}
+        for stage in self.data["stages"]:
+            stage_name = stage["name"].lower().replace(" ", "_")
+            self.stage_map[stage_name] = stage
+            
+        # Create step name to step data mapping for each stage
+        self.steps_map = {}
+        for stage_name, stage in self.stage_map.items():
+            self.steps_map[stage_name] = {}
+            for step in stage["steps"]:
+                step_name = step["name"].lower().replace(" ", "_")
+                self.steps_map[stage_name][step_name] = step
+                
+        
+        # Stage mapping for process steps
+        self._stage_mapping = {
+            # 数据处理步骤映射（使用ProcessStep来保持与本地一致）
+            ProcessStep.LIST_DOCUMENTS: "activating_the_memory_matrix",
+            ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS: "activating_the_memory_matrix",
+            ProcessStep.CHUNK_DOCUMENT: "activating_the_memory_matrix",
+            ProcessStep.CHUNK_EMBEDDING: "activating_the_memory_matrix",
+
+            ProcessStep.EXTRACT_DIMENSIONAL_TOPICS: "synthesize_your_life_narrative",
+            ProcessStep.GENERATE_BIOGRAPHY: "synthesize_your_life_narrative",
+            ProcessStep.MAP_ENTITY_NETWORK: "synthesize_your_life_narrative",
+
+            ProcessStep.DECODE_PREFERENCE_PATTERNS: "prepare_training_data_for_deep_comprehension",
+            ProcessStep.REINFORCE_IDENTITY: "prepare_training_data_for_deep_comprehension",
+            ProcessStep.AUGMENT_CONTENT_RETENTION: "prepare_training_data_for_deep_comprehension",
+            
+            # 云端训练步骤映射
+            CloudProcessStep.UPLOAD_TRAINING_DATA: "training_to_create_second_me",
+            CloudProcessStep.CREATE_FINE_TUNE_JOB: "training_to_create_second_me",
+            CloudProcessStep.WAIT_FOR_FINE_TUNE_COMPLETION: "training_to_create_second_me",
+        }
+    
+    def update_progress(self, stage: str, step: str, current_step_status: Union[str, CloudStatus], 
+                       stage_progress: Optional[float] = None, extra_info: Optional[Dict[str, Any]] = None):
+        """Update progress status
+        
+        Args:
+            stage: Stage key (snake_case format)
+            step: Step key (snake_case format)
+            current_step_status: Status (string or CloudStatus)
+            stage_progress: Optional progress value (0-100)
+            extra_info: Optional extra information to update (job_id, model_id, etc.)
+        """
+        stage_data = self.stage_map[stage]
+        status_value = current_step_status if isinstance(current_step_status, str) else current_step_status
+        step_data = self.steps_map[stage][step]
+        
+        # Update step status
+        step_data["status"] = status_value
+        step_data["completed"] = status_value == CloudStatus.COMPLETED
+        
+        # Update extra info if provided
+        if extra_info:
+            for key, value in extra_info.items():
+                if key in self.data:
+                    self.data[key] = value
+        
+        # Update stage progress
+        self._update_stage_progress(stage_data, stage_progress)
+        
+        # Update stage status and current step
+        self._update_stage_status(stage_data, step_data)
+        
+        # Update overall progress
+        self._update_overall_progress()
+        
+        # Update overall status
+        self._update_overall_status()
+        
+        # Update timestamp
+        self.data["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
+    
+    def _update_stage_progress(self, stage_data: Dict, stage_progress: Optional[float] = None):
+        """Update the progress of a stage
+        
+        Args:
+            stage_data: Stage data dictionary
+            stage_progress: Optional progress value (0-100)
+        """
+        if stage_progress is not None:
+            stage_data["progress"] = stage_progress
+        else:
+            completed_steps = sum(1 for s in stage_data["steps"] if s["completed"])
+            total_steps = len(stage_data["steps"])
+            stage_data["progress"] = (completed_steps / total_steps) * 100.0
+    
+    def _update_stage_status(self, stage_data: Dict, step_data: Dict):
+        """Update the status and current step of a stage
+        
+        Args:
+            stage_data: Stage data dictionary
+            step_data: Step data dictionary
+        """
+        if all(step["completed"] for step in stage_data["steps"]):
+            stage_data["status"] = CloudStatus.COMPLETED
+            stage_data["current_step"] = None
+            next_stage = None
+            for stage_name, stage_info in self.stage_map.items():
+                if stage_info["status"] != CloudStatus.COMPLETED:
+                    next_stage = stage_name
+                    break
+            self.data["current_stage"] = next_stage
+        elif any(step["status"] == CloudStatus.FAILED for step in stage_data["steps"]):
+            stage_data["status"] = CloudStatus.FAILED
+            stage_data["current_step"] = step_data["name"]
+            self.data["current_stage"] = stage_data["name"]
+        elif any(step["status"] == CloudStatus.CANCELLED for step in stage_data["steps"]):
+            stage_data["status"] = CloudStatus.CANCELLED
+            stage_data["current_step"] = step_data["name"]
+            self.data["current_stage"] = stage_data["name"]
+        elif any(step["status"] == CloudStatus.SUSPENDED for step in stage_data["steps"]):
+            stage_data["status"] = CloudStatus.SUSPENDED
+            stage_data["current_step"] = step_data["name"]
+            self.data["current_stage"] = stage_data["name"]
+        else:
+            stage_data["status"] = CloudStatus.IN_PROGRESS
+            stage_data["current_step"] = step_data["name"]
+            self.data["current_stage"] = stage_data["name"]
+    
+    def _update_overall_progress(self):
+        """Update the overall progress based on all stages"""
+        completed_progress = sum(s["progress"] for s in self.data["stages"])
+        self.data["overall_progress"] = completed_progress / len(self.data["stages"])
+    
+    def _update_overall_status(self):
+        """Update the overall status based on all stages"""
+        if all(s["status"] == CloudStatus.COMPLETED for s in self.data["stages"]):
+            self.data["status"] = CloudStatus.COMPLETED
+        elif any(s["status"] == CloudStatus.FAILED for s in self.data["stages"]):
+            self.data["status"] = CloudStatus.FAILED
+        elif any(s["status"] == CloudStatus.CANCELLED for s in self.data["stages"]):
+            self.data["status"] = CloudStatus.CANCELLED
+        elif any(s["status"] == CloudStatus.SUSPENDED for s in self.data["stages"]):
+            self.data["status"] = CloudStatus.SUSPENDED
+        elif any(s["status"] == CloudStatus.IN_PROGRESS for s in self.data["stages"]):
+            self.data["status"] = CloudStatus.IN_PROGRESS
+        else:
+            self.data["status"] = CloudStatus.PENDING
+    
+    def to_dict(self) -> dict:
+        """Convert progress status to dictionary format"""
+        return self.data
+    
+    def reset(self):
+        """Reset all progress statuses"""
+        self.__init__()
 
 class CloudProgressHolder:
     """Cloud training progress holder"""
     
-    def __init__(self, model_name: str):
-        """
-        Initialize progress holder
-        
-        Args:
-            model_name: Model name
-        """
+    def __init__(self, model_name=None, job_id=None):
         self.model_name = model_name
-        self.progress_dir = Path("data/cloud_progress")
-        self.progress_dir.mkdir(parents=True, exist_ok=True)
-        self.progress_file = self.progress_dir / f"{model_name}.json"
+        self.job_id = job_id
+        self.progress = CloudProgress()
         
-        # Initialize progress data
-        self.progress = self._load_progress()
+        # 设置进度数据中的标识符
+        if model_name:
+            self.progress.data["model_name"] = model_name
+        if job_id:
+            self.progress.data["job_id"] = job_id
+            
+        # 设置进度文件路径 - 始终使用同一个文件
+        progress_dir = Path("data/cloud_progress")
+        progress_dir.mkdir(parents=True, exist_ok=True)
         
-    def _load_progress(self) -> Dict[str, Any]:
+        # 使用固定的文件名
+        self.progress_file = progress_dir / "cloud_progress.json"
+        self._load_progress()
+    
+    @staticmethod
+    def get_latest_progress():
         """
-        Load progress from file
+        获取最新的进度数据
         
         Returns:
-            Dict: Progress data
+            tuple: (CloudProgressHolder, job_id) 如果找到进度数据，返回(CloudProgressHolder实例, job_id)；否则返回(None, None)
         """
-        if self.progress_file.exists():
-            try:
-                with open(self.progress_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception as e:
-                logger.error(f"Error loading progress: {str(e)}")
+        progress_file = Path("data/cloud_progress/cloud_progress.json")
+        if not progress_file.exists():
+            return None, None
+            
+        try:
+            # 读取文件内容
+            with open(progress_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                
+            # 获取模型名称和job_id
+            model_name = data.get("model_name")
+            job_id = data.get("job_id")
+            
+            # 创建进度持有者实例
+            holder = CloudProgressHolder(model_name=model_name, job_id=job_id)
+            holder.progress.data = data
+            holder._rebuild_mappings()
+            holder._reset_in_progress_status()
+            
+            return holder, job_id
+        except Exception as e:
+            logger.error(f"Error reading progress file {progress_file}: {str(e)}")
+            return None, None
+    
+    def _rebuild_mappings(self):
+        """重新创建进度数据的映射"""
+        # 重新创建映射
+        self.progress.stage_map = {}
+        for stage in self.progress.data["stages"]:
+            stage_name = stage["name"].lower().replace(" ", "_")
+            self.progress.stage_map[stage_name] = stage
+            
+        self.progress.steps_map = {}
+        for stage_name, stage in self.progress.stage_map.items():
+            self.progress.steps_map[stage_name] = {}
+            for step in stage["steps"]:
+                step_name = step["name"].lower().replace(" ", "_")
+                self.progress.steps_map[stage_name][step_name] = step
         
-        # Initialize new progress data
-        # 使用CloudStatus的字符串值而不是类属性
-        pending_status = CloudStatus.PENDING  # 这是字符串 "pending"
-        return {
-            "model_name": self.model_name,
-            "status": pending_status,
-            "steps": {step.value: {"status": pending_status, "progress": 0} for step in CloudProcessStep},
-            "current_step": None,
-            "message": "Initialized",
-            "timestamp": None
-        }
+    def _load_progress(self):
+        """
+        从文件加载进度数据
+        """
+        if not self.progress_file or not os.path.exists(self.progress_file):
+            return
+            
+        try:
+            with open(self.progress_file, "r", encoding="utf-8") as f:
+                saved_data = json.load(f)
+                
+                # 删除model_id字段（如果存在）
+                if "model_id" in saved_data:
+                    logger.info("删除进度数据中的model_id字段")
+                    del saved_data["model_id"]
+                    # 保存更新后的文件
+                    with open(self.progress_file, "w", encoding="utf-8") as fw:
+                        json.dump(saved_data, fw, indent=2, ensure_ascii=False)
+                
+                # 加载进度数据
+                self.progress.data = saved_data
+                
+                # 如果没有指定模型名称或job_id，从文件中加载
+                if not self.model_name:
+                    self.model_name = saved_data.get("model_name")
+                if not self.job_id:
+                    self.job_id = saved_data.get("job_id")
+                
+                # 重新创建映射
+                self._rebuild_mappings()
+                
+                # 重置正在进行的状态
+                self._reset_in_progress_status()
+                
+                logger.debug(f"Loaded progress data from {self.progress_file}")
+        except Exception as e:
+            logger.error(f"Error loading progress: {str(e)}")
+    
+    def _reset_in_progress_status(self):
+        """
+        Reset any in_progress status to failed after loading from file
+        """
+        need_save = False
+        
+        # 检查整体状态
+        if self.progress.data["status"] == CloudStatus.IN_PROGRESS:
+            self.progress.data["status"] = CloudStatus.FAILED
+            need_save = True
+            logger.info("Reset overall in_progress status to failed")
+        
+        # 检查每个阶段
+        for stage in self.progress.data["stages"]:
+            if stage["status"] == CloudStatus.IN_PROGRESS:
+                stage["status"] = CloudStatus.FAILED
+                need_save = True
+                logger.info(f"Reset stage '{stage['name']}' in_progress status to failed")
+            
+            # 检查阶段中的每个步骤
+            for step in stage["steps"]:
+                if step["status"] == CloudStatus.IN_PROGRESS:
+                    step["status"] = CloudStatus.FAILED
+                    step["completed"] = False
+                    need_save = True
+                    logger.info(f"Reset step '{step['name']}' in_progress status to failed")
+        
+        # 如果有任何更改，保存进度
+        if need_save:
+            self.save_progress()
+            logger.info("Saved progress after resetting in_progress statuses")
     
     def save_progress(self):
-        """Save progress to file"""
+        """
+        Update progress in memory (no file saving)
+        """
         try:
-            # 确保所有值都是可序列化的
-            # 如果有CloudStatus类的属性，将其转换为字符串
-            progress_copy = self._ensure_serializable(self.progress)
+            # 更新时间戳
+            self.progress.data["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
             
+            # 确保进度文件路径存在
+            progress_dir = Path("data/cloud_progress")
+            progress_dir.mkdir(parents=True, exist_ok=True)
+            self.progress_file = progress_dir / "cloud_progress.json"
+            
+            # 保存进度数据
             with open(self.progress_file, "w", encoding="utf-8") as f:
-                json.dump(progress_copy, f, indent=2)
+                json.dump(self.progress.data, f, ensure_ascii=False, indent=2)
+                
+            logger.debug(f"Progress saved to {self.progress_file}")
         except Exception as e:
             logger.error(f"Error saving progress: {str(e)}")
-            
-    def _ensure_serializable(self, obj):
-        """Ensure all values in the object are JSON serializable"""
-        if isinstance(obj, dict):
-            return {k: self._ensure_serializable(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [self._ensure_serializable(item) for item in obj]
-        elif hasattr(obj, '__dict__'):  # 如果是自定义对象，转换为字符串
-            return str(obj)
-        else:
-            return obj
     
-    def mark_step_status(self, step: CloudProcessStep, status: str, message: str = None):
+    def mark_step_status(self, step, status: str, step_name: str = None):
         """
         Mark step status
         
         Args:
-            step: Process step
+            step: Process step (CloudProcessStep/ProcessStep enum or stage name string)
             status: Status (string value)
-            message: Optional message
+            step_name: Optional step name (only used when step is a string)
         """
-        if step.value not in self.progress["steps"]:
-            self.progress["steps"][step.value] = {"status": CloudStatus.PENDING, "progress": 0}
-        
-        # 确保使用字符串值
-        self.progress["steps"][step.value]["status"] = status
-        
-        # 使用字符串比较和赋值
-        if status == CloudStatus.IN_PROGRESS:
-            self.progress["current_step"] = step.value
-            self.progress["status"] = status  # 使用传入的status参数
-        elif status == CloudStatus.COMPLETED:
-            self.progress["steps"][step.value]["progress"] = 100
-        elif status == CloudStatus.FAILED:
-            self.progress["status"] = status  # 使用传入的status参数
-        elif status == CloudStatus.SUSPENDED:
-            self.progress["status"] = status  # 使用传入的status参数
-        
-        if message:
-            self.progress["steps"][step.value]["message"] = message
-            self.progress["message"] = message
-        
-        import time
-        self.progress["timestamp"] = time.time()
-        
-        self.save_progress()
-    
-    def update_step_progress(self, step: CloudProcessStep, progress: float, message: str = None):
+        try:
+            # 处理不同类型的step参数
+            if hasattr(step, 'value') and isinstance(step.value, str):
+                # 如果是枚举类型（具有value属性的对象）
+                stage_name = self.progress._stage_mapping[step]
+                step_name = step.value
+            else:
+                # 如果是字符串，直接使用
+                stage_name = step
+                # 如果没有提供step_name，使用stage_name
+                if step_name is None:
+                    step_name = stage_name
+            
+            # 确保 status 是字符串类型
+            if hasattr(status, 'value') and isinstance(status.value, str):
+                status_str = status.value
+            else:
+                status_str = str(status)
+                
+            # 更新步骤状态
+            self.progress.update_progress(stage_name, step_name, status_str)
+            
+            # 保存进度
+            self.save_progress()
+        except Exception as e:
+            logger.error(f"Error marking step status: {str(e)}")
+            logger.debug(f"Error details: step={step}, stage_name={stage_name if 'stage_name' in locals() else 'unknown'}, step_name={step_name if 'step_name' in locals() else 'unknown'}")
+
+
+    def update_step_progress(self, step, progress: float, message: str = None, step_name: str = None):
         """
         Update step progress
         
         Args:
-            step: Process step
-            progress: Progress percentage (0-100)
+            step: Process step (CloudProcessStep/ProcessStep enum or stage name string)
+            progress: Progress value (0-100)
             message: Optional message
+            step_name: Optional step name (only used when step is a string)
         """
-        if step.value not in self.progress["steps"]:
-            self.progress["steps"][step.value] = {"status": CloudStatus.PENDING, "progress": 0}
-        
-        self.progress["steps"][step.value]["progress"] = progress
-        
-        if progress < 100:
-            self.progress["steps"][step.value]["status"] = CloudStatus.IN_PROGRESS
-            self.progress["current_step"] = step.value
-            self.progress["status"] = CloudStatus.IN_PROGRESS
-        else:
-            self.progress["steps"][step.value]["status"] = CloudStatus.COMPLETED
-        
-        if message:
-            self.progress["steps"][step.value]["message"] = message
-            self.progress["message"] = message
-        
-        import time
-        self.progress["timestamp"] = time.time()
-        
-        self.save_progress()
-    
-    def get_last_successful_step(self) -> Optional[CloudProcessStep]:
-        """
-        Get the last successfully completed step
-        
-        Returns:
-            Optional[CloudProcessStep]: Last successful step or None
-        """
-        ordered_steps = CloudProcessStep.get_ordered_steps()
-        last_successful = None
-        
-        for step in ordered_steps:
-            if (step.value in self.progress["steps"] and 
-                self.progress["steps"][step.value]["status"] == CloudStatus.COMPLETED):
-                last_successful = step
+        try:
+            # 准备额外信息
+            extra_info = {}
+            if message:
+                extra_info["message"] = message
+            
+            # 确定状态
+            status = None
+            if progress >= 100:
+                status = CloudStatus.COMPLETED
+            elif progress > 0:
+                status = CloudStatus.IN_PROGRESS
             else:
-                break
-        
-        return last_successful
-    
-    def reset_progress(self):
-        """Reset progress"""
-        self.progress = {
-            "model_name": self.model_name,
-            "status": CloudStatus.PENDING,
-            "steps": {step.value: {"status": CloudStatus.PENDING, "progress": 0} for step in CloudProcessStep},
-            "current_step": None,
-            "message": "Reset",
-            "timestamp": None
-        }
-        self.save_progress()
+                status = CloudStatus.PENDING
+            
+            # 处理不同类型的step参数
+            if hasattr(step, 'value') and isinstance(step.value, str):
+                # 如果是枚举类型（具有value属性的对象）
+                if hasattr(self.progress, '_stage_mapping') and step in self.progress._stage_mapping:
+                    # 如果是CloudProcessStep枚举且在映射中
+                    stage_name = self.progress._stage_mapping.get(step)
+                    if not stage_name:
+                        logger.error(f"No stage mapping found for step: {step}")
+                        return
+                else:
+                    # 如果是CloudProcessStep枚举但不在映射中，使用默认阶段名称
+                    if isinstance(step, CloudProcessStep):
+                        # 对于MAP_YOUR_ENTITY_NETWORK步骤，使用synthesize_your_life_narrative阶段
+                        if step == CloudProcessStep.MAP_YOUR_ENTITY_NETWORK:
+                            stage_name = "synthesize_your_life_narrative"
+                        # 对于DECODE_PREFERENCE_PATTERNS步骤，使用prepare_training_data_for_deep_comprehension阶段
+                        elif step == CloudProcessStep.DECODE_PREFERENCE_PATTERNS:
+                            stage_name = "prepare_training_data_for_deep_comprehension"
+                        else:
+                            # 其他CloudProcessStep枚举使用默认阶段
+                            stage_name = "prepare_training_data_for_deep_comprehension"
+                            logger.warning(f"CloudProcessStep {step} not found in _stage_mapping, using default stage")
+                    else:
+                        # 如果是ProcessStep枚举或其他枚举，直接使用其值
+                        stage_name = step.value.lower().replace(" ", "_")
+                
+                # 获取步骤名称
+                step_name = step.value.lower().replace(" ", "_")
+            else:
+                # 如果是字符串，直接使用
+                stage_name = step
+                # 如果没有提供step_name，使用stage_name
+                if step_name is None:
+                    step_name = stage_name
+            
+            # 更新进度
+            self.progress.update_progress(stage_name, step_name, status, progress, extra_info)
+            
+            # 保存进度
+            self.save_progress()
+        except Exception as e:
+            logger.error(f"Error updating step progress: {str(e)}")
     
     def get_progress(self) -> Dict[str, Any]:
         """
@@ -186,4 +584,18 @@ class CloudProgressHolder:
         Returns:
             Dict: Progress data
         """
-        return self.progress
+        return self.progress.to_dict()
+        
+    def update_message(self, message: str):
+        """
+        更新进度消息
+        
+        Args:
+            message: 新的消息内容
+        """
+        try:
+            self.progress.data["message"] = message
+            self.save_progress()
+            logger.info(f"Updated progress message: {message}")
+        except Exception as e:
+            logger.error(f"Error updating progress message: {str(e)}")
