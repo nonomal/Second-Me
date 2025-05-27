@@ -9,6 +9,8 @@ import type { TrainingConfig } from '@/service/train';
 import type { IModelConfig } from '@/service/modelConfig';
 import LocalTrainingConfig from './LocalTrainingConfig';
 import CloudTrainingConfig from './CloudTrainingConfig';
+import { startCloudTraining } from '@/service/cloudService';
+import type { CommonResponse } from '@/types/responseModal';
 
 interface BaseModelOption {
   value: string;
@@ -28,11 +30,13 @@ interface TrainingConfigurationProps {
   status: string;
   trainSuspended: boolean;
   handleResetProgress: () => void;
-  handleTrainingAction: () => Promise<void>;
+  handleTrainingAction: (trainingType: 'local' | 'cloud') => Promise<void>;
   trainActionLoading: boolean;
   setSelectedInfo: React.Dispatch<React.SetStateAction<boolean>>;
   trainingParams: TrainingConfig;
   cudaAvailable: boolean;
+  trainingType: 'local' | 'cloud';
+  setTrainingType: (type: 'local' | 'cloud') => void;
 }
 
 const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
@@ -47,23 +51,28 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
   trainActionLoading,
   handleTrainingAction,
   setSelectedInfo,
-  cudaAvailable
+  cudaAvailable,
+  trainingType,
+  setTrainingType
 }) => {
-  const [activeTabKey, setActiveTabKey] = useState<string>('local');
+  // 使用从父组件传递下来的 trainingType 状态
+  const activeTabKey = trainingType;
 
   const disabledChangeParams = useMemo(() => {
     return isTraining || trainSuspended;
   }, [isTraining, trainSuspended]);
 
   const trainButtonText = useMemo(() => {
-    return isTraining
-      ? 'Stop Training'
-      : status === 'trained'
-        ? 'Retrain'
-        : trainSuspended
-          ? 'Resume Training'
-          : 'Start Training';
-  }, [isTraining, status, trainSuspended]);
+    if (isTraining) {
+      return 'Stop Training';
+    } else if (status === 'trained') {
+      return activeTabKey === 'local' ? 'Retrain Locally' : 'Retrain on Cloud';
+    } else if (trainSuspended) {
+      return 'Resume Training';
+    } else {
+      return activeTabKey === 'local' ? 'Start Local Training' : 'Start Cloud Training';
+    }
+  }, [isTraining, status, trainSuspended, activeTabKey]);
 
   const trainButtonIcon = useMemo(() => {
     return isTraining ? (
@@ -76,6 +85,33 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
       <PlayIcon className="h-5 w-5 mr-2" />
     );
   }, [isTraining, trainActionLoading]);
+  
+  // 处理不同模式的训练动作
+  const handleTraining = async () => {
+    if (!isTraining) {
+      message.warning('Please do not shutdown your computer during training');
+    }
+
+    if (activeTabKey === 'local') {
+      // 调用本地训练功能
+      await handleTrainingAction('local');
+    } else {
+      // 检查是否设置了云服务 API Key
+      if (!modelConfig?.cloud_service_api_key) {
+        message.error('Please set up cloud service API key first');
+        return;
+      }
+
+      if (isTraining) {
+        // 如果正在训练，停止训练（无论是本地还是云端）
+        await handleTrainingAction('cloud');
+        return;
+      }
+
+      // 直接调用云端训练方法
+      await handleTrainingAction('cloud');
+    }
+  };
   
   const tabItems: TabsProps['items'] = [
     {
@@ -133,15 +169,15 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
         </button>
       </div>
       <p className="text-gray-600 mb-6 leading-relaxed">
-        {`Configure how your Second Me will be trained using your memory data and identity. Then click 'Start Training'.`}
+        {`Configure how your Second Me will be trained using your memory data and identity. Then click '${activeTabKey === 'local' ? 'Start Local Training' : 'Start Cloud Training'}'.`}
       </p>
 
       <Tabs 
         activeKey={activeTabKey}
         onChange={(key) => {
           // 首先设置活动标签，这样UI立即响应
-          setActiveTabKey(key);
-          
+          setTrainingType(key as 'local' | 'cloud');
+
           // 当切换标签时，切换到对应环境的模型，但只在必要时更新
           if (key === 'local') {
             // 从云端切换到本地，使用 local_model_name（如果存在）
@@ -196,13 +232,7 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
           ${!isTraining && !modelConfig?.provider_type ? 'bg-gray-300 hover:bg-gray-400 cursor-not-allowed' : 'cursor-pointer'}
           focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
           disabled={!isTraining && !modelConfig?.provider_type}
-          onClick={() => {
-            if (!isTraining) {
-              message.warning('Please do not shutdown your computer during training');
-            }
-
-            handleTrainingAction();
-          }}
+          onClick={handleTraining}
         >
           {trainButtonIcon}
           {trainButtonText}

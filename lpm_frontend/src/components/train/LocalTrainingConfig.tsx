@@ -64,17 +64,20 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
       const currentModelIsValid = baseModelOptions.some(
         (m) => m.value === trainingParams.model_name
       );
-      
+
       // 只有在没有有效选择时才设置默认值
       if (!trainingParams.model_name || !currentModelIsValid) {
         const defaultModel = baseModelOptions[0].value;
+
         // 避免不必要的更新
-        if (trainingParams.model_name !== defaultModel || 
-            trainingParams.local_model_name !== defaultModel) {
-          updateTrainingParams({ 
-            ...trainingParams, 
+        if (
+          trainingParams.model_name !== defaultModel ||
+          trainingParams.local_model_name !== defaultModel
+        ) {
+          updateTrainingParams({
+            ...trainingParams,
             model_name: defaultModel,
-            local_model_name: defaultModel 
+            local_model_name: defaultModel
           });
         }
       } else {
@@ -90,10 +93,10 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
     } else {
       // 如果没有可用的模型选项，清空当前选择，但只在需要时更新
       if (trainingParams.model_name !== '' || trainingParams.local_model_name !== '') {
-        updateTrainingParams({ 
-          ...trainingParams, 
+        updateTrainingParams({
+          ...trainingParams,
           model_name: '',
-          local_model_name: '' 
+          local_model_name: ''
         });
       }
     }
@@ -213,10 +216,10 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
             onChange={(value) => {
               // 检查是否真的发生了变化，避免不必要的更新
               if (value !== trainingParams.model_name) {
-                updateTrainingParams({ 
-                  ...trainingParams, 
+                updateTrainingParams({
+                  ...trainingParams,
                   model_name: value,
-                  local_model_name: value 
+                  local_model_name: value
                 });
               }
             }}
@@ -231,10 +234,8 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
               >
                 <span className="block truncate">
                   {baseModelOptions.find((option) => option.value === trainingParams.model_name)
-                    ?.label || 
-                    (baseModelOptions.length > 0 
-                      ? baseModelOptions[0].label 
-                      : 'Select a model...')}
+                    ?.label ||
+                    (baseModelOptions.length > 0 ? baseModelOptions[0].label : 'Select a model...')}
                 </span>
                 <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                   <ColumnArrowIcon className="h-5 w-5 text-gray-400" />

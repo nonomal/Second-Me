@@ -18,6 +18,7 @@ import { useLoadInfoStore } from '@/store/useLoadInfoStore';
 import TrainingTipModal from '../upload/TraingTipModal';
 import { getMemoryList } from '@/service/memory';
 import { getModelList, ModelInfo } from '@/service/model';
+import { listDeployments, CloudDeployment } from '@/service/cloudService';
 
 const { Text } = Typography;
 
@@ -46,61 +47,85 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
     const messageText = type === 'local' ? 'No local models available' : 'No cloud models available';
 
     return (
-      <div className="flex flex-col items-center">
+      <div className="flex flex-col items-center py-8 px-4">
         <Image
           alt="SecondMe Logo"
-          className="object-contain"
-          height={40}
+          className="object-contain opacity-30 mb-2"
+          height={32}
           src="/images/single_logo.png"
-          width={120}
+          width={96}
         />
-        <div className="text-gray-500 text-[18px] leading-[32px]">{messageText}</div>
+        <div className="text-gray-500 text-base text-center">{messageText}</div>
+        {type === 'local' && (
+          <div className="text-gray-400 text-sm text-center mt-2">
+            You can add local models to get started
+          </div>
+        )}
+        {type === 'cloud' && (
+          <div className="text-gray-400 text-sm text-center mt-2">
+            No deployed cloud models found
+          </div>
+        )}
       </div>
     );
   };
 
-  // For demonstration, we'll use a mock function to load cloud models
+  // Fetch cloud models from real API
   useEffect(() => {
     if (open) {
-      // Here you would fetch cloud models from your API
       setLoadingCloudModels(true);
-
-      // Simulate API call with timeout
-      const timeout = setTimeout(() => {
-        // Mock cloud models for demonstration
-        // In real implementation, this would be replaced with actual API call
-        const mockCloudModels: ModelInfo[] = [
-          {
-            model_path: 'cloud/gpt-4-turbo-20240509',
-            full_path: '/models/cloud/gpt-4-turbo-20240509',
-            file_size: 0, // Not applicable for cloud models
-            created_time: Date.now() - 7 * 24 * 60 * 60 * 1000, // 1 week ago
-            training_params: {
-              type: 'pretrained',
-              tokens: '1.5T',
-              architecture: 'Transformer',
-              context_length: '128K'
-            }
-          },
-          {
-            model_path: 'cloud/llama-3-70b-instruct',
-            full_path: '/models/cloud/llama-3-70b-instruct',
-            file_size: 0, // Not applicable for cloud models
-            created_time: Date.now() - 14 * 24 * 60 * 60 * 1000, // 2 weeks ago
-            training_params: {
-              type: 'fine-tuned',
-              tokens: '8T',
-              architecture: 'Transformer',
-              context_length: '8K'
-            }
+      
+      // 获取真实的云端部署模型数据
+      listDeployments()
+        .then((res) => {
+          if (res.data.code === 0 && res.data.data.deployments) {
+            const deploymentModels: ModelInfo[] = res.data.data.deployments.map((deployment: CloudDeployment) => {
+                
+                // 从deployed_model中提取时间戳并转换为标准格式
+                const timestampMatch = deployment.deployed_model.match(/ft-(\d{12})/);
+                let extractedTimestamp;
+                if (timestampMatch) {
+                  const rawTimestamp = timestampMatch[1];
+                  // 将 YYYYMMDDHHMM 格式转换为标准时间戳
+                  const year = parseInt(rawTimestamp.slice(0, 4));
+                  const month = parseInt(rawTimestamp.slice(4, 6)) - 1; // JavaScript月份从0开始
+                  const day = parseInt(rawTimestamp.slice(6, 8));
+                  const hour = parseInt(rawTimestamp.slice(8, 10));
+                  const minute = parseInt(rawTimestamp.slice(10, 12));
+                  extractedTimestamp = new Date(year, month, day, hour, minute).getTime() / 1000;
+                } else {
+                  extractedTimestamp = Date.now() / 1000;
+                }
+                
+                const modelInfo = {
+                  model_path: `cloud/${deployment.name}`, // 保持路径前缀为cloud
+                  full_path: `/models/cloud/${deployment.deployed_model}`,
+                  file_size: 0, // 云端模型不适用此参数
+                  created_time: extractedTimestamp, 
+                  training_params: {
+                    type: 'fine-tuned',
+                    base_model: deployment.base_model, // 保存base_model用于显示
+                    deployed_model: deployment.deployed_model,
+                    status: deployment.status,
+                    created_at: deployment.deployed_model // 使用deployed_model用于获取创建时间
+                  }
+                };
+                
+                return modelInfo;
+            });
+            
+            setCloudModels(deploymentModels);
+          } else {
+            setCloudModels([]);
           }
-        ];
-
-        setCloudModels(mockCloudModels);
-        setLoadingCloudModels(false);
-      }, 1000);
-
-      return () => clearTimeout(timeout);
+        })
+        .catch((error) => {
+          console.error('Failed to fetch cloud deployments:', error);
+          setCloudModels([]);
+        })
+        .finally(() => {
+          setLoadingCloudModels(false);
+        });
     }
   }, [open]);
 
@@ -135,7 +160,13 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
 
   const renderModelItem = (model: ModelInfo, index: number, isCloud: boolean = false) => {
     const fileName = model.model_path.split('/')[1];
+    // 判断是否为云端模型（拥有特定格式的文件名如ft-202505231047-cf9e）
+    const isCloudDeployment = isCloud || (fileName && model.model_path.startsWith('cloud/'));
+    
+    // 显示原始文件名，不再提取和格式化时间戳用于标题显示
     const timeStamp = fileName?.replace('.gguf', '') || 'Unknown version';
+    
+    // 获取模型名称，对于云模型使用更友好的显示方式
     const modelName = model.model_path.split('/')[0];
 
     // Check if this is the newest model in its category
@@ -148,106 +179,252 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
     return (
       <div
         key={model.model_path}
-        className="relative cursor-pointer hover:bg-gray-50 rounded transition-colors p-3 border border-gray-200 mb-3"
+        className={`relative cursor-pointer hover:bg-white/80 rounded-lg transition-all duration-200 p-3 border mb-2 hover:shadow-md hover:border-blue-300 ${
+          isCloud 
+            ? 'border-blue-200 bg-blue-50/50 hover:bg-blue-50/80' 
+            : 'border-gray-200 bg-white/60 hover:bg-white/90'
+        }`}
         onClick={() => onModelSelect(model)}
       >
         <div className="flex items-center justify-between w-full">
-          <div className="flex flex-col">
-            <Text strong>{timeStamp}</Text>
-            <Text className="text-xs" type="secondary">
-              {modelName}
+          <div className="flex flex-col flex-1">
+            <div className="flex items-center mb-1">
+              <Text strong className="text-sm">{timeStamp}</Text>
+              {showNewTag && (
+                <div className="ml-2 px-2 py-0.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs rounded-full font-medium shadow-sm">
+                  New
+                </div>
+              )}
+            </div>
+            <Text className="text-xs text-gray-600" type="secondary">
+              {isCloudDeployment && model.training_params.base_model ? model.training_params.base_model : modelName}
             </Text>
-            {isCloud && (
-              <Text className="text-xs text-purple-500 mt-1" type="secondary">
-                Cloud Model
-              </Text>
-            )}
           </div>
 
-          <div className="flex items-center space-x-2">
-            {showNewTag && (
-              <div className="px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full font-medium shadow-sm">
-                New
-              </div>
-            )}
+          <div className="flex items-center space-x-2 ml-4">
             <Tooltip
               placement="left"
               title={
-                <div className="text-xs">
-                  <div className="font-bold mb-1">{modelName}</div>
-                  <div className="font-bold mt-2 mb-1">Training Parameters:</div>
-                  <ul>
+                <div className="text-xs max-w-xs">
+                  {/* 模型名称作为标题 */}
+                  <div className="font-semibold text-white mb-2 text-sm border-b border-white/20 pb-2">
+                    {timeStamp}
+                  </div>
+                  
+                  {/* 基础模型信息 - 对本地和云端模型都显示 */}
+                  {model.training_params.base_model && (
+                    <div className="mb-2">
+                      <div className="text-blue-200 text-xs mb-1">Base Model</div>
+                      <div className="text-white/90 text-xs">{model.training_params.base_model}</div>
+                    </div>
+                  )}
+                  
+                  {/* 创建时间 - 本地和云端都显示，统一格式 */}
+                  <div className="mb-2">
+                    <div className="text-blue-200 text-xs mb-1">Created</div>
+                    {(() => {
+                      // 统一的时间格式化函数
+                      const formatTime = (timestamp: number) => {
+                        const date = new Date(timestamp * 1000);
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const day = String(date.getDate()).padStart(2, '0');
+                        const hour = String(date.getHours()).padStart(2, '0');
+                        const minute = String(date.getMinutes()).padStart(2, '0');
+                        return `${year}-${month}-${day} ${hour}:${minute}`;
+                      };
+
+                      if (isCloudDeployment) {
+                        // 云端模型使用 created_time
+                        return <div className="text-white/90 text-xs">{formatTime(model.created_time)}</div>;
+                      } else {
+                        // 本地模型也使用 created_time
+                        return <div className="text-white/90 text-xs">{formatTime(model.created_time)}</div>;
+                      }
+                    })()}
+                  </div>
+
+                  {/* 所有训练参数（按重要性排序，避免重复） */}
+                  <div className="space-y-1 border-t border-white/10 pt-2">
                     {Object.entries(model.training_params).length > 0 ? (
-                      Object.entries(model.training_params).map(([key, value]) => (
-                        <li key={key}>
-                          {key}: {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                        </li>
-                      ))
+                      (() => {
+                        // 定义参数重要性排序
+                        const priorityOrder = [
+                          'type',
+                          'status',
+                          'deployed_model'
+                          // 其他参数按字母顺序
+                        ];
+
+                        // 过滤和排序参数
+                        return Object.entries(model.training_params)
+                          .filter(([key]) => {
+                            // 过滤掉不需要的参数
+                            if (key === 'created_at') return false; 
+                            if (key === 'base_model') return false; // 已经单独显示，避免重复
+                            if (key === 'model_name') return false; // 已经映射为base_model，避免重复
+                            if (!isCloudDeployment && key === 'model_path') return false;
+                            return true;
+                          })
+                          .sort((a, b) => {
+                            // 按照优先级数组排序
+                            const indexA = priorityOrder.indexOf(a[0]);
+                            const indexB = priorityOrder.indexOf(b[0]);
+
+                            // 在优先级列表中的排在前面
+                            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+                            if (indexA !== -1) return -1;
+                            if (indexB !== -1) return 1;
+                            // 其他按字母顺序
+                            return a[0].localeCompare(b[0]);
+                          })
+                          .map(([key, value]) => (
+                            <div key={key} className="flex justify-between items-start">
+                              <span className="text-blue-200 text-xs capitalize shrink-0">
+                                {key.replace(/_/g, ' ')}:
+                              </span>
+                              <span className="text-white/90 text-xs ml-2 text-right break-all">
+                                {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                              </span>
+                            </div>
+                          ));
+                      })()
                     ) : (
-                      <li>No training parameters available</li>
+                      <div className="text-white/70 text-xs">No parameters available</div>
                     )}
-                  </ul>
+                  </div>
                 </div>
               }
             >
-              <InfoCircleOutlined className="text-gray-400 hover:text-blue-500" />
+              <InfoCircleOutlined className="text-gray-400 hover:text-blue-500 text-base transition-colors" />
             </Tooltip>
+            <div className="text-gray-300">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path d="M9 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+              </svg>
+            </div>
           </div>
         </div>
       </div>
     );
   };
 
+  // Scrollable container component
+  const ScrollableModelList = ({ 
+    models,
+    loading,
+    emptyType,
+    isCloud = false,
+    height = '180px'
+  }: {
+    models: ModelInfo[];
+    loading: boolean;
+    emptyType: 'local' | 'cloud';
+    isCloud?: boolean;
+    height?: string;
+  }) => (
+    <div 
+      className={`border border-gray-200 rounded-lg ${isCloud ? 'bg-blue-50/20' : 'bg-gray-50/30'}`}
+      style={{ height }}
+    >
+      {loading ? (
+        <div className="flex items-center justify-center h-full">
+          <Spin />
+        </div>
+      ) : (
+        <>
+          {models.length > 0 ? (
+            <div
+              className="subtle-scrollbar"
+              style={{
+                height: '100%',
+                overflowY: 'scroll',
+                padding: '12px'
+              }}
+            >
+              {models.map((model, index) => renderModelItem(model, index, isCloud))}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-full">{renderEmpty(emptyType)}</div>
+          )}
+        </>
+      )}
+    </div>
+  );
+
   return (
     <Modal
-      bodyStyle={{ maxHeight: '70vh', overflow: 'hidden', padding: '20px' }}
       footer={null}
       onCancel={handleClose}
       open={open}
-      title="Select a Model to Start"
-      width={600}
+      title={<div className="text-xl font-bold text-gray-900">Select a Model to Start</div>}
+      width={650}
+      style={{ top: 20 }}
     >
-      <div className="overflow-hidden">
-        <div className="overflow-auto no-scrollbar" style={{ maxHeight: 'calc(70vh - 120px)' }}>
-          {/* Local Models Section */}
-          <div className="mb-6">
-            <div className="text-base font-medium mb-2">Local Models</div>
-            <Spin spinning={loadingModels}>
-              {sortedLocalModels.length > 0 ? (
-                <div>{sortedLocalModels.map((model, index) => renderModelItem(model, index))}</div>
-              ) : (
-                renderEmpty('local')
-              )}
-            </Spin>
+      <div style={{ height: '60vh', maxHeight: '600px', minHeight: '400px' }}>
+        {/* Local Models Section */}
+        <div className="mb-6">
+          <div className="text-base font-semibold mb-3 flex items-center text-gray-700 ">
+            Local Models
+            <span className="ml-3 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full font-medium">
+              {sortedLocalModels.length}
+            </span>
           </div>
+          <ScrollableModelList
+            models={sortedLocalModels}
+            loading={loadingModels}
+            emptyType="local"
+            height="180px"
+          />
+        </div>
 
-          {/* Cloud Models Section */}
-          <div>
-            <div className="text-base font-medium mb-2">Cloud Models</div>
-            <div className="text-sm text-gray-500 mb-4">
-              All cloud models feature high-efficiency training and are billed using a token-based
-              pricing model.
-            </div>
-            <Spin spinning={loadingCloudModels}>
-              {sortedCloudModels.length > 0 ? (
-                <div>
-                  {sortedCloudModels.map((model, index) => renderModelItem(model, index, true))}
-                </div>
-              ) : (
-                renderEmpty('cloud')
-              )}
-            </Spin>
+        {/* Cloud Models Section */}
+        <div>
+          <div className="text-base font-semibold mb-2 flex items-center text-gray-700 ">
+            Cloud Models
+            <span className="ml-3 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full font-medium">
+              {sortedCloudModels.length}
+            </span>
           </div>
+          <div className="text-sm text-gray-500 mb-3 mt-2">
+            All cloud models feature high-efficiency training and are billed using a token-based pricing model.
+          </div>
+          <ScrollableModelList
+            models={sortedCloudModels}
+            loading={loadingCloudModels}
+            emptyType="cloud"
+            isCloud={true}
+            height="200px"
+          />
         </div>
       </div>
 
       <style global jsx>{`
-        .no-scrollbar {
-          -ms-overflow-style: none;  /* IE and Edge */
-          scrollbar-width: none;  /* Firefox */
+        .subtle-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(203, 213, 225, 0.3) transparent;
         }
-        .no-scrollbar::-webkit-scrollbar {
-          display: none;  /* Chrome, Safari and Opera */
+
+        .subtle-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+
+        .subtle-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .subtle-scrollbar::-webkit-scrollbar-thumb {
+          background-color: rgba(203, 213, 225, 0.4);
+          border-radius: 2px;
+          transition: background-color 0.2s ease;
+        }
+
+        .subtle-scrollbar::-webkit-scrollbar-thumb:hover {
+          background-color: rgba(148, 163, 184, 0.6);
+        }
+
+        .subtle-scrollbar:hover::-webkit-scrollbar-thumb {
+          background-color: rgba(203, 213, 225, 0.6);
         }
       `}</style>
     </Modal>
@@ -326,7 +503,22 @@ export function ModelStatus() {
       const res = await getModelList();
 
       if (res.data.code === 0) {
-        setModelList(res.data.data);
+        // 处理本地模型，为它们添加 base_model 字段并统一格式
+        const processedModels = res.data.data.map((model: ModelInfo) => {
+          // 为本地模型添加 base_model 字段
+          const updatedTrainingParams = {
+            ...model.training_params,
+            // 如果没有 base_model 但有 model_name，则使用 model_name 作为 base_model
+            base_model: model.training_params.base_model || model.training_params.model_name || 'Unknown'
+          };
+          
+          return {
+            ...model,
+            training_params: updatedTrainingParams
+          };
+        });
+        
+        setModelList(processedModels);
         // Read saved configuration, initialize selected model
         const config = JSON.parse(localStorage.getItem('trainingParams') || '{}');
 
@@ -349,10 +541,10 @@ export function ModelStatus() {
       } else {
         messageApi.error({ content: res.data.message!, duration: 1 });
       }
-    } catch (error: unknown) {
+    } catch (error: any) {
       console.error('Error fetching model list:', error);
       messageApi.error({
-        content: error.response?.data?.message || error.message,
+        content: error.response?.data?.message || error.message || 'Failed to fetch models',
         duration: 1
       });
     } finally {
@@ -408,8 +600,8 @@ export function ModelStatus() {
     pollingInterval.current = setInterval(() => {
       fetchServiceStatus()
         .then((res) => {
-          if (res.data.code === 0) {
-            const isRunning = res.data.data.is_running;
+          if (res.data) {
+            const isRunning = res.data.is_running;
 
             if (!isRunning) {
               setServiceStopping(false);
@@ -664,23 +856,91 @@ export function ModelStatus() {
                 <Tooltip
                   placement="left"
                   title={
-                    <div className="text-xs">
-                      <div className="font-bold mb-1">
-                        {selectedModelForConfirmation.model_path.split('/')[0]}
+                    <div className="text-xs max-w-xs">
+                      {/* 模型名称作为标题 */}
+                      <div className="font-semibold text-white mb-2 text-sm border-b border-white/20 pb-2">
+                        {selectedModelForConfirmation.model_path.split('/')[1]}
                       </div>
-                      <div className="font-bold mt-2 mb-1">Training Parameters:</div>
-                      <ul>
+                      
+                      {/* 基础模型信息 - 对本地和云端模型都显示 */}
+                      {selectedModelForConfirmation.training_params.base_model && (
+                        <div className="mb-2">
+                          <div className="text-blue-200 text-xs mb-1">Base Model</div>
+                          <div className="text-white/90 text-xs">{selectedModelForConfirmation.training_params.base_model}</div>
+                        </div>
+                      )}
+                      
+                      {/* 创建时间 - 本地和云端都显示，统一格式 */}
+                      <div className="mb-2">
+                        <div className="text-blue-200 text-xs mb-1">Created</div>
+                        {(() => {
+                          // 统一的时间格式化函数
+                          const formatTime = (timestamp: number) => {
+                            const date = new Date(timestamp * 1000);
+                            const year = date.getFullYear();
+                            const month = String(date.getMonth() + 1).padStart(2, '0');
+                            const day = String(date.getDate()).padStart(2, '0');
+                            const hour = String(date.getHours()).padStart(2, '0');
+                            const minute = String(date.getMinutes()).padStart(2, '0');
+                            return `${year}-${month}-${day} ${hour}:${minute}`;
+                          };
+
+                          // 使用 created_time 字段进行统一的时间显示
+                          return <div className="text-white/90 text-xs">{formatTime(selectedModelForConfirmation.created_time)}</div>;
+                        })()}
+                      </div>
+                      
+                      {/* 所有训练参数（按重要性排序） */}
+                      <div className="space-y-1 border-t border-white/10 pt-2">
                         {Object.entries(selectedModelForConfirmation.training_params).length > 0 ? (
-                          Object.entries(selectedModelForConfirmation.training_params).map(([key, value]) => (
-                            <li key={key}>
-                                {key}:{' '}
-                                {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                            </li>
-                          ))
+                          (() => {
+                            // 定义参数重要性排序
+                            const priorityOrder = [
+                              'type', 
+                              'status', 
+                              'base_model', 
+                              'deployed_model',
+                              // 其他参数按字母顺序
+                            ];
+                            
+                            // 过滤和排序参数
+                            return Object.entries(selectedModelForConfirmation.training_params)
+                              .filter(([key]) => {
+                                // 过滤掉不需要的参数
+                                if (key === 'created_at') return false; 
+                                if (key === 'base_model') return false; // 已经单独显示，避免重复
+                                if (key === 'model_name') return false; // 已经映射为base_model，避免重复
+                                if (!selectedModelForConfirmation.model_path.includes('cloud/') && key === 'model_path') return false;
+                                return true;
+                              })
+                              .sort((a, b) => {
+                                // 按照优先级数组排序
+                                const indexA = priorityOrder.indexOf(a[0]);
+                                const indexB = priorityOrder.indexOf(b[0]);
+                                
+                                // 在优先级列表中的排在前面
+                                if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+                                if (indexA !== -1) return -1;
+                                if (indexB !== -1) return 1;
+                                
+                                // 其他按字母顺序
+                                return a[0].localeCompare(b[0]);
+                              })
+                              .map(([key, value]) => (
+                                <div key={key} className="flex justify-between items-start">
+                                  <span className="text-blue-200 text-xs capitalize shrink-0">
+                                    {key.replace(/_/g, ' ')}:
+                                  </span>
+                                  <span className="text-white/90 text-xs ml-2 text-right break-all">
+                                    {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                  </span>
+                                </div>
+                              ));
+                          })()
                         ) : (
-                          <li>No training parameters available</li>
+                          <div className="text-white/70 text-xs">No parameters available</div>
                         )}
-                      </ul>
+                      </div>
                     </div>
                   }
                 >

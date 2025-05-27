@@ -85,8 +85,8 @@ export interface TrainingParams {
 
 export interface TrainBaseParams {
   model_name: string;
-  local_model_name?: string;
-  cloud_model_name?: string;
+  local_model_name: string;
+  cloud_model_name: string;
 }
 
 export interface CloudHyperParameters {

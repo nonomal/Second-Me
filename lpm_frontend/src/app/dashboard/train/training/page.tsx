@@ -12,6 +12,12 @@ import {
   checkCudaAvailability,
   resetProgress
 } from '@/service/train';
+import {
+  startCloudTraining,
+  searchJobInfo,
+  getCloudTrainingStatus
+} from '@/service/cloudService';
+import type { TrainingJobInfo } from '@/service/cloudService';
 import { useTrainingStore } from '@/store/useTrainingStore';
 import { getMemoryList } from '@/service/memory';
 import { message, Modal } from 'antd';
@@ -71,7 +77,7 @@ const pageTitle = 'Training Process';
 const pageDescription =
   'Transform your memories into a personalized AI model that thinks and communicates like you.';
 
-export default function TrainingPage() {
+export default function TrainingPage(): JSX.Element {
   const checkTrainStatus = useTrainingStore((state) => state.checkTrainStatus);
   const resetTrainingState = useTrainingStore((state) => state.resetTrainingState);
   const trainingError = useTrainingStore((state) => state.error);
@@ -92,10 +98,15 @@ export default function TrainingPage() {
   const [showCelebration, setShowCelebration] = useState(false);
   const [showMemoryModal, setShowMemoryModal] = useState(false);
 
+  // 云端训练相关状态
+  const [trainingType, setTrainingType] = useState<'local' | 'cloud'>('local');
+  const [cloudJobInfo, setCloudJobInfo] = useState<TrainingJobInfo | null>(null);
+
   const cleanupEventSourceRef = useRef<(() => void) | undefined>();
   const containerRef = useRef<HTMLDivElement>(null);
   const firstLoadRef = useRef<boolean>(true);
   const pollingStopRef = useRef<boolean>(false);
+  const cloudPollingRef = useRef<NodeJS.Timeout | null>(null); // 用于云训练轮询的引用
 
   const [cudaAvailable, setCudaAvailable] = useState<boolean>(false);
   const trainSuspended = useTrainingStore((state) => state.trainSuspended);
@@ -243,7 +254,8 @@ export default function TrainingPage() {
   // Cleanup when component unmounts
   useEffect(() => {
     return () => {
-      stopPolling();
+      stopPolling(); // 停止本地训练轮询
+      stopCloudPolling(); // 停止云端训练轮询
     };
   }, []);
 
@@ -385,7 +397,7 @@ export default function TrainingPage() {
       console.log('Using startTrain API to train new model:', trainingParams.model_name);
       const res = await startTrain({
         ...trainingParams,
-        model_name: trainingParams.model_name
+        model_name: trainingParams.local_model_name
       });
 
       if (res.data.code === 0) {
@@ -442,8 +454,8 @@ export default function TrainingPage() {
     }
   };
 
-  // Call the appropriate handler function based on status
-  const handleTrainingAction = async () => {
+  // 统一处理本地和云端训练的动作
+  const handleTrainingAction = async (type: 'local' | 'cloud' = 'local') => {
     if (trainActionLoading) {
       message.info('Please wait a moment...');
 
@@ -458,30 +470,220 @@ export default function TrainingPage() {
 
     setTrainActionLoading(true);
 
+    // 更新当前活动的训练类型
+    setTrainingType(type);
+
     // If training is in progress, stop it
     if (isTraining) {
-      await handleStopTraining();
+      if (type === 'cloud') {
+        stopCloudPolling();
+        setIsTraining(false);
+      } else {
+        await handleStopTraining();
+      }
+
       setTrainActionLoading(false);
 
       return;
     }
 
-    // If the same model has already been trained and status is 'trained' or 'running', perform retraining
-    if (status === 'trained') {
-      await handleRetrainModel();
+    // 根据训练类型选择不同的处理方法
+    if (type === 'cloud') {
+      // 云端训练流程
+      await handleStartCloudTraining();
     } else {
-      // Otherwise start new training
-      await handleStartNewTraining();
+      // 本地训练流程
+      if (status === 'trained') {
+        await handleRetrainModel();
+      } else {
+        await handleStartNewTraining();
+      }
     }
 
     setTrainActionLoading(false);
   };
 
+  // 云端训练相关方法
+  // 启动云端训练
+  const handleStartCloudTraining = async () => {
+    setIsTraining(true);
+    // 清除训练日志
+    setTrainingDetails([]);
+    localStorage.removeItem('trainingLogs');
+    // 重置训练状态
+    resetTrainingState();
+
+    try {
+      const res = await startCloudTraining({
+        base_model: trainingParams.cloud_model_name,
+        training_type: 'efficient_sft',
+        hyper_parameters: {
+          n_epochs: trainingParams.number_of_epochs,
+          learning_rate: trainingParams.learning_rate
+        }
+      });
+
+      if (res.data.code === 0) {
+        // 保存训练配置并开始轮询
+        localStorage.setItem('trainingParams', JSON.stringify(trainingParams));
+        scrollPageToBottom();
+        setTrainingType('cloud');
+        startCloudTrainingPolling();
+      } else {
+        message.error(res.data.message || 'Failed to start cloud training');
+        setIsTraining(false);
+      }
+    } catch (error) {
+      console.error('Error starting cloud training:', error);
+      setIsTraining(false);
+
+      if (error instanceof Error) {
+        message.error(error.message || 'Failed to start cloud training');
+      } else {
+        message.error('Failed to start cloud training');
+      }
+    }
+  };
+
+  // 开始云端训练轮询
+  const startCloudTrainingPolling = () => {
+    // 设置状态为训练中
+    setStatus('training');
+    setIsTraining(true);
+
+    // 先轮询任务信息获取 job_id
+    pollCloudJobInfo();
+  };
+
+  // 轮询云端任务信息
+  const pollCloudJobInfo = () => {
+    if (pollingStopRef.current) return;
+
+    searchJobInfo()
+      .then((res) => {
+        if (res.data.code === 0) {
+          const jobInfo = res.data.data as TrainingJobInfo;
+
+          setCloudJobInfo(jobInfo);
+
+          if (jobInfo && jobInfo.job_id) {
+            // 如果获取到了 job_id，就开始轮询训练状态
+            pollCloudTrainingStatus(jobInfo.job_id);
+
+            return;
+          }
+        }
+
+        // 如果没有获取到 job_id，继续轮询
+        if (!pollingStopRef.current) {
+          cloudPollingRef.current = setTimeout(() => {
+            pollCloudJobInfo();
+          }, POLLING_INTERVAL);
+        }
+      })
+      .catch((error) => {
+        console.error('Error polling cloud job info:', error);
+
+        if (!pollingStopRef.current) {
+          cloudPollingRef.current = setTimeout(() => {
+            pollCloudJobInfo();
+          }, POLLING_INTERVAL);
+        }
+      });
+  };
+
+  // 根据 job_id 轮询云端训练状态
+  const pollCloudTrainingStatus = (jobId: string) => {
+    if (pollingStopRef.current) return;
+
+    getCloudTrainingStatus(jobId)
+      .then((res) => {
+        if (res.data.code === 0) {
+          const jobStatus = res.data.message;
+
+          // 根据状态更新进度
+          if (jobStatus === 'SUCCEEDED') {
+            // 训练完成
+            setStatus('trained');
+            setIsTraining(false);
+
+            // 显示训练完成庆祝效果
+            const hasShownTrainingComplete = localStorage.getItem('hasShownTrainingComplete');
+
+            if (hasShownTrainingComplete !== 'true') {
+              setTimeout(() => {
+                setShowCelebration(true);
+                localStorage.setItem('hasShownTrainingComplete', 'true');
+              }, 1000);
+            }
+
+            stopCloudPolling();
+
+            return;
+          } else if (jobStatus === 'FAILED') {
+            // 训练失败
+            message.error('Cloud training failed');
+            setIsTraining(false);
+            stopCloudPolling();
+            return;
+          }
+
+          // 继续轮询
+          if (!pollingStopRef.current) {
+            cloudPollingRef.current = setTimeout(() => {
+              pollCloudTrainingStatus(jobId);
+            }, POLLING_INTERVAL);
+          }
+        } else {
+          // API 错误
+          message.error(res.data.message || 'Failed to get cloud training status');
+
+          if (!pollingStopRef.current) {
+            cloudPollingRef.current = setTimeout(() => {
+              pollCloudTrainingStatus(jobId);
+            }, POLLING_INTERVAL);
+          }
+        }
+      })
+      .catch((error) => {
+        console.error('Error polling cloud training status:', error);
+
+        if (!pollingStopRef.current) {
+          cloudPollingRef.current = setTimeout(() => {
+            pollCloudTrainingStatus(jobId);
+          }, POLLING_INTERVAL);
+        }
+      });
+  };
+
+  // 停止云端轮询
+  const stopCloudPolling = () => {
+    pollingStopRef.current = true;
+
+    if (cloudPollingRef.current) {
+      clearTimeout(cloudPollingRef.current);
+      cloudPollingRef.current = null;
+    }
+  };
+
+  // 清理资源
+  useEffect(() => {
+    return () => {
+      stopPolling();
+      stopCloudPolling();
+    };
+  }, []);
+
   const renderTrainingProgress = () => {
     return (
       <div className="space-y-6">
         {/* Training Progress Component */}
-        <TrainingProgress status={status} trainingProgress={trainingProgress} />
+        <TrainingProgress 
+          status={status} 
+          trainingProgress={trainingProgress}
+          trainingType={trainingType}
+          cloudJobInfo={cloudJobInfo}
+        />
       </div>
     );
   };
@@ -536,6 +738,8 @@ export default function TrainingPage() {
           trainSuspended={trainSuspended}
           trainingParams={trainingParams}
           updateTrainingParams={updateTrainingParams}
+          trainingType={trainingType}
+          setTrainingType={setTrainingType}
         />
 
         {/* Only show training progress after training starts */}
@@ -569,6 +773,28 @@ export default function TrainingPage() {
 
         {/* Training completion celebration effect */}
         <CelebrationEffect isVisible={showCelebration} onClose={() => setShowCelebration(false)} />
+
+        {/* 调试区域：显示Training参数 */}
+        <div className="mt-8 p-4 border rounded-md bg-gray-50">
+          <h3 className="text-lg font-medium mb-4">训练参数调试信息</h3>
+          <div className="bg-white p-3 rounded shadow-inner overflow-auto max-h-80">
+            <pre className="text-sm text-gray-700">{JSON.stringify(trainingParams, null, 2)}</pre>
+          </div>
+          <div className="mt-4">
+            <h4 className="font-medium mb-2">当前训练类型:</h4>
+            <div className="bg-white p-3 rounded shadow-inner">
+              <span className="font-mono">{trainingType}</span>
+            </div>
+          </div>
+          {cloudJobInfo && (
+            <div className="mt-4">
+              <h4 className="font-medium mb-2">云训练任务信息:</h4>
+              <div className="bg-white p-3 rounded shadow-inner">
+                <pre className="text-sm text-gray-700">{JSON.stringify(cloudJobInfo, null, 2)}</pre>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
