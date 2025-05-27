@@ -429,7 +429,7 @@ class CloudService:
                                     "choices": [
                                         {
                                             "message": {
-                                                "content": "没有收到 API 响应，请稍后再试",
+                                                "content": "No response received from API",
                                                 "role": "assistant"
                                             },
                                             "finish_reason": "stop"
@@ -448,7 +448,7 @@ class CloudService:
                             "choices": [
                                 {
                                     "message": {
-                                        "content": f"发生错误: {str(e)}",
+                                        "content": f"Error: {str(e)}",
                                         "role": "assistant"
                                     },
                                     "finish_reason": "stop"
@@ -458,10 +458,9 @@ class CloudService:
                     }
                     yield error_response
             
-            # 将生成器函数的结果存储在列表中，确保传递给handle_cloud_stream_response的是可迭代对象
-            chunks = list(generate())
-            logger.debug(f"Generated {len(chunks)} chunks for streaming response")
-            return self.handle_cloud_stream_response(chunks)
+            # 直接将生成器函数传递给handle_cloud_stream_response，保持真正的流式响应
+            logger.debug("Passing generator directly to handle_cloud_stream_response")
+            return self.handle_cloud_stream_response(generate())
         else:
             # 非流式响应处理
             try:
@@ -519,11 +518,10 @@ class CloudService:
         log_offset = 0
         counter = 0
         start_time = time.time()
-        estimated_total_minutes = None  # 从日志中解析的估计总时间
-        queuing_phase = True  # 初始阶段为排队阶段
-        fine_tune_start_time = None  # 微调开始的时间
+        estimated_total_minutes = None
+        queuing_phase = True
+        fine_tune_start_time = None
         
-        # 初始化进度
         if progress_callback:
             progress_callback("IN_PROGRESS", 0, "Fine-tuning job started, waiting in queue...")
         
@@ -531,32 +529,24 @@ class CloudService:
             status = self.check_fine_tune_status(job_id=job_id)
             elapsed_minutes = (time.time() - start_time) / 60
             
-            # 定期获取日志并解析估计时间
             if counter % (log_interval // check_interval) == 0:
                 new_offset, parsed_minutes = self._fetch_and_print_logs(log_offset)
-                
-                # 更新日志偏移量
+
                 if new_offset > log_offset:
                     log_offset = new_offset
                 
-                # 检查是否找到估计时间
                 if parsed_minutes is not None and estimated_total_minutes is None:
-                    # 当找到估计时间时，表示数据上传和微调任务创建已完成
-                    # 并且微调即将开始
                     estimated_total_minutes = parsed_minutes
                     logger.info(f"Using estimated fine-tune time from logs: {estimated_total_minutes} minutes")
                     
-                    # 标记上传和创建任务已完成，微调开始
                     if queuing_phase:
                         queuing_phase = False
                         fine_tune_start_time = time.time()
                         logger.info("Fine-tuning phase started")
                         
-                        # 通知回调函数上传和创建任务已完成
                         if progress_callback:
                             progress_callback("IN_PROGRESS", 10, f"Data uploaded and fine-tune job created. Estimated time: {estimated_total_minutes} minutes")
                 
-                # 如果还没有找到估计时间，但发现微调开始的日志
                 logs_content = self.get_fine_tune_logs(offset=0, line=1000)
                 logs_str = str(logs_content) if logs_content else ""
                 if queuing_phase and ("start to fine-tune" in logs_str or "Fine-tune started" in logs_str):
@@ -564,9 +554,7 @@ class CloudService:
                     fine_tune_start_time = time.time()
                     logger.info("Fine-tuning phase started")
             
-            # 根据状态和阶段计算进度
             if status == "SUCCEEDED":
-                # 微调完成
                 new_offset, _ = self._fetch_and_print_logs(log_offset)
                 logger.info("Fine-tuning job completed successfully!")
                 
@@ -577,7 +565,6 @@ class CloudService:
                 
                 return True
             elif status in ["FAILED", "CANCELLED"]:
-                # 微调失败
                 new_offset, _ = self._fetch_and_print_logs(log_offset)
                 error_message = f"Fine-tuning job failed, status: {status}"
                 logger.error(error_message)
@@ -587,23 +574,16 @@ class CloudService:
                 
                 return False
             
-            # 计算进度
             if queuing_phase:
-                # 在排队阶段，这包括数据上传和创建微调任务
-                # 根据经过的时间估计进度，但最高只能达到10%
-                queue_progress = min(10, elapsed_minutes * 2)  # 每分钟增加2%，最高10%
+                queue_progress = min(10, elapsed_minutes * 2)
                 estimated_progress = queue_progress
                 progress_message = f"Preparing data and creating fine-tune job. Elapsed time: {int(elapsed_minutes)} minutes"
             else:
-                # 微调已经开始，计算实际微调进度
                 if estimated_total_minutes is not None and fine_tune_start_time is not None:
-                    # 使用从日志解析的估计时间计算进度
                     fine_tune_elapsed = (time.time() - fine_tune_start_time) / 60
-                    # 微调阶段占总进度的90%（从10%到95%）
                     progress_percent = (fine_tune_elapsed / estimated_total_minutes) * 85
                     estimated_progress = min(95, 10 + progress_percent)
                     
-                    # 根据进度百分比定制消息
                     if estimated_progress < 30:
                         stage_desc = "Initializing training environment"
                     elif estimated_progress < 60:
@@ -613,8 +593,7 @@ class CloudService:
                         
                     progress_message = f"{stage_desc}. Elapsed: {int(fine_tune_elapsed)}/{estimated_total_minutes} minutes (~{int(estimated_progress)}%)"
                 else:
-                    # 如果没有估计时间，保持在微调初始阶段
-                    estimated_progress = 15  # 固定在初始阶段的进度
+                    estimated_progress = 15
                     fine_tune_elapsed = (time.time() - fine_tune_start_time) / 60 if fine_tune_start_time else elapsed_minutes
                     progress_message = f"Waiting for training progress information. Elapsed time: {int(fine_tune_elapsed)} minutes"
             
