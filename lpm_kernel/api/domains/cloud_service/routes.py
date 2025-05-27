@@ -17,6 +17,8 @@ from .cloud_trainprocess_service import CloudTrainProcessService
 from .cloud_progress_holder import CloudProgressHolder
 from ...services.user_llm_config_service import UserLLMConfigService
 from ...dto.user_llm_config_dto import UpdateUserLLMConfigDTO
+from lpm_kernel.api.domains.cloud_service.dto.cloud_inference_dto import CloudInferenceRequest
+from lpm_kernel.api.services.local_llm_service import local_llm_service
 
 from lpm_kernel.configs.logging import get_train_process_logger
 logger = get_train_process_logger()
@@ -92,51 +94,6 @@ def list_available_models():
     except Exception as e:
         logger.error(f"Failed to list available models: {str(e)}", exc_info=True)
         return jsonify(APIResponse.error(f"Failed to list available models: {str(e)}"))
-
-
-@cloud_bp.route("/debug_api_config", methods=["GET"])
-def debug_api_config():
-    """Debug endpoint to check API configuration"""
-    try:
-        user_llm_config_service = UserLLMConfigService()
-        config = user_llm_config_service.get_available_llm()
-        
-        api_key = None
-        if config:
-            api_key = config.cloud_service_api_key
-        
-        # Create CloudService instance
-        cloud_service = CloudService(api_key=api_key)
-        
-        # Get API configuration
-        api_config = {
-            "api_key_set": bool(api_key),
-            "api_key_masked": f"{api_key[:4]}...{api_key[-4:]}" if api_key and len(api_key) > 8 else None,
-            "api_base": cloud_service.api_base,
-            "api_version": cloud_service.api_version,
-            "model_list_endpoint": f"{cloud_service.api_base}/v{cloud_service.api_version}/models",
-            "fine_tune_endpoint": f"{cloud_service.api_base}/v{cloud_service.api_version}/fine_tunes",
-            "file_upload_endpoint": f"{cloud_service.api_base}/v{cloud_service.api_version}/files",
-        }
-        
-        # Check if API key is valid by making a test request
-        models = cloud_service.list_available_models()
-        api_config["api_key_valid"] = bool(models)
-        
-        # Check if any models support fine-tuning
-        fine_tunable_models = []
-        if models:
-            for model in models:
-                if "fine-tuning" in model.get("capabilities", []):
-                    fine_tunable_models.append(model["id"])
-        
-        api_config["fine_tunable_models"] = fine_tunable_models
-        api_config["fine_tunable_models_count"] = len(fine_tunable_models)
-        
-        return jsonify(APIResponse.success(data=api_config))
-    except Exception as e:
-        logger.error(f"Failed to debug API config: {str(e)}", exc_info=True)
-        return jsonify(APIResponse.error(f"Failed to debug API config: {str(e)}"))
 
 
 # ============= Cloud Training Process Routes =============
@@ -390,25 +347,73 @@ def check_cloud_deployment_status(model_id):
 
 @cloud_bp.route("/train/inference", methods=["POST"])
 def run_cloud_inference():
-    """Run inference using deployed model"""
+    """Run inference using deployed model
+    
+    This endpoint accepts a request in OpenAI-compatible format and returns a response
+    in the same format. It supports both streaming and non-streaming responses.
+    
+    Request format:
+    {
+        "messages": [{"role": "user", "content": "Hello"}],
+        "model_id": "your-model-id",
+        "temperature": 0.1,
+        "max_tokens": 2000,
+        "stream": true
+    }
+    """
     try:
-        data = request.json
-        messages = data.get("messages")
-        model_id = data.get("model_id")
         
-        if not messages:
+        try:
+            body = CloudInferenceRequest(**request.json)
+        except Exception as e:
+            logger.error(f"Invalid request format: {str(e)}")
+            return jsonify(APIResponse.error(f"Invalid request format: {str(e)}"))
+        
+        # 1. 检查必要参数
+        if not body.messages:
             return jsonify(APIResponse.error("messages are required"))
-        if not model_id:
-            return jsonify(APIResponse.error("model_endpoint is required"))
+        if not body.model_id:
+            return jsonify(APIResponse.error("model_id is required"))
 
+        # 2. 创建CloudService实例
         cloud_service = CloudService()
 
-        response = cloud_service.run_inference(user_input=messages, model_id=model_id)
-        
-        if not response:
-            return jsonify(APIResponse.error("Failed to run inference"))
-        
-        return jsonify(APIResponse.success(data=response))
+        try:
+            # 3. 调用run_inference方法，传递流式参数
+            response = cloud_service.run_inference(
+                messages=body.messages,
+                model_id=body.model_id,
+                stream=body.stream,
+                temperature=body.temperature,
+                max_tokens=body.max_tokens
+            )
+            
+            # 4. 处理流式或非流式响应
+            if body.stream:
+                return response
+            else:
+                # 对于非流式响应，返回完整的JSON响应
+                if not response:
+                    return jsonify(APIResponse.error("Failed to run inference"))
+                return jsonify(APIResponse.success(data=response))
+                
+        except ValueError as e:
+            error_msg = str(e)
+            logger.error(f"Inference error: {error_msg}")
+            error_response = {
+                "error": {
+                    "message": error_msg,
+                    "type": "server_error",
+                    "code": "inference_error"
+                }
+            }
+            
+            # 根据请求类型返回错误响应
+            if body.stream:
+                return local_llm_service.handle_stream_response(iter([error_response]))
+            else:
+                return jsonify(APIResponse.error(message=error_msg))
+                
     except Exception as e:
         logger.error(f"Run inference failed: {str(e)}", exc_info=True)
         return jsonify(APIResponse.error(f"Failed to run inference: {str(e)}"))

@@ -326,15 +326,13 @@ class CloudTrainProcessService(TrainProcessService):
             
             # 1. 准备训练数据（生成L2级别数据）
             logger.info("Step 1: Preparing training data...")
-            from lpm_kernel.api.domains.trainprocess.process_step import ProcessStep
-            self.progress.mark_step_status(ProcessStep.DECODE_PREFERENCE_PATTERNS, CloudStatus.IN_PROGRESS)
+
             success = self.prepare_training_data()
             logger.info(f"Training data preparation result: {success}")
             if not success:
                 logger.error("Failed to prepare training data")
-                self.progress.mark_step_status(ProcessStep.DECODE_PREFERENCE_PATTERNS, CloudStatus.FAILED)
                 return False
-            self.progress.mark_step_status(ProcessStep.DECODE_PREFERENCE_PATTERNS, CloudStatus.COMPLETED)
+
             
             # 7. 上传训练数据
             logger.info("Step 7: Uploading training data...")
@@ -456,12 +454,9 @@ class CloudTrainProcessService(TrainProcessService):
             )
             
             if success:
-                logger.info(f"Fine-tuning job completed successfully.")
-                # 更新进度消息
                 self.progress.update_message("Fine-tuning job completed successfully!")
             else:
                 logger.error(f"Fine-tuning job failed")
-                # 进度回调函数已经处理了失败状态，这里不需要再次更新
         except Exception as e:
             logger.error(f"Error in async wait thread: {str(e)}", exc_info=True)
             self.progress.mark_step_status("cloud_training", "wait_for_fine-tune_completion", CloudStatus.FAILED, f"Error: {str(e)}")

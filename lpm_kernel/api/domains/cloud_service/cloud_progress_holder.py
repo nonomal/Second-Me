@@ -278,10 +278,15 @@ class CloudProgress:
             stage_data["status"] = CloudStatus.SUSPENDED
             stage_data["current_step"] = step_data["name"]
             self.data["current_stage"] = stage_data["name"]
-        else:
+        elif step_data["status"] == CloudStatus.IN_PROGRESS:
+            # 只有当前步骤是IN_PROGRESS状态时，才将阶段设置为IN_PROGRESS
             stage_data["status"] = CloudStatus.IN_PROGRESS
             stage_data["current_step"] = step_data["name"]
             self.data["current_stage"] = stage_data["name"]
+        else:
+            # 当前步骤不是IN_PROGRESS状态，保持阶段状态不变
+            # 但仍然更新当前步骤
+            stage_data["current_step"] = step_data["name"]
     
     def _update_overall_progress(self):
         """Update the overall progress based on all stages"""
@@ -390,14 +395,6 @@ class CloudProgressHolder:
         try:
             with open(self.progress_file, "r", encoding="utf-8") as f:
                 saved_data = json.load(f)
-                
-                # 删除model_id字段（如果存在）
-                if "model_id" in saved_data:
-                    logger.info("删除进度数据中的model_id字段")
-                    del saved_data["model_id"]
-                    # 保存更新后的文件
-                    with open(self.progress_file, "w", encoding="utf-8") as fw:
-                        json.dump(saved_data, fw, indent=2, ensure_ascii=False)
                 
                 # 加载进度数据
                 self.progress.data = saved_data

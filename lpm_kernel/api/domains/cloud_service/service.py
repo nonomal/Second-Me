@@ -1,7 +1,7 @@
 import os
 import requests
 import time
-from typing import Dict, Any, Iterator, Optional
+from typing import Dict, Any, Iterator, Optional, Generator, List
 from pathlib import Path
 import json
 
@@ -249,37 +249,235 @@ class CloudService:
             logger.error(f"Exception during fine-tune job deletion: {str(e)}")
             return False
 
-    def run_inference(self, user_input, model_id):
-        """使用调优后的模型进行推理"""
-
+    def handle_cloud_stream_response(self, response_iter):
+        """
+        处理云服务的流式响应，直接返回原始格式
+        
+        Args:
+            response_iter: 响应生成器
+            
+        Returns:
+            Flask Response 对象，包含流式响应
+        """
+        from flask import Response
+        
+        def generate():
+            logger.info("=== Starting cloud stream response handler (raw mode) ===")
+            
+            try:
+                # 处理响应流
+                chunk_count = 0
+                for chunk in response_iter:
+                    chunk_count += 1
+                    logger.debug(f"Processing chunk #{chunk_count}: {type(chunk)}")
+                    
+                    # 将Python对象转换为JSON字符串，然后转换为字节数据
+                    data_str = json.dumps(chunk)
+                    logger.debug(f"Yielding raw chunk: {data_str}")
+                    output = f"data: {data_str}\n\n".encode('utf-8')
+                    yield output
+                
+                logger.info(f"Stream complete, processed {chunk_count} chunks")
+                # 发送流结束标记
+                yield b"data: [DONE]\n\n"
+                
+            except Exception as e:
+                logger.error(f"Error in stream response handler: {str(e)}", exc_info=True)
+                # 返回错误信息，使用与阿里云 DashScope API 相同的格式
+                error_response = {
+                    "output": {
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": f"发生错误: {str(e)}",
+                                    "role": "assistant"
+                                },
+                                "finish_reason": "stop"
+                            }
+                        ]
+                    }
+                }
+                error_str = json.dumps(error_response)
+                yield f"data: {error_str}\n\n".encode('utf-8')
+                yield b"data: [DONE]\n\n"
+        
+        # 设置正确的 MIME 类型和头部
+        headers = {
+            'Cache-Control': 'no-cache, no-transform',
+            'X-Accel-Buffering': 'no',
+            'Content-Type': 'text/event-stream',
+            'Connection': 'keep-alive'
+        }
+        
+        logger.info(f"Creating Response with headers: {headers}")
+        return Response(generate(), mimetype='text/event-stream', headers=headers, direct_passthrough=True)
+    
+    def run_inference(self, messages, model_id, stream=False, temperature=0.1, max_tokens=2000):
+        """使用调优后的模型进行推理
+        
+        Args:
+            messages: 消息列表，OpenAI格式
+            model_id: 模型ID
+            stream: 是否使用流式输出
+            temperature: 温度参数
+            max_tokens: 最大生成token数
+            
+        Returns:
+            如果stream=True，返回一个 Flask Response 对象，否则返回完整响应
+        """
+        # 记录请求参数
+        logger.info(f"Cloud inference request - model_id: {model_id}, stream: {stream}, temperature: {temperature}, max_tokens: {max_tokens}")
+        logger.debug(f"Messages: {messages}")
+        
         url = f"{self.base_url}/services/aigc/text-generation/generation"
+        logger.info(f"API URL: {url}")
+        
+        # 创建基本的 headers
         headers = {**self.headers, "Content-Type": "application/json"}
+        
+        # 如果是流式请求，添加特定的 header
+        if stream:
+            headers["X-DashScope-SSE"] = "enable"
 
         payload = {
             "model": model_id,
             "input": {
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": user_input
-                    }
-                ]
+                "messages": messages
             },
             "parameters": {
-                "result_format": "message"
+                "result_format": "message",
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "stream": stream
             }
         }
 
-        response = requests.post(url, headers=headers, json=payload)
-        response_data = response.json()
+        if stream:
+            # 流式响应处理
+            def generate():
+                try:
+                    logger.info(f"Sending stream request to {url}")
+                    logger.debug(f"Request payload: {payload}")
+                    
+                    with requests.post(url, headers=headers, json=payload, stream=True) as response:
+                        logger.info(f"Received response with status code: {response.status_code}")
+                        
+                        if response.status_code != 200:
+                            error_msg = f"Model inference failed! Status code: {response.status_code}"
+                            logger.error(error_msg)
+                            # 返回错误信息，使用与阿里云 DashScope API 相同的格式
+                            error_response = {
+                                "output": {
+                                    "choices": [
+                                        {
+                                            "message": {
+                                                "content": f"API请求失败: {error_msg}",
+                                                "role": "assistant"
+                                            },
+                                            "finish_reason": "stop"
+                                        }
+                                    ]
+                                }
+                            }
+                            yield error_response
+                            return
+                        
+                        response_received = False
+                        chunk_count = 0
+                        
+                        for line in response.iter_lines():
+                            if not line:
+                                continue
+                                
+                            line = line.decode('utf-8')
+                            response_received = True
+                            
+                            if line.startswith('data:'):
+                                data = line[5:].strip()
+                                
+                                if data == '[DONE]':
+                                    logger.info("Received [DONE] marker")
+                                    break
+                                
+                                try:
+                                    chunk_data = json.loads(data)
+                                    
+                                    # 直接返回原始数据，不做任何转换
+                                    chunk_count += 1
+                                    logger.debug(f"Processing chunk #{chunk_count}: {json.dumps(chunk_data)[:100]}...")
+                                    
+                                    # 提取内容用于日志记录
+                                    if 'output' in chunk_data and 'choices' in chunk_data['output'] and len(chunk_data['output']['choices']) > 0:
+                                        choice = chunk_data['output']['choices'][0]
+                                        if 'message' in choice and 'content' in choice['message']:
+                                            content = choice['message']['content']
+                                            logger.info(f"Chunk #{chunk_count} content: {content[:50]}...")
+                                    
+                                    yield chunk_data
+                                except json.JSONDecodeError as e:
+                                    logger.error(f"Failed to decode JSON: {e} - Raw data: {data}")
+                                except Exception as e:
+                                    logger.error(f"Error processing SSE data: {str(e)}", exc_info=True)
+                        
+                        logger.info(f"Processed {chunk_count} chunks from SSE response")
+                        
+                        # 如果没有收到任何响应，返回一个空响应
+                        if not response_received or chunk_count == 0:
+                            logger.warning("No response received from API")
+                            empty_data = {
+                                "output": {
+                                    "choices": [
+                                        {
+                                            "message": {
+                                                "content": "没有收到 API 响应，请稍后再试",
+                                                "role": "assistant"
+                                            },
+                                            "finish_reason": "stop"
+                                        }
+                                    ]
+                                }
+                            }
+                            yield empty_data
+                            
+                except Exception as e:
+                    # 处理所有可能的异常
+                    error_msg = f"Exception during cloud inference: {str(e)}"
+                    logger.error(error_msg, exc_info=True)
+                    error_response = {
+                        "output": {
+                            "choices": [
+                                {
+                                    "message": {
+                                        "content": f"发生错误: {str(e)}",
+                                        "role": "assistant"
+                                    },
+                                    "finish_reason": "stop"
+                                }
+                            ]
+                        }
+                    }
+                    yield error_response
+            
+            # 将生成器函数的结果存储在列表中，确保传递给handle_cloud_stream_response的是可迭代对象
+            chunks = list(generate())
+            logger.debug(f"Generated {len(chunks)} chunks for streaming response")
+            return self.handle_cloud_stream_response(chunks)
+        else:
+            # 非流式响应处理
+            try:
+                response = requests.post(url, headers=headers, json=payload)
+                response_data = response.json()
 
-        if response.status_code != 200:
-            logger.error(f"Model inference failed! Error: {response_data}")
-            return None
+                if response.status_code != 200:
+                    logger.error(f"Model inference failed! Error: {response_data}")
+                    return None
 
-        result = response_data.get('text')
-        logger.info(f"Model output: {result}")
-        return result
+                # 返回原始响应数据
+                logger.info(f"Received non-streaming response: {json.dumps(response_data)[:200]}...")
+                return response_data
+            except Exception as e:
+                logger.error(f"Exception during cloud inference: {str(e)}", exc_info=True)
+                return None
 
     def cancel_fine_tune_job(self, job_id):
         """取消正在进行的模型调优任务
