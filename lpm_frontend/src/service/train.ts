@@ -85,6 +85,19 @@ export interface TrainingParams {
 
 export interface TrainBaseParams {
   model_name: string;
+  local_model_name?: string;
+  cloud_model_name?: string;
+}
+
+export interface CloudHyperParameters {
+  learning_rate?: number;
+  n_epochs?: number;
+}
+
+export interface CloudTrainingParams {
+  base_model: string;
+  training_type?: string;
+  hyper_parameters?: CloudHyperParameters;
 }
 
 export type TrainingConfig = TrainingParams & TrainAdvanceParams & TrainBaseParams;
