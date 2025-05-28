@@ -581,8 +581,66 @@ class CloudProgressHolder:
         Returns:
             Dict: Progress data
         """
-        return self.progress.to_dict()
+        return self.progress.data
         
+    def is_stage_completed(self, stage_name):
+        """
+        检查指定阶段是否已完成
+        
+        Args:
+            stage_name: 阶段名称（格式化后的，如"activating_the_memory_matrix"）
+            
+        Returns:
+            bool: 如果阶段已完成返回True，否则返回False
+        """
+        try:
+            # 加载最新的进度数据
+            self._load_progress()
+            
+            # 获取阶段对象
+            stage = self.progress.stage_map.get(stage_name)
+            if not stage:
+                logger.warning(f"Stage {stage_name} not found in progress data")
+                return False
+                
+            # 检查阶段状态
+            return stage.get("status") == CloudStatus.COMPLETED and stage.get("progress") == 100.0
+        except Exception as e:
+            logger.error(f"Error checking stage completion status: {str(e)}")
+            return False
+            
+    def is_step_completed(self, stage_name, step_name):
+        """
+        检查指定阶段中的特定步骤是否已完成
+        
+        Args:
+            stage_name: 阶段名称（格式化后的，如"activating_the_memory_matrix"）
+            step_name: 步骤名称（如"list_documents"）
+            
+        Returns:
+            bool: 如果步骤已完成返回True，否则返回False
+        """
+        try:
+            # 加载最新的进度数据
+            self._load_progress()
+            
+            # 获取阶段对象
+            stage = self.progress.stage_map.get(stage_name)
+            if not stage:
+                logger.warning(f"Stage {stage_name} not found in progress data")
+                return False
+                
+            # 查找步骤
+            for step in stage.get("steps", []):
+                if step.get("name") == step_name:
+                    return step.get("completed", False) and step.get("status") == CloudStatus.COMPLETED
+                    
+            logger.warning(f"Step {step_name} not found in stage {stage_name}")
+            return False
+        except Exception as e:
+            logger.error(f"Error checking step completion status: {str(e)}")
+            return False
+            
     def update_message(self, message: str):
         """
         更新进度消息

@@ -10,6 +10,7 @@ import time
 import json
 import tempfile
 import threading
+from datetime import datetime
 from pathlib import Path
 from ....configs.config import Config
 from .service import CloudService
@@ -98,6 +99,36 @@ def list_available_models():
 
 # ============= Cloud Training Process Routes =============
 
+@cloud_bp.route("/train/resume", methods=["POST"])
+def resume_cloud_training():
+    """Resume cloud training process from the last checkpoint
+    
+    Request: JSON object, containing:
+    - model_name: str, optional, the model name to resume training for
+    - base_model: str, optional, the base model to use for fine-tuning
+    - training_type: str, optional, the training type to use
+    - hyper_parameters: dict, optional, hyperparameters for training
+    
+    If model_name is not provided, the system will attempt to resume the most recent training process.
+    """
+    try:
+
+        cloud_train_service = CloudTrainProcessService.get_instance()
+
+        if cloud_train_service is None:
+            logger.warning("No training parameters found in file")
+            return jsonify(APIResponse.error("No training parameters found. Please use /train/start endpoint for initial training."))
+
+        thread = threading.Thread(target=cloud_train_service.start_process)
+        thread.daemon = True
+        thread.start()
+
+        return jsonify(APIResponse.success("Cloud resume training process started successfully"))
+    
+    except Exception as e:
+        logger.error(f"Failed to resume cloud training: {str(e)}", exc_info=True)
+        return jsonify(APIResponse.error(f"Failed to resume cloud training: {str(e)}"))
+
 @cloud_bp.route("/train/stop", methods=["POST"])
 def stop_cloud_training():
     """Stop cloud training process
@@ -108,44 +139,19 @@ def stop_cloud_training():
     If model_name is not provided, the system will attempt to stop the most recent training process.
     """
     try:
-        data = request.json or {}
-        model_name = data.get("model_name")
-        
-        # 如果没有提供model_name，尝试从job_id.json文件中获取最近的训练任务
-        if not model_name:
-            try:
-                current_dir = Path(__file__).parent
-                job_file_path = current_dir / "job_id.json"
-                
-                if job_file_path.exists():
-                    with open(job_file_path, "r") as f:
-                        job_info = json.load(f)
-                        job_id = job_info.get("job_id")
-                        if job_id:
-                            logger.info(f"Found job_id {job_id} from job_id.json")
-                            # 使用时间戳作为模型名称
-                            model_name = time.strftime("%Y%m%d_%H%M%S")
-                else:
-                    logger.warning("No job_id.json file found")
-            except Exception as e:
-                logger.error(f"Failed to read job ID from file: {str(e)}", exc_info=True)
-        
-        if not model_name:
-            return jsonify(APIResponse.error("No model_name provided and no active training job found"))
-        
-        # 获取CloudTrainProcessService实例
-        train_service = CloudTrainProcessService.get_instance(current_model_name=model_name)
+
+        train_service = CloudTrainProcessService.get_instance()
         
         if not train_service:
-            return jsonify(APIResponse.error(f"No training service found for model: {model_name}"))
+            return jsonify(APIResponse.error("No training parameters found. Please use /train/start endpoint for initial training."))
         
         # 停止训练进程
         success = train_service.stop_process()
         
         if success:
-            return jsonify(APIResponse.success(message=f"Cloud training process for model {model_name} stopped successfully"))
+            return jsonify(APIResponse.success(message=f"Cloud training process  stopped successfully"))
         else:
-            return jsonify(APIResponse.error(f"Failed to stop cloud training process for model {model_name}"))
+            return jsonify(APIResponse.error(f"Failed to stop cloud training process"))
     
     except Exception as e:
         logger.error(f"Failed to stop cloud training process: {str(e)}", exc_info=True)
@@ -163,6 +169,24 @@ def start_cloud_training():
         base_model = data.get("base_model")
         training_type = data.get("training_type", "efficient_sft")
         hyper_parameters = data.get("hyper_parameters", {})
+        
+        training_params = {
+            "model_name": model_name,
+            "base_model": base_model,
+            "training_type": training_type,
+            "hyper_parameters": hyper_parameters,
+            "created_at": datetime.now().isoformat()
+        }
+        
+
+        params_dir = Path("data/cloud_progress")
+        params_dir.mkdir(parents=True, exist_ok=True)
+        
+        params_file = params_dir / "cloud_training_params.json"
+        with open(params_file, "w", encoding="utf-8") as f:
+            json.dump(training_params, f, indent=2, ensure_ascii=False)
+        
+        logger.info(f"Training parameters saved to {params_file}")
         
         train_service = CloudTrainProcessService(current_model_name=model_name, base_model=base_model, training_type=training_type, hyper_parameters=hyper_parameters)
         
