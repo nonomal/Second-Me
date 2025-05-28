@@ -347,10 +347,11 @@ def check_cloud_deployment_status(model_id):
 
 @cloud_bp.route("/train/inference", methods=["POST"])
 def run_cloud_inference():
-    """Run inference using deployed model
+    """Run inference using deployed model with local knowledge retrieval
     
     This endpoint accepts a request in OpenAI-compatible format and returns a response
     in the same format. It supports both streaming and non-streaming responses.
+    It also supports local knowledge retrieval before sending to cloud inference.
     
     Request format:
     {
@@ -358,7 +359,10 @@ def run_cloud_inference():
         "model_id": "your-model-id",
         "temperature": 0.1,
         "max_tokens": 2000,
-        "stream": true
+        "stream": true,
+        "enable_l0_retrieval": false,
+        "enable_l1_retrieval": false,
+        "role_id": "optional-role-id"
     }
     """
     try:
@@ -375,20 +379,53 @@ def run_cloud_inference():
         if not body.model_id:
             return jsonify(APIResponse.error("model_id is required"))
 
-        # 2. 创建CloudService实例
+        # 2. 执行本地知识检索（如果启用）
+        enhanced_messages = body.messages.copy()
+        
+        if body.enable_l0_retrieval or body.enable_l1_retrieval:
+            logger.info("Performing local knowledge retrieval before cloud inference")
+            
+            # 从本地 ChatService 获取知识增强的消息
+            from lpm_kernel.api.domains.kernel2.dto.chat_dto import ChatRequest
+            from lpm_kernel.api.domains.kernel2.services.chat_service import chat_service
+            
+            # 构造临时的 ChatRequest 对象用于知识检索
+            temp_chat_request = ChatRequest(
+                message="",  # 将通过 messages 字段传递
+                messages=body.messages,
+                model="",  # 云端推理不需要本地模型
+                temperature=body.temperature,
+                max_tokens=body.max_tokens,
+                metadata={
+                    'enable_l0_retrieval': body.enable_l0_retrieval,
+                    'enable_l1_retrieval': body.enable_l1_retrieval,
+                    'role_id': body.role_id
+                }
+            )
+            
+            # 使用 ChatService 构建增强的消息（仅用于知识检索和prompt构建）
+            try:
+                enhanced_messages = chat_service._build_messages(temp_chat_request)
+                logger.info(f"Enhanced messages with local knowledge: {len(enhanced_messages)} messages")
+            except Exception as e:
+                logger.error(f"Local knowledge retrieval failed: {str(e)}")
+                # 如果知识检索失败，继续使用原始消息
+                enhanced_messages = body.messages
+
+        # 3. 创建CloudService实例
         cloud_service = CloudService()
 
         try:
-            # 3. 调用run_inference方法，传递流式参数
+            # 4. 调用run_inference方法，使用增强后的消息
             response = cloud_service.run_inference(
-                messages=body.messages,
+                messages=enhanced_messages,
                 model_id=body.model_id,
                 stream=body.stream,
                 temperature=body.temperature,
                 max_tokens=body.max_tokens
             )
             
-            # 4. 处理流式或非流式响应
+            # 5. 处理流式或非流式响应
             if body.stream:
                 return response
             else:

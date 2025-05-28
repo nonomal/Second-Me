@@ -22,7 +22,7 @@ interface StartTrainResponse {
 export type StepStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'suspended';
 export type StageStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'suspended';
 
-interface TrainStep {
+export interface TrainStep { // Add export here
   completed: boolean;
   current_file?: string;
   name: string;
@@ -31,7 +31,7 @@ interface TrainStep {
   have_output?: boolean;
 }
 
-interface TrainStage {
+export interface TrainStage { // Add export here
   name: string;
   progress: number;
   status: StageStatus;

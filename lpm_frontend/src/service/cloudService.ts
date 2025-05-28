@@ -1,5 +1,7 @@
 import { Request } from '../utils/request';
 import type { CommonResponse } from '../types/responseModal';
+import type { TrainProgress as LocalTrainProgress } from './train'; // Assuming this is the correct path and type for local progress
+import type { AxiosPromise } from 'axios';
 
 export interface CloudModel {
   model_id: string;
@@ -8,7 +10,7 @@ export interface CloudModel {
   created_at?: string;
 }
 
-export const listAvailableModels = () => {
+export const listAvailableModels = (): AxiosPromise<CommonResponse<CloudModel[]>> => {
   return Request<CommonResponse<CloudModel[]>>({
     method: 'get',
     url: '/api/cloud_service/list_available_models'
@@ -23,6 +25,22 @@ export interface TrainingJobInfo {
   message?: string;
 }
 
+// Re-using LocalTrainProgress structure for cloud progress data as per user's example and request.
+export type CloudProgressData = LocalTrainProgress;
+
+export interface CloudTrainingProgressResponseData {
+  job_id: string | null;
+  progress: CloudProgressData;
+  timestamp: string;
+}
+
+export const getCloudTrainingProgress = (): AxiosPromise<CommonResponse<CloudTrainingProgressResponseData>> => {
+  return Request<CommonResponse<CloudTrainingProgressResponseData>>({
+    method: 'get',
+    url: '/api/cloud_service/train/progress'
+  });
+};
+
 export interface CloudTrainingStatus {
   status: string; // e.g., "PROCESSING", "SUCCEEDED", "FAILED"
   model_id?: string; // Available when SUCCEEDED
@@ -31,11 +49,10 @@ export interface CloudTrainingStatus {
 }
 
 export const startCloudTraining = (params: {
-  base_model: string; // Corresponds to model_name in TrainingConfig
-  training_type?: string; // e.g., "efficient_sft" or other types your backend supports
+  base_model: string;
+  training_type?: string;
   hyper_parameters?: Record<string, unknown>;
-  // Add any other parameters your /api/cloud_service/train/start endpoint expects
-}) => {
+}): AxiosPromise<CommonResponse<unknown>> => {
   return Request<CommonResponse<unknown>>({
     method: 'post',
     url: '/api/cloud_service/train/start',
@@ -43,14 +60,7 @@ export const startCloudTraining = (params: {
   });
 };
 
-export const searchJobInfo = () => {
-  return Request<CommonResponse<TrainingJobInfo>>({
-    method: 'get',
-    url: '/api/cloud_service/train/search_job_info'
-  });
-};
-
-export const getCloudTrainingStatus = (jobId: string) => {
+export const getCloudTrainingStatus = (jobId: string): AxiosPromise<CommonResponse<CloudTrainingStatus>> => {
   return Request<CommonResponse<CloudTrainingStatus>>({
     method: 'get',
     url: `/api/cloud_service/train/status/training/${jobId}`
@@ -69,9 +79,46 @@ export interface DeploymentListResponse {
   deployments: CloudDeployment[];
 }
 
-export const listDeployments = () => {
+export const listDeployments = (): AxiosPromise<CommonResponse<DeploymentListResponse>> => {
   return Request<CommonResponse<DeploymentListResponse>>({
     method: 'get',
     url: '/api/cloud_service/train/list_deployments'
   });
+};
+
+// Cloud inference request interface
+export interface CloudInferenceRequest {
+  messages: { role: 'user' | 'assistant' | 'system'; content: string }[];
+  model_id: string;
+  temperature?: number;
+  max_tokens?: number;
+  stream?: boolean;
+  // Knowledge retrieval parameters for hybrid architecture
+  enable_l0_retrieval?: boolean;
+  enable_l1_retrieval?: boolean;
+  role_id?: string;
+}
+
+// Cloud inference function using fetch for streaming support
+export const runCloudInference = async (
+  request: CloudInferenceRequest,
+  signal?: AbortSignal
+): Promise<Response> => {
+  const response = await fetch('/api/cloud_service/train/inference', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive'
+    },
+    body: JSON.stringify(request),
+    signal
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  return response;
 };

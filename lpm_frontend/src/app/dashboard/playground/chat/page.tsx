@@ -14,6 +14,7 @@ import type { ChatRequest } from '@/hooks/useSSE';
 import { useSSE } from '@/hooks/useSSE';
 import { useLoadInfoStore } from '@/store/useLoadInfoStore';
 import { getTrainingParams } from '@/service/train';
+import { getActiveCloudModel, getCurrentModelDisplayName } from '@/utils/cloudModelUtils';
 
 // Use the Message type directly from storage
 type Message = StorageMessage;
@@ -273,7 +274,14 @@ export default function PlaygroundChat() {
       stream: true
     };
 
-    await sendStreamMessage(chatRequest);
+    // Check if a cloud model is active
+    const cloudModel = getActiveCloudModel();
+
+    if (cloudModel) {
+      await sendStreamMessage(chatRequest, true, cloudModel.deployed_model);
+    } else {
+      await sendStreamMessage(chatRequest);
+    }
   };
 
   // Listen for streamContent changes to update messages
@@ -331,7 +339,12 @@ export default function PlaygroundChat() {
       {/* Main chat area */}
       <div className="flex-1 flex flex-col bg-white">
         <div className="flex items-center justify-between px-6 py-3 border-b">
-          <h2 className="text-lg font-semibold">Chat with Second Me</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold">Chat with Second Me</h2>
+            <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
+              {getCurrentModelDisplayName()}
+            </span>
+          </div>
           <button className="text-sm text-gray-600 hover:text-gray-900" onClick={handleClearChat}>
             Clear Chat
           </button>

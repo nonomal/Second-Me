@@ -14,10 +14,9 @@ import {
 } from '@/service/train';
 import {
   startCloudTraining,
-  searchJobInfo,
-  getCloudTrainingStatus
+  getCloudTrainingProgress,
 } from '@/service/cloudService';
-import type { TrainingJobInfo } from '@/service/cloudService';
+import type { CloudProgressData } from '@/service/cloudService';
 import { useTrainingStore } from '@/store/useTrainingStore';
 import { getMemoryList } from '@/service/memory';
 import { message, Modal } from 'antd';
@@ -100,7 +99,8 @@ export default function TrainingPage(): JSX.Element {
 
   // 云端训练相关状态
   const [trainingType, setTrainingType] = useState<'local' | 'cloud'>('local');
-  const [cloudJobInfo, setCloudJobInfo] = useState<TrainingJobInfo | null>(null);
+  const [cloudProgress, setCloudProgress] = useState<CloudProgressData | null>(null);
+  const [cloudJobId, setCloudJobId] = useState<string | null>(null);
 
   const cleanupEventSourceRef = useRef<(() => void) | undefined>();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -139,6 +139,45 @@ export default function TrainingPage(): JSX.Element {
         message.error('CUDA availability check failed');
       });
   }, []);
+
+  // Check cloud training progress on page load
+  const checkCloudTrainingProgress = async () => {
+    try {
+      const res = await getCloudTrainingProgress();
+      
+      if (res.data.code === 0) {
+        const progressData = res.data.data.progress;
+        const currentJobId = res.data.data.job_id;
+        
+        if (progressData) {
+          setCloudProgress(progressData);
+          
+          if (currentJobId) {
+            setCloudJobId(currentJobId);
+          }
+
+          // If training is in progress, set the state and start polling
+          if (progressData.status === 'in_progress') {
+            setTrainingType('cloud');
+            setIsTraining(true);
+            setStatus('training');
+            startCloudTrainingPolling();
+          } else if (progressData.status === 'completed') {
+            setTrainingType('cloud');
+            setStatus('trained');
+            setIsTraining(false);
+          } else if (progressData.status === 'failed') {
+            setTrainingType('cloud');
+            setStatus('training'); // Keep as 'training' since ModelStatus doesn't have 'failed'
+            setIsTraining(false);
+          }
+        }
+      }
+    } catch (error) {
+      // Silently handle errors for initial check - cloud training might not be active
+      console.log('No active cloud training found or error checking cloud progress:', error);
+    }
+  };
 
   // Start polling training progress
   const startPolling = () => {
@@ -214,8 +253,11 @@ export default function TrainingPage(): JSX.Element {
         console.error('Error checking memory count:', error);
       }
 
-      // Only proceed with training status check if memory check passes
-      checkTrainStatus();
+      // Check both local and cloud training status
+      await Promise.allSettled([
+        checkTrainStatus(),
+        checkCloudTrainingProgress()
+      ]);
     };
 
     checkMemoryCount();
@@ -255,7 +297,10 @@ export default function TrainingPage(): JSX.Element {
   useEffect(() => {
     return () => {
       stopPolling(); // 停止本地训练轮询
-      stopCloudPolling(); // 停止云端训练轮询
+      if (cloudPollingRef.current) { // Ensure cloud polling is stopped
+        clearTimeout(cloudPollingRef.current);
+      }
+      pollingStopRef.current = true; // Set flag to stop any ongoing polling
     };
   }, []);
 
@@ -512,11 +557,13 @@ export default function TrainingPage(): JSX.Element {
     localStorage.removeItem('trainingLogs');
     // 重置训练状态
     resetTrainingState();
+    setCloudProgress(null); // Reset cloud progress
+    setCloudJobId(null); // Reset cloud job ID
 
     try {
       const res = await startCloudTraining({
         base_model: trainingParams.cloud_model_name,
-        training_type: 'efficient_sft',
+        training_type: 'efficient_sft', // Or make this configurable if needed
         hyper_parameters: {
           n_epochs: trainingParams.number_of_epochs,
           learning_rate: trainingParams.learning_rate
@@ -524,9 +571,14 @@ export default function TrainingPage(): JSX.Element {
       });
 
       if (res.data.code === 0) {
+        const data = res.data.data as { job_id?: string }; // Type assertion for the data
+        const returnedJobId = data.job_id;
+        if (returnedJobId) {
+          setCloudJobId(returnedJobId);
+        }
         // 保存训练配置并开始轮询
         localStorage.setItem('trainingParams', JSON.stringify(trainingParams));
-        scrollPageToBottom();
+        scrollPageToBottom(); // Corrected function call
         setTrainingType('cloud');
         startCloudTrainingPolling();
       } else {
@@ -550,111 +602,70 @@ export default function TrainingPage(): JSX.Element {
     // 设置状态为训练中
     setStatus('training');
     setIsTraining(true);
-
-    // 先轮询任务信息获取 job_id
-    pollCloudJobInfo();
+    pollingStopRef.current = false; // Reset polling stop flag
+    pollCloudProgress();
   };
 
-  // 轮询云端任务信息
-  const pollCloudJobInfo = () => {
+  // New function to poll cloud training progress
+  const pollCloudProgress = () => {
     if (pollingStopRef.current) return;
 
-    searchJobInfo()
+    getCloudTrainingProgress()
       .then((res) => {
+        if (pollingStopRef.current) return; // Check again in case it was stopped during API call
+
         if (res.data.code === 0) {
-          const jobInfo = res.data.data as TrainingJobInfo;
+          const progressData = res.data.data.progress;
+          const currentJobId = res.data.data.job_id;
 
-          setCloudJobInfo(jobInfo);
-
-          if (jobInfo && jobInfo.job_id) {
-            // 如果获取到了 job_id，就开始轮询训练状态
-            pollCloudTrainingStatus(jobInfo.job_id);
-
-            return;
+          setCloudProgress(progressData);
+          if (currentJobId) {
+            setCloudJobId(currentJobId);
           }
-        }
-
-        // 如果没有获取到 job_id，继续轮询
-        if (!pollingStopRef.current) {
-          cloudPollingRef.current = setTimeout(() => {
-            pollCloudJobInfo();
-          }, POLLING_INTERVAL);
-        }
-      })
-      .catch((error) => {
-        console.error('Error polling cloud job info:', error);
-
-        if (!pollingStopRef.current) {
-          cloudPollingRef.current = setTimeout(() => {
-            pollCloudJobInfo();
-          }, POLLING_INTERVAL);
-        }
-      });
-  };
-
-  // 根据 job_id 轮询云端训练状态
-  const pollCloudTrainingStatus = (jobId: string) => {
-    if (pollingStopRef.current) return;
-
-    getCloudTrainingStatus(jobId)
-      .then((res) => {
-        if (res.data.code === 0) {
-          const jobStatus = res.data.message;
-
-          // 根据状态更新进度
-          if (jobStatus === 'SUCCEEDED') {
-            // 训练完成
+          
+          // Check training status from progressData
+          // Assuming 'completed' or 'succeeded' means success, and 'failed' means failure.
+          // Adjust these based on actual status values from your API.
+          if (progressData.status === 'completed' || progressData.status === 'succeeded') {
             setStatus('trained');
             setIsTraining(false);
-
-            // 显示训练完成庆祝效果
             const hasShownTrainingComplete = localStorage.getItem('hasShownTrainingComplete');
-
             if (hasShownTrainingComplete !== 'true') {
               setTimeout(() => {
                 setShowCelebration(true);
                 localStorage.setItem('hasShownTrainingComplete', 'true');
               }, 1000);
             }
-
             stopCloudPolling();
-
             return;
-          } else if (jobStatus === 'FAILED') {
-            // 训练失败
-            message.error('Cloud training failed');
+          } else if (progressData.status === 'failed') {
+            message.error(progressData.message || 'Cloud training failed');
+            setStatus('failed'); 
             setIsTraining(false);
             stopCloudPolling();
             return;
           }
 
-          // 继续轮询
+          // Continue polling if still in progress
           if (!pollingStopRef.current) {
-            cloudPollingRef.current = setTimeout(() => {
-              pollCloudTrainingStatus(jobId);
-            }, POLLING_INTERVAL);
+            cloudPollingRef.current = setTimeout(pollCloudProgress, POLLING_INTERVAL);
           }
         } else {
-          // API 错误
-          message.error(res.data.message || 'Failed to get cloud training status');
-
+          message.error(res.data.message || 'Failed to get cloud training progress');
+          // Optionally decide if polling should stop or continue on API error
           if (!pollingStopRef.current) {
-            cloudPollingRef.current = setTimeout(() => {
-              pollCloudTrainingStatus(jobId);
-            }, POLLING_INTERVAL);
+            cloudPollingRef.current = setTimeout(pollCloudProgress, POLLING_INTERVAL);
           }
         }
       })
       .catch((error) => {
-        console.error('Error polling cloud training status:', error);
-
+        console.error('Error polling cloud training progress:', error);
         if (!pollingStopRef.current) {
-          cloudPollingRef.current = setTimeout(() => {
-            pollCloudTrainingStatus(jobId);
-          }, POLLING_INTERVAL);
+          cloudPollingRef.current = setTimeout(pollCloudProgress, POLLING_INTERVAL);
         }
       });
   };
+
 
   // 停止云端轮询
   const stopCloudPolling = () => {
@@ -678,11 +689,12 @@ export default function TrainingPage(): JSX.Element {
     return (
       <div className="space-y-6">
         {/* Training Progress Component */}
-        <TrainingProgress 
-          status={status} 
+        <TrainingProgress
+          status={status}
           trainingProgress={trainingProgress}
           trainingType={trainingType}
-          cloudJobInfo={cloudJobInfo}
+          cloudProgressData={cloudProgress}
+          cloudJobId={cloudJobId}
         />
       </div>
     );
@@ -786,11 +798,19 @@ export default function TrainingPage(): JSX.Element {
               <span className="font-mono">{trainingType}</span>
             </div>
           </div>
-          {cloudJobInfo && (
+          {cloudProgress && ( // Add new debug for cloudProgress
             <div className="mt-4">
-              <h4 className="font-medium mb-2">云训练任务信息:</h4>
+              <h4 className="font-medium mb-2">云训练进度信息:</h4>
               <div className="bg-white p-3 rounded shadow-inner">
-                <pre className="text-sm text-gray-700">{JSON.stringify(cloudJobInfo, null, 2)}</pre>
+                <pre className="text-sm text-gray-700">{JSON.stringify(cloudProgress, null, 2)}</pre>
+              </div>
+            </div>
+          )}
+          {cloudJobId && ( // Add new debug for cloudJobId
+            <div className="mt-4">
+              <h4 className="font-medium mb-2">云训练任务 ID:</h4>
+              <div className="bg-white p-3 rounded shadow-inner">
+                <pre className="text-sm text-gray-700">{JSON.stringify(cloudJobId, null, 2)}</pre>
               </div>
             </div>
           )}

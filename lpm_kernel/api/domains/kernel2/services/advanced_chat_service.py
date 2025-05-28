@@ -34,11 +34,13 @@ class AdvancedChatService:
         
         # Convert AdvancedChatRequest to ChatRequest
         chat_request = ChatRequest(
-            message=request.requirement,
-            system_prompt="",  # Will be set by strategy
-            enable_l0_retrieval=request.enable_l0_retrieval,
-            enable_l1_retrieval=request.enable_l1_retrieval,
-            temperature=request.temperature
+            messages=[{"role": "user", "content": request.requirement}],
+            temperature=request.temperature,
+            stream=False,
+            metadata={
+                'enable_l0_retrieval': request.enable_l0_retrieval,
+                'enable_l1_retrieval': request.enable_l1_retrieval
+            }
         )
         logger.info(f"Created chat request with message: {chat_request.message[:100]}...")
         
@@ -61,9 +63,9 @@ class AdvancedChatService:
         logger.info(f"Input requirement: {requirement[:100]}...")
         
         chat_request = ChatRequest(
-            message=requirement,
-            system_prompt="",  # Will be set by strategy
-            temperature=temperature
+            messages=[{"role": "user", "content": requirement}],
+            temperature=temperature,
+            stream=False
         )
         
         logger.info("Calling chat service with ExpertSolutionStrategy using expert model...")
@@ -85,15 +87,15 @@ class AdvancedChatService:
         logger.info(f"Validating solution of length {len(solution)} characters...")
         
         chat_request = ChatRequest(
-            message=f"""
+            messages=[{"role": "user", "content": f"""
             Requirement:
             {requirement}
             
             Solution:
             {solution}
-            """,
-            system_prompt="",  # Will be set by strategy
-            temperature=0.2  # Lower temperature for more consistent validation
+            """}],
+            temperature=0.2,  # Lower temperature for more consistent validation
+            stream=False
         )
         
         logger.info("Calling chat service with SolutionValidatorStrategy...")

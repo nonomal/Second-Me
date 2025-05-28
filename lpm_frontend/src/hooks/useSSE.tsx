@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { runCloudInference, type CloudInferenceRequest } from '../service/cloudService';
 
 export interface ChatRequest {
   messages: ChatHistory[];
@@ -18,7 +19,19 @@ interface ChatHistory {
   content: string;
 }
 
-export const useSSE = () => {
+export const useSSE = (): {
+  stopSSE: () => void;
+  sendStreamMessage: (
+    request: ChatRequest,
+    isCloudModel?: boolean,
+    cloudModelId?: string
+  ) => Promise<void>;
+  streaming: boolean;
+  error: string | null;
+  streamContent: string;
+  streamRawContent: string;
+  firstContentLoading: boolean;
+} => {
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [streamContent, setStreamContent] = useState('');
@@ -37,7 +50,11 @@ export const useSSE = () => {
     setStreaming(false);
   };
 
-  const sendStreamMessage = async (request: ChatRequest) => {
+  const sendStreamMessage = async (
+    request: ChatRequest,
+    isCloudModel = false,
+    cloudModelId?: string
+  ) => {
     setStreaming(true);
     setError(null);
     setStreamContent('');
@@ -54,20 +71,42 @@ export const useSSE = () => {
     const signal = controller.signal;
 
     try {
-      const response = await fetch('/api/kernel2/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          Connection: 'keep-alive'
-        },
-        body: JSON.stringify(request),
-        signal
-      });
+      let response: Response;
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (isCloudModel && cloudModelId) {
+        // Use cloud inference endpoint
+        const cloudRequest: CloudInferenceRequest = {
+          messages: request.messages.map((msg) => ({
+            role: msg.role,
+            content: msg.content
+          })),
+          model_id: cloudModelId,
+          temperature: request.temperature,
+          max_tokens: request.max_tokens || 2000,
+          stream: true,
+          // Pass knowledge retrieval parameters from metadata
+          enable_l0_retrieval: request.metadata?.enable_l0_retrieval || false,
+          enable_l1_retrieval: request.metadata?.enable_l1_retrieval || false,
+          role_id: request.metadata?.role_id
+        };
+
+        response = await runCloudInference(cloudRequest, signal);
+      } else {
+        response = await fetch('/api/kernel2/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            Connection: 'keep-alive'
+          },
+          body: JSON.stringify(request),
+          signal
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
       }
 
       const reader = response.body?.getReader();
@@ -109,12 +148,30 @@ export const useSSE = () => {
             if (!jsonChunk) continue;
 
             const parsedData = JSON.parse(jsonChunk);
-            const content = parsedData?.choices[0].delta.content || '';
+            
+            let content = '';
+            
+            if (isCloudModel) {
+              // Cloud API format: {"output": {"choices": [{"message": {"content": "...", "role": "assistant"}}]}}
+              content = parsedData?.output?.choices?.[0]?.message?.content || '';
+              // For cloud API, content is already accumulated, so we set it directly
 
-            // Use useRef to record the latest streamContent
-            setFirstContentLoading(false);
-            streamContentRef.current += content;
-            setStreamContent(streamContentRef.current);
+              if (content) {
+                setFirstContentLoading(false);
+                streamContentRef.current = content;
+                setStreamContent(content);
+              }
+            } else {
+              // Local API format: {"choices": [{"delta": {"content": "..."}}]}
+              content = parsedData?.choices?.[0]?.delta?.content || '';
+              // For local API, we need to accumulate the content
+
+              if (content) {
+                setFirstContentLoading(false);
+                streamContentRef.current += content;
+                setStreamContent(streamContentRef.current);
+              }
+            }
           }
         } catch {
           setStreaming(false);

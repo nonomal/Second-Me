@@ -127,9 +127,17 @@ export const useTrainingStore = create<ModelState>((set, get) => ({
       if (res.data.code === 0) {
         const isRunning = res.data.data.is_running;
 
-        if (isRunning) {
+        // 检查是否有活跃的云端模型
+        const activeCloudModel = localStorage.getItem('activeCloudModel');
+        
+        if (activeCloudModel) {
+          // 如果有云端模型，设置服务为已启动
+          set({ serviceStarted: true });
+        } else if (isRunning) {
+          // 本地模型服务正在运行
           set({ serviceStarted: true });
         } else {
+          // 没有任何服务运行
           set({ serviceStarted: false });
         }
       }
@@ -157,7 +165,9 @@ export const useTrainingStore = create<ModelState>((set, get) => ({
                       'Qwen2.5-0.5B-Instruct';
       
       const res = await getTrainProgress({
-        model_name: modelName
+        model_name: modelName,
+        local_model_name: config.local_model_name || modelName,
+        cloud_model_name: config.cloud_model_name || ''
       });
 
       if (res.data.code === 0) {

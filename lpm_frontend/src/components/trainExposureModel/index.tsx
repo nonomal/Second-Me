@@ -6,8 +6,9 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 
 export interface IStepOutputInfo {
-  path?: string;
+  path?: string | null; // Allow null for path
   stepName: string;
+  stageName?: string; // Add optional stageName
 }
 interface IProps {
   handleClose: () => void;

@@ -616,25 +616,44 @@ export function ModelStatus() {
   };
 
   const handleStopService = () => {
-    setServiceStopping(true);
-    stopService()
-      .then((res) => {
-        if (res.data.code === 0) {
-          messageApi.success({ content: 'Service stopping...', duration: 1 });
-          startStopPolling();
-        } else {
-          messageApi.error({ content: res.data.message!, duration: 1 });
-          setServiceStopping(false);
-        }
-      })
-      .catch((error: any) => {
-        console.error('Error stopping service:', error);
-        messageApi.error({
-          content: error.response?.data?.message || error.message,
-          duration: 1
-        });
+    // 检查是否有活跃的云端模型
+    const activeCloudModel = localStorage.getItem('activeCloudModel');
+    
+    if (activeCloudModel) {
+      // 对于云端模型，只需要清除本地状态
+      setServiceStopping(true);
+      
+      setTimeout(() => {
+        // 清除云端模型信息
+        localStorage.removeItem('activeCloudModel');
         setServiceStopping(false);
-      });
+        messageApi.success({ content: 'Cloud model service stopped successfully!', duration: 2 });
+        
+        // 更新服务状态
+        fetchServiceStatus();
+      }, 1000);
+    } else {
+      // 对于本地模型，使用原有的停止逻辑
+      setServiceStopping(true);
+      stopService()
+        .then((res) => {
+          if (res.data.code === 0) {
+            messageApi.success({ content: 'Service stopping...', duration: 1 });
+            startStopPolling();
+          } else {
+            messageApi.error({ content: res.data.message!, duration: 1 });
+            setServiceStopping(false);
+          }
+        })
+        .catch((error: any) => {
+          console.error('Error stopping service:', error);
+          messageApi.error({
+            content: error.response?.data?.message || error.message,
+            duration: 1
+          });
+          setServiceStopping(false);
+        });
+    }
   };
 
   const handleServiceAction = () => {
@@ -671,26 +690,62 @@ export function ModelStatus() {
   const handleStartServiceConfirmed = () => {
     if (!selectedModelForConfirmation) return;
 
-    // Start the service with the selected model
-    setServiceStarting(true);
-    startService(selectedModelForConfirmation)
-      .then((res) => {
-        if (res.data.code === 0) {
-          messageApi.success({ content: 'Service starting...', duration: 1 });
-          startPolling();
-        } else {
-          setServiceStarting(false);
-          messageApi.error({ content: res.data.message!, duration: 1 });
-        }
-      })
-      .catch((error: any) => {
-        console.error('Error starting service:', error);
+    // 检查是否为云端模型
+    const isCloudModel = selectedModelForConfirmation.model_path.includes('cloud/');
+    
+    if (isCloudModel) {
+      // 对于云端模型，我们不需要启动本地服务，而是标记服务为已启动状态
+      // 云端模型的推理会通过 /train/inference 接口直接调用
+      setServiceStarting(true);
+      
+      // 模拟启动过程，实际上云端模型已经部署好了
+      setTimeout(() => {
         setServiceStarting(false);
-        messageApi.error({
-          content: error.response?.data?.message || error.message,
-          duration: 1
+        // 直接调用 fetchServiceStatus 来更新状态，这里我们需要特殊处理云端模型
+        // 由于云端模型不需要本地服务，我们直接设置为已启动
+        messageApi.success({ content: 'Cloud model service started successfully!', duration: 2 });
+        
+        // 对于云端模型，我们需要在 localStorage 中保存云端模型信息，用于后续推理
+        const cloudModelInfo = {
+          name: selectedModelForConfirmation.model_path.split('/')[1] || 'Unknown Cloud Model',
+          deployed_model: selectedModelForConfirmation.training_params.deployed_model,
+          base_model: selectedModelForConfirmation.training_params.base_model || 'Unknown Base Model',
+          status: selectedModelForConfirmation.training_params.status || 'RUNNING'
+        };
+        localStorage.setItem('activeCloudModel', JSON.stringify(cloudModelInfo));
+        
+        // 手动更新服务状态为已启动（这是前端状态管理）
+        fetchServiceStatus()
+          .then(() => {
+            // 由于云端模型不会在本地服务状态中体现，我们需要特殊处理
+            // 这里我们可以设置一个特殊的状态来表示云端模型服务已启动
+          })
+          .catch((error) => {
+            console.error('Error fetching service status after cloud model start:', error);
+          });
+      }, 1000);
+    } else {
+      // 对于本地模型，使用原有的启动逻辑
+      setServiceStarting(true);
+      startService(selectedModelForConfirmation)
+        .then((res) => {
+          if (res.data.code === 0) {
+            messageApi.success({ content: 'Service starting...', duration: 1 });
+            startPolling();
+          } else {
+            setServiceStarting(false);
+            messageApi.error({ content: res.data.message!, duration: 1 });
+          }
+        })
+        .catch((error: any) => {
+          console.error('Error starting service:', error);
+          setServiceStarting(false);
+          messageApi.error({
+            content: error.response?.data?.message || error.message,
+            duration: 1
+          });
         });
-      });
+    }
 
     // Close the confirmation modal
     setShowConfirmationModal(false);

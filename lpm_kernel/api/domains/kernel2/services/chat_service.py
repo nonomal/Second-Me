@@ -59,7 +59,9 @@ class ChatService:
         result_chain = self.default_strategy_chain.copy()
         
         # Add knowledge enhancement strategy based on request parameters
-        if request.enable_l0_retrieval or request.enable_l1_retrieval:
+        enable_l0 = request.metadata.get('enable_l0_retrieval', False) if request.metadata else False
+        enable_l1 = request.metadata.get('enable_l1_retrieval', False) if request.metadata else False
+        if enable_l0 or enable_l1:
             result_chain.append(KnowledgeEnhancedStrategy)
             
         return result_chain
