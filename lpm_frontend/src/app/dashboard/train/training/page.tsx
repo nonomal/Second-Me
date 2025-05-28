@@ -785,36 +785,6 @@ export default function TrainingPage(): JSX.Element {
 
         {/* Training completion celebration effect */}
         <CelebrationEffect isVisible={showCelebration} onClose={() => setShowCelebration(false)} />
-
-        {/* 调试区域：显示Training参数 */}
-        <div className="mt-8 p-4 border rounded-md bg-gray-50">
-          <h3 className="text-lg font-medium mb-4">训练参数调试信息</h3>
-          <div className="bg-white p-3 rounded shadow-inner overflow-auto max-h-80">
-            <pre className="text-sm text-gray-700">{JSON.stringify(trainingParams, null, 2)}</pre>
-          </div>
-          <div className="mt-4">
-            <h4 className="font-medium mb-2">当前训练类型:</h4>
-            <div className="bg-white p-3 rounded shadow-inner">
-              <span className="font-mono">{trainingType}</span>
-            </div>
-          </div>
-          {cloudProgress && ( // Add new debug for cloudProgress
-            <div className="mt-4">
-              <h4 className="font-medium mb-2">云训练进度信息:</h4>
-              <div className="bg-white p-3 rounded shadow-inner">
-                <pre className="text-sm text-gray-700">{JSON.stringify(cloudProgress, null, 2)}</pre>
-              </div>
-            </div>
-          )}
-          {cloudJobId && ( // Add new debug for cloudJobId
-            <div className="mt-4">
-              <h4 className="font-medium mb-2">云训练任务 ID:</h4>
-              <div className="bg-white p-3 rounded shadow-inner">
-                <pre className="text-sm text-gray-700">{JSON.stringify(cloudJobId, null, 2)}</pre>
-              </div>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );
