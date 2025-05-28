@@ -161,6 +161,16 @@ def stop_cloud_training():
 def start_cloud_training():
     """Start cloud training process"""
     try:
+        params_dir = Path("data/cloud_progress")
+        if params_dir.exists():
+            import os
+            logger.info("Cleaning cloud_progress directory...")
+            for file_path in params_dir.glob("*"):
+                if file_path.is_file():
+                    os.remove(file_path)
+                    logger.info(f"Removed file: {file_path}")
+            logger.info("Cloud_progress directory cleaned successfully")
+            
         data = request.json
         
         timestamp = time.strftime("%Y%m%d_%H%M%S")
@@ -278,7 +288,7 @@ def reset_cloud_training_progress():
         if train_service:
             # 如果有正在运行的训练服务，使用其job_id和model_name
             job_id = train_service.job_id
-            model_name = train_service.current_model_name
+            model_name = train_service.model_name
         else:
             # 如果没有正在运行的训练服务，尝试加载最新的进度文件
             progress_holder, job_id = CloudProgressHolder.get_latest_progress()
@@ -308,8 +318,10 @@ def reset_cloud_training_progress():
 # ... (其他代码保持不变)
 def search_job_info():
     try:
-        current_dir = Path(__file__).parent
-        job_file_path = current_dir / "job_id.json"
+        # 使用data/cloud_progress文件夹存储job_id.json
+        params_dir = Path("data/cloud_progress")
+        params_dir.mkdir(parents=True, exist_ok=True)
+        job_file_path = params_dir / "job_id.json"
         
         if not job_file_path.exists():
             return jsonify(APIResponse.success(data={

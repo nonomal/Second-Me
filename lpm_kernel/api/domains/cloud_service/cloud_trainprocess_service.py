@@ -49,6 +49,7 @@ class CloudTrainProcessService(TrainProcessService):
         self.base_model = base_model
         self.training_type = training_type
         self.hyper_parameters = hyper_parameters
+        self.model_name = current_model_name
         self.job_id = None
         
         # Initialize cloud service
@@ -445,9 +446,10 @@ class CloudTrainProcessService(TrainProcessService):
                     hyper_parameters=self.hyper_parameters
                 )
                 try:
-                    current_dir = Path(__file__).parent
-
-                    job_file_path = current_dir / "job_id.json"
+                    # 使用data/cloud_progress文件夹存储job_id.json
+                    params_dir = Path("data/cloud_progress")
+                    params_dir.mkdir(parents=True, exist_ok=True)
+                    job_file_path = params_dir / "job_id.json"
 
                     job_info = {
                         "job_id": success_id,
@@ -590,8 +592,9 @@ class CloudTrainProcessService(TrainProcessService):
             
             if not self.job_id:
                 try:
-                    current_dir = Path(__file__).parent
-                    job_file_path = current_dir / "job_id.json"
+                    # 使用data/cloud_progress文件夹存储job_id.json
+                    params_dir = Path("data/cloud_progress")
+                    job_file_path = params_dir / "job_id.json"
                     
                     if job_file_path.exists():
                         with open(job_file_path, "r") as f:
