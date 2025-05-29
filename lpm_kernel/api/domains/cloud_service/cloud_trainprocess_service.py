@@ -1,7 +1,8 @@
 import time
 import json
 import os
-import time
+import enum
+import threading
 from pathlib import Path
 from typing import Dict, Any
 
@@ -12,6 +13,11 @@ from lpm_kernel.api.domains.trainprocess.trainprocess_service import TrainProces
 from lpm_kernel.configs.logging import get_train_process_logger
 
 logger = get_train_process_logger()
+
+class PrepareDataResult(enum.Enum):
+    SUCCESS = "success"
+    STOPPED = "stopped"
+    ERROR = "error"
 
 class CloudTrainProcessService(TrainProcessService):
     """Cloud training process service (singleton pattern)
@@ -51,6 +57,11 @@ class CloudTrainProcessService(TrainProcessService):
         self.hyper_parameters = hyper_parameters
         self.model_name = current_model_name
         self.job_id = None
+        
+        # 用于跟踪数据处理线程
+        self._data_processing_thread = None
+        self._data_processing_completed = threading.Event()
+        self._data_processing_result = None
         
         # Initialize cloud service
         self.cloud_service = CloudService()
@@ -96,8 +107,14 @@ class CloudTrainProcessService(TrainProcessService):
 
 
             
-    def prepare_training_data(self) -> bool:
-        """Prepare training data for cloud training"""
+    def prepare_training_data(self) -> PrepareDataResult:
+        """Prepare training data for cloud training
+        
+        Returns:
+            PrepareDataResult: SUCCESS if data preparation completed successfully,
+                              STOPPED if process was stopped by user,
+                              ERROR if an error occurred during data preparation
+        """
         try:
             # 执行第一阶段的步骤（Activating the Memory Matrix）
             logger.info("Executing memory matrix activation steps...")
@@ -111,21 +128,21 @@ class CloudTrainProcessService(TrainProcessService):
                 # 检查是否已停止
                 if self.is_stopped:
                     logger.info("Process has been stopped, cancelling data preparation")
-                    return False
+                    return PrepareDataResult.STOPPED
             
                 # 1. 列出文档
                 logger.info("Step 1.1: Listing documents...")
                 # 检查是否已停止
                 if self.is_stopped:
                     logger.info("Process has been stopped, cancelling data preparation")
-                    return False
+                    return PrepareDataResult.STOPPED
                 # 检查该步骤是否已完成
                 if self.progress.is_step_completed(stage_name, "list_documents"):
                     logger.info("Step 'list_documents' already completed, skipping...")
                 else:
                     if not super().list_documents():
                         logger.error("Failed to list documents")
-                        return False
+                        return PrepareDataResult.ERROR
             
                 # 更新第一步完成后的进度
                 if stage:
@@ -143,14 +160,14 @@ class CloudTrainProcessService(TrainProcessService):
                 # 检查是否已停止
                 if self.is_stopped:
                     logger.info("Process has been stopped, cancelling data preparation")
-                    return False
+                    return PrepareDataResult.STOPPED
                 # 检查该步骤是否已完成
                 if self.progress.is_step_completed(stage_name, "generate_document_embeddings"):
                     logger.info("Step 'generate_document_embeddings' already completed, skipping...")
                 else:
                     if not super().generate_document_embeddings():
                         logger.error("Failed to generate document embeddings")
-                        return False
+                        return PrepareDataResult.ERROR
             
                 # 更新第二步完成后的进度
                 if stage:
@@ -167,10 +184,10 @@ class CloudTrainProcessService(TrainProcessService):
             # 检查是否已停止
             if self.is_stopped:
                 logger.info("Process has been stopped, cancelling data preparation")
-                return False
+                return PrepareDataResult.STOPPED
             if not super().process_chunks():
                 logger.error("Failed to process document chunks")
-                return False
+                return PrepareDataResult.ERROR
             
             # 更新第三步完成后的进度
             if stage:
@@ -187,10 +204,10 @@ class CloudTrainProcessService(TrainProcessService):
             # 检查是否已停止
             if self.is_stopped:
                 logger.info("Process has been stopped, cancelling data preparation")
-                return False
+                return PrepareDataResult.STOPPED
             if not super().chunk_embedding():
                 logger.error("Failed to generate chunk embeddings")
-                return False
+                return PrepareDataResult.ERROR
             
             # 更新第一阶段完成后的进度为100%并标记为已完成
             if stage:
@@ -217,14 +234,14 @@ class CloudTrainProcessService(TrainProcessService):
                 # 检查是否已停止
                 if self.is_stopped:
                     logger.info("Process has been stopped, cancelling data preparation")
-                    return False
+                    return PrepareDataResult.STOPPED
                 # 检查该步骤是否已完成
                 if self.progress.is_step_completed(stage_name, "extract_dimensional_topics"):
                     logger.info("Step 'extract_dimensional_topics' already completed, skipping...")
                 else:
                     if not super().extract_dimensional_topics():
                         logger.error("Failed to extract dimensional topics")
-                        return False
+                        return PrepareDataResult.ERROR
             
                 # 更新第一步完成后的进度
                 if stage:
@@ -242,14 +259,14 @@ class CloudTrainProcessService(TrainProcessService):
                 # 检查是否已停止
                 if self.is_stopped:
                     logger.info("Process has been stopped, cancelling data preparation")
-                    return False
+                    return PrepareDataResult.STOPPED
                 # 检查该步骤是否已完成
                 if self.progress.is_step_completed(stage_name, "generate_biography"):
                     logger.info("Step 'generate_biography' already completed, skipping...")
                 else:
                     if not super().generate_biography():
                         logger.error("Failed to generate biography")
-                        return False
+                        return PrepareDataResult.ERROR
             
                 # 更新第二步完成后的进度
                 if stage:
@@ -266,14 +283,14 @@ class CloudTrainProcessService(TrainProcessService):
                 # 检查是否已停止
                 if self.is_stopped:
                     logger.info("Process has been stopped, cancelling data preparation")
-                    return False
+                    return PrepareDataResult.STOPPED
                 # 检查该步骤是否已完成
                 if self.progress.is_step_completed(stage_name, "map_your_entity_network"):
                     logger.info("Step 'map_your_entity_network' already completed, skipping...")
                 else:
                     if not super().map_your_entity_network():
                         logger.error("Failed to map entity network")
-                        return False
+                        return PrepareDataResult.ERROR
             
                 # 更新第二阶段完成后的进度为100%并标记为已完成
                 if stage:
@@ -300,14 +317,14 @@ class CloudTrainProcessService(TrainProcessService):
                 # 检查是否已停止
                 if self.is_stopped:
                     logger.info("Process has been stopped, cancelling data preparation")
-                    return False
+                    return PrepareDataResult.STOPPED
                 # 检查该步骤是否已完成
                 if self.progress.is_step_completed(stage_name, "decode_preference_patterns"):
                     logger.info("Step 'decode_preference_patterns' already completed, skipping...")
                 else:
                     if not super().decode_preference_patterns():
                         logger.error("Failed to decode preference patterns")
-                        return False
+                        return PrepareDataResult.ERROR
             
                 # 更新第一步完成后的进度
                 if stage:
@@ -325,14 +342,14 @@ class CloudTrainProcessService(TrainProcessService):
                 # 检查是否已停止
                 if self.is_stopped:
                     logger.info("Process has been stopped, cancelling data preparation")
-                    return False
+                    return PrepareDataResult.STOPPED
                 # 检查该步骤是否已完成
                 if self.progress.is_step_completed(stage_name, "reinforce_identity"):
                     logger.info("Step 'reinforce_identity' already completed, skipping...")
                 else:
                     if not super().reinforce_identity():
                         logger.error("Failed to reinforce identity")
-                        return False
+                        return PrepareDataResult.ERROR
             
                 # 更新第二步完成后的进度
                 if stage:
@@ -349,14 +366,14 @@ class CloudTrainProcessService(TrainProcessService):
                 # 检查是否已停止
                 if self.is_stopped:
                     logger.info("Process has been stopped, cancelling data preparation")
-                    return False
+                    return PrepareDataResult.STOPPED
                 # 检查该步骤是否已完成
                 if self.progress.is_step_completed(stage_name, "augment_content_retention"):
                     logger.info("Step 'augment_content_retention' already completed, skipping...")
                 else:
                     if not super().augment_content_retention():
                         logger.error("Failed to augment content retention")
-                        return False
+                        return PrepareDataResult.ERROR
             
                 # 更新第三阶段完成后的进度为100%并标记为已完成
                 if stage:
@@ -373,7 +390,7 @@ class CloudTrainProcessService(TrainProcessService):
             self._update_overall_progress()
             
             logger.info("Successfully generated all necessary data using parent class methods")
-            return True
+            return PrepareDataResult.SUCCESS
         except Exception as e:
             logger.error(f"Prepare training data failed: {str(e)}")
             # 尝试标记当前正在进行的阶段为失败
@@ -385,12 +402,13 @@ class CloudTrainProcessService(TrainProcessService):
                         step_name = step["current_step"].lower().replace(" ", "_")
                         self.progress.mark_step_status(stage_name, step_name, CloudStatus.FAILED)
                         break
-            return False
-
+            return PrepareDataResult.ERROR
     
     def start_process(self) -> bool:
         """Start the cloud training process using CloudService"""
         self.is_stopped = False
+        self._data_processing_completed.clear()
+        self._data_processing_result = None
 
         self.current_pid = os.getpid()
         logger.info(f"Cloud training process started with PID: {self.current_pid}")
@@ -399,9 +417,27 @@ class CloudTrainProcessService(TrainProcessService):
 
         logger.info("Step 1: Preparing training data...")
 
-        success = self.prepare_training_data()
+        # 在单独的线程中执行数据准备工作
+        self._data_processing_thread = threading.Thread(
+            target=self._prepare_data_thread,
+            name="DataProcessingThread"
+        )
+        self._data_processing_thread.daemon = True
+        self._data_processing_thread.start()
+        
+        # 等待数据处理完成
+        self._data_processing_completed.wait()
+        
+        # 检查数据处理结果
+        success = self._data_processing_result
         logger.info(f"Training data preparation result: {success}")
-        if not success:
+        
+        if success == PrepareDataResult.SUCCESS:
+            logger.info("Training data preparation completed successfully")
+        elif success == PrepareDataResult.STOPPED:
+            logger.info("Training data preparation stopped by user")
+            return False
+        elif success == PrepareDataResult.ERROR:
             logger.error("Failed to prepare training data")
             return False
 
@@ -412,6 +448,17 @@ class CloudTrainProcessService(TrainProcessService):
             return False
 
         return True
+        
+    def _prepare_data_thread(self):
+        """在单独的线程中执行数据准备工作"""
+        try:
+            result = self.prepare_training_data()
+            self._data_processing_result = result
+        except Exception as e:
+            logger.error(f"Error in data processing thread: {str(e)}", exc_info=True)
+            self._data_processing_result = PrepareDataResult.ERROR
+        finally:
+            self._data_processing_completed.set()
 
     def cloud_deploy(self) -> bool:
         try:
@@ -580,6 +627,7 @@ class CloudTrainProcessService(TrainProcessService):
         
         This method will attempt to stop the fine-tuning job if it's in progress,
         by deleting the job, and update the progress status accordingly.
+        It will also wait for any data processing thread to complete before returning.
         
         Returns:
             bool: True if the process was successfully stopped, False otherwise
@@ -590,6 +638,23 @@ class CloudTrainProcessService(TrainProcessService):
             
             any_operation_succeeded = False
             
+            # 等待数据处理线程完成
+            if self._data_processing_thread and self._data_processing_thread.is_alive():
+                logger.info("Waiting for data processing thread to complete...")
+                # 设置标志后等待线程自行结束
+                wait_start = time.time()
+                max_wait_time = 300  # 最多等待300秒
+                
+                while self._data_processing_thread.is_alive() and time.time() - wait_start < max_wait_time:
+                    time.sleep(2)  # 每2秒检查一次
+                
+                if self._data_processing_thread.is_alive():
+                    logger.warning("Data processing thread did not complete in time, proceeding anyway")
+                else:
+                    logger.info("Data processing thread completed")
+                    any_operation_succeeded = True
+            
+            # 尝试取消云端任务
             if not self.job_id:
                 try:
                     # 使用data/cloud_progress文件夹存储job_id.json
