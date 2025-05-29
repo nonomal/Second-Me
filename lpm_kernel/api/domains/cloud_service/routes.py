@@ -246,20 +246,43 @@ def get_cloud_training_progress():
     try:
         # 获取进度数据
         progress_holder = None
+        job_id = None
         
-        # 尝试从现有的训练服务实例获取进度
-        train_service = CloudTrainProcessService.get_instance()
-        if train_service:
-            # 如果有正在运行的训练服务，使用其进度
-            progress_holder = train_service.progress
-            job_id = train_service.job_id
-        else:
-            # 如果没有正在运行的训练服务，尝试加载最新的进度文件
-            progress_holder, job_id = CloudProgressHolder.get_latest_progress()
-            if not progress_holder:
-                # 如果没有找到进度文件，创建一个新的空进度
-                progress_holder = CloudProgressHolder()
-                job_id = None
+        # 先检查进度文件是否存在
+        progress_file = Path("data/cloud_progress/cloud_progress.json")
+        if progress_file.exists():
+            # 尝试从现有的训练服务实例获取进度
+            train_service = CloudTrainProcessService.get_instance()
+            if train_service:
+                # 如果有正在运行的训练服务，使用其进度
+                progress_holder = train_service.progress
+                job_id = train_service.job_id
+            else:
+                # 如果没有正在运行的训练服务，直接加载进度文件
+                try:
+                    # 直接读取文件内容
+                    with open(progress_file, "r", encoding="utf-8") as f:
+                        progress_data = json.load(f)
+                    
+                    # 获取job_id
+                    job_id = progress_data.get("job_id")
+                    
+                    # 创建一个新的进度持有者
+                    progress_holder = CloudProgressHolder(model_name=progress_data.get("model_name"), job_id=job_id)
+                    progress_holder.progress.data = progress_data
+                    progress_holder._rebuild_mappings()
+                    
+                    logger.info(f"Loaded progress data directly from file: {progress_file}")
+                except Exception as e:
+                    logger.error(f"Error reading progress file directly: {str(e)}")
+                    # 如果直接读取失败，尝试使用get_latest_progress
+                    progress_holder, job_id = CloudProgressHolder.get_latest_progress()
+        
+        # 如果还是没有找到进度数据，创建一个新的空进度
+        if not progress_holder:
+            progress_holder = CloudProgressHolder()
+            job_id = None
+            logger.info("Created new empty progress holder as no existing progress was found")
         
         # 获取进度数据
         progress_data = progress_holder.get_progress()
@@ -278,39 +301,55 @@ def get_cloud_training_progress():
 
 @cloud_bp.route("/train/progress/reset", methods=["POST"])
 def reset_cloud_training_progress():
-    """重置云端训练的进度信息"""
+    """重置云端训练的进度信息并强制初始化cloud_progress.json文件"""
     try:
-        # 先检查是否有正在运行的训练服务
-        train_service = CloudTrainProcessService.get_instance()
+        # 清除现有的CloudTrainProcessService实例相关文件
+        params_dir = Path("data/cloud_progress")
+        params_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 删除训练参数文件，强制重置训练服务
+        params_file = params_dir / "cloud_training_params.json"
+        if params_file.exists():
+            os.remove(params_file)
+            logger.info(f"Deleted training params file: {params_file}")
+        
+        # 删除进度文件
+        progress_file = params_dir / "cloud_progress.json"
+        if progress_file.exists():
+            os.remove(progress_file)
+            logger.info(f"Deleted existing progress file: {progress_file}")
+        
+        # 强制重置CloudTrainProcessService._instance为None
+        CloudTrainProcessService._instance = None
+        logger.info("Reset CloudTrainProcessService instance to None")
+        
+        # 获取job_id和model_name（如果需要保留）
         job_id = None
         model_name = None
         
-        if train_service:
-            # 如果有正在运行的训练服务，使用其job_id和model_name
-            job_id = train_service.job_id
-            model_name = train_service.model_name
-        else:
-            # 如果没有正在运行的训练服务，尝试加载最新的进度文件
-            progress_holder, job_id = CloudProgressHolder.get_latest_progress()
-            if progress_holder:
-                model_name = progress_holder.model_name
+        # 可以从环境变量或其他地方获取这些值，或者完全不使用
+        # 这里我们选择不使用任何已存在的值，完全重置
         
-        # 创建一个新的进度持有者
-        progress_holder = CloudProgressHolder(model_name=model_name, job_id=job_id)
+        # 创建一个全新的进度持有者，不使用任何已存在的值
+        new_progress_holder = CloudProgressHolder()
         
         # 重置进度
-        progress_holder.progress.reset()
+        new_progress_holder.progress.reset()
         
-        # 设置job_id和model_name
-        if job_id:
-            progress_holder.progress.data["job_id"] = job_id
-        if model_name:
-            progress_holder.progress.data["model_name"] = model_name
+        # 保存初始化的进度
+        new_progress_holder.save_progress()
+        logger.info(f"Created new progress file with completely fresh state: {progress_file}")
         
-        # 保存重置后的进度
-        progress_holder.save_progress()
+        # 创建一个空的训练参数文件，确保下次不会加载旧的训练服务
+        empty_params = {
+            "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "reset": True
+        }
+        with open(params_file, "w", encoding="utf-8") as f:
+            json.dump(empty_params, f, indent=2, ensure_ascii=False)
+        logger.info(f"Created empty training params file to prevent loading old service: {params_file}")
         
-        return jsonify(APIResponse.success(message=f"Cloud training progress for job {job_id} has been reset"))
+        return jsonify(APIResponse.success(message=f"Cloud training progress has been completely reset with a fresh state"))
     except Exception as e:
         logger.error(f"Reset cloud training progress failed: {str(e)}", exc_info=True)
         return jsonify(APIResponse.error(f"Failed to reset cloud training progress: {str(e)}"))
