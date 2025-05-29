@@ -2,13 +2,18 @@ import time
 import json
 import os
 import enum
-import threading
+import multiprocessing
+from multiprocessing import Process, Queue, Event
+import signal
+import psutil
+import sys
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional, Callable
 
 from lpm_kernel.api.domains.cloud_service.cloud_process_step import CloudProcessStep
 from lpm_kernel.api.domains.cloud_service.cloud_progress_holder import CloudProgressHolder, CloudStatus
 from lpm_kernel.api.domains.cloud_service.service import CloudService
+from lpm_kernel.api.domains.trainprocess.process_step import ProcessStep
 from lpm_kernel.api.domains.trainprocess.trainprocess_service import TrainProcessService
 from lpm_kernel.configs.logging import get_train_process_logger
 
@@ -58,10 +63,16 @@ class CloudTrainProcessService(TrainProcessService):
         self.model_name = current_model_name
         self.job_id = None
         
-        # 用于跟踪数据处理线程
-        self._data_processing_thread = None
-        self._data_processing_completed = threading.Event()
+        # 用于跟踪数据处理进程
+        self._data_processing_process = None
+        self._data_processing_pid = None
+        self._result_queue = None
+        self._process_completed = None
         self._data_processing_result = None
+        
+        # 用于跟踪任务完成进程
+        self._wait_completion_process = None
+        self._wait_completion_pid = None
         
         # Initialize cloud service
         self.cloud_service = CloudService()
@@ -407,7 +418,6 @@ class CloudTrainProcessService(TrainProcessService):
     def start_process(self) -> bool:
         """Start the cloud training process using CloudService"""
         self.is_stopped = False
-        self._data_processing_completed.clear()
         self._data_processing_result = None
 
         self.current_pid = os.getpid()
@@ -417,48 +427,45 @@ class CloudTrainProcessService(TrainProcessService):
 
         logger.info("Step 1: Preparing training data...")
 
-        # 在单独的线程中执行数据准备工作
-        self._data_processing_thread = threading.Thread(
-            target=self._prepare_data_thread,
-            name="DataProcessingThread"
-        )
-        self._data_processing_thread.daemon = True
-        self._data_processing_thread.start()
-        
-        # 等待数据处理完成
-        self._data_processing_completed.wait()
-        
-        # 检查数据处理结果
-        success = self._data_processing_result
-        logger.info(f"Training data preparation result: {success}")
-        
-        if success == PrepareDataResult.SUCCESS:
-            logger.info("Training data preparation completed successfully")
-        elif success == PrepareDataResult.STOPPED:
-            logger.info("Training data preparation stopped by user")
-            return False
-        elif success == PrepareDataResult.ERROR:
-            logger.error("Failed to prepare training data")
-            return False
-
-        deploy_success = self.cloud_deploy()
-        logger.info(f"Cloud deploy result: {deploy_success}")
-        if not deploy_success:
-            logger.error("Failed to cloud deploy")
-            return False
-
-        return True
-        
-    def _prepare_data_thread(self):
-        """在单独的线程中执行数据准备工作"""
+        # 直接在主进程中执行数据准备工作，不创建子进程
         try:
+            # 准备训练数据
+            if self.is_stopped:
+                logger.info("Process has been stopped, cancelling data preparation")
+                return False
+                
             result = self.prepare_training_data()
             self._data_processing_result = result
+            
+            # 检查数据处理结果
+            success = self._data_processing_result
+            logger.info(f"Training data preparation result: {success}")
+            
+            if success == PrepareDataResult.SUCCESS:
+                logger.info("Training data preparation completed successfully")
+            elif success == PrepareDataResult.STOPPED:
+                logger.info("Training data preparation stopped by user")
+                return False
+            elif success == PrepareDataResult.ERROR:
+                logger.error("Failed to prepare training data")
+                return False
+
+            # 检查是否已停止
+            if self.is_stopped:
+                logger.info("Process has been stopped after data preparation")
+                return False
+                
+            # 部署到云端
+            deploy_success = self.cloud_deploy()
+            logger.info(f"Cloud deploy result: {deploy_success}")
+            if not deploy_success:
+                logger.error("Failed to cloud deploy")
+                return False
+
+            return True
         except Exception as e:
-            logger.error(f"Error in data processing thread: {str(e)}", exc_info=True)
-            self._data_processing_result = PrepareDataResult.ERROR
-        finally:
-            self._data_processing_completed.set()
+            logger.error(f"Error in cloud training process: {str(e)}", exc_info=True)
+            return False
 
     def cloud_deploy(self) -> bool:
         try:
@@ -530,9 +537,22 @@ class CloudTrainProcessService(TrainProcessService):
             self.progress.mark_step_status(CloudProcessStep.CREATE_FINE_TUNE_JOB, CloudStatus.COMPLETED)
 
             logger.info("Step 9: Waiting for fine-tune job to complete...")
-            
+        
             self.progress.mark_step_status(CloudProcessStep.WAIT_FOR_FINE_TUNE_COMPLETION, CloudStatus.IN_PROGRESS)
-            self._wait_for_completion_thread(self.cloud_service, self.job_id)
+        
+            # 直接在主进程中输出消息，不创建子进程
+            # 注意：实际的等待过程将通过定时请求API来检查状态
+            logger.info(f"Fine-tune job {self.job_id} has been created and is now running")
+            logger.info("The job will continue running in the background")
+            logger.info("You can check the status using the cloud service API")
+        
+            # 将进度标记为正在运行
+            self.progress.mark_step_status(CloudProcessStep.WAIT_FOR_FINE_TUNE_COMPLETION, CloudStatus.IN_PROGRESS, 
+                                          "Fine-tune job is running in the background")
+        
+            # 注意：我们不再在这里等待任务完成
+            # 相反，我们将等待逻辑移到了单独的API端点中
+            # 这样用户可以随时检查状态而不会阻塞主进程
 
             logger.info("Cloud training process completed successfully")
             return True
@@ -542,9 +562,17 @@ class CloudTrainProcessService(TrainProcessService):
                 self.progress.mark_step_status(self.current_step, CloudStatus.FAILED, f"Error: {str(e)}")
             return False
 
-    def _wait_for_completion_thread(self, cloud_service, job_id):
+    def _wait_for_completion_process(self, cloud_service, job_id):
         try:
-            logger.info(f"Async thread: waiting for job {job_id} to complete")
+            # 注册信号处理程序
+            def handle_sigterm(signum, frame):
+                logger.info(f"Wait completion process received SIGTERM signal, exiting...")
+                import sys
+                sys.exit(0)
+                
+            signal.signal(signal.SIGTERM, handle_sigterm)
+            
+            logger.info(f"Async process: waiting for job {job_id} to complete")
             
             # 定义进度回调函数
             def progress_callback(status, progress, message):
@@ -627,32 +655,84 @@ class CloudTrainProcessService(TrainProcessService):
         
         This method will attempt to stop the fine-tuning job if it's in progress,
         by deleting the job, and update the progress status accordingly.
-        It will also wait for any data processing thread to complete before returning.
+        It will also wait for the current data processing step to complete before returning.
         
         Returns:
             bool: True if the process was successfully stopped, False otherwise
         """
         try:
-            self.is_stopped = True
             logger.info(f"Attempting to stop cloud training process for model: {self.model_name}")
             
-            any_operation_succeeded = False
+            self.is_stopped = True
             
-            # 等待数据处理线程完成
-            if self._data_processing_thread and self._data_processing_thread.is_alive():
-                logger.info("Waiting for data processing thread to complete...")
-                # 设置标志后等待线程自行结束
-                wait_start = time.time()
-                max_wait_time = 300  # 最多等待300秒
+            max_wait_time = 300  # 秒，减少等待时间以避免前端请求超时
+            wait_start = time.time()
+            
+            current_stage = self.progress.get_progress().get("current_stage")
+            logger.info(f"Current stage when stopping: {current_stage}")
+            current_step = None
+            
+            if current_stage:
+                for stage in self.progress.get_progress().get("stages", []):
+                    if stage["name"] == current_stage:
+                        current_step_name = stage.get("current_step")
+                        if current_step_name:
+                            # 先尝试从 CloudProcessStep 中查找
+                            found = False
+                            for step in CloudProcessStep:
+                                if step.value == current_step_name:
+                                    current_step = step
+                                    found = True
+                                    logger.info(f"Found step in CloudProcessStep: {current_step}")
+                                    break
+                            
+                            # 如果在 CloudProcessStep 中没有找到，尝试从 ProcessStep 中查找
+                            if not found:
+                                for step in ProcessStep:
+                                    if step.value == current_step_name:
+                                        current_step = step
+                                        logger.info(f"Found step in ProcessStep: {current_step}")
+                                        break
+                        break
+            
+            logger.info(f"Current step when stopping: {current_step}")
+            
+            # 等待当前步骤状态变化或超时
+            while time.time() - wait_start < max_wait_time:
+                # 检查当前步骤的状态是否已经变化（完成、失败或取消）
+                if current_step:
+                    # 直接从进度数据中获取步骤状态
+                    step_status = None
+                    current_stage_data = None
+                    
+                    # 找到当前阶段的数据
+                    for stage in self.progress.progress.data["stages"]:
+                        if stage["name"] == current_stage:
+                            current_stage_data = stage
+                            logger.info(f"Found current stage data: {stage['name']}")
+                            break
+                    
+                    # 如果找到当前阶段，则在其步骤中查找当前步骤
+                    if current_stage_data:
+                        step_name = current_step.value if hasattr(current_step, 'value') else str(current_step)
+                        logger.info(f"Looking for step with name: {step_name}")
+                        for step in current_stage_data["steps"]:
+                            if step["name"] == step_name:
+                                step_status = step["status"]
+                                logger.info(f"Found step status: {step_status}")
+                                break
+                    
+                    logger.info(f"Current step status: {step_status}")
+                    if step_status in [CloudStatus.COMPLETED, CloudStatus.FAILED, CloudStatus.CANCELLED]:
+                        logger.info(f"Step {current_step.value} has status {step_status}, continuing with stop process")
+                        break
                 
-                while self._data_processing_thread.is_alive() and time.time() - wait_start < max_wait_time:
-                    time.sleep(2)  # 每2秒检查一次
-                
-                if self._data_processing_thread.is_alive():
-                    logger.warning("Data processing thread did not complete in time, proceeding anyway")
-                else:
-                    logger.info("Data processing thread completed")
-                    any_operation_succeeded = True
+                # 短暂休眠以减少CPU使用
+                time.sleep(2)
+            
+            # 如果等待超时，记录警告
+            if time.time() - wait_start >= max_wait_time:
+                logger.warning(f"Waited {max_wait_time} seconds for current step to complete, proceeding with stop process")
             
             # 尝试取消云端任务
             if not self.job_id:
@@ -676,28 +756,16 @@ class CloudTrainProcessService(TrainProcessService):
                 
                 if success:
                     logger.info(f"Successfully cancelled fine-tune job: {self.job_id}")
-                    any_operation_succeeded = True
                 else:
                     logger.error(f"Failed to cancel fine-tune job: {self.job_id}")
             else:
                 logger.warning("No active fine-tune job found to delete")
 
-            # 获取当前阶段和步骤
-            current_stage = self.progress.get_progress().get("current_stage")
-            if current_stage:
-                # 找到当前阶段对应的步骤
-                for stage in self.progress.get_progress().get("stages", []):
-                    if stage["name"].lower().replace(" ", "_") == current_stage:
-                        current_step_name = stage.get("current_step")
-                        if current_step_name:
-                            # 找到对应的CloudProcessStep
-                            for step in CloudProcessStep:
-                                if step.value == current_step_name:
-                                    self.progress.mark_step_status(step, CloudStatus.CANCELLED, "Process cancelled by user")
-                                    break
-                        break
+            if current_step:
+                self.progress.mark_step_status(current_step, CloudStatus.CANCELLED, "Process cancelled by user")
             
-            return any_operation_succeeded or not (self.job_id)
+            logger.info("Cloud training process has been stopped successfully")
+            return True
                 
         except Exception as e:
             logger.error(f"Error stopping cloud process: {str(e)}", exc_info=True)

@@ -5,11 +5,16 @@ from sqlalchemy import table
 from ...common.responses import APIResponse
 from ...common.errors import APIError, ErrorCodes
 import logging
+import gc
 import os
 import time
 import json
+import psutil
 import tempfile
 import threading
+import signal
+import sys
+from multiprocessing import Process
 from datetime import datetime
 from pathlib import Path
 from ....configs.config import Config
@@ -205,7 +210,11 @@ def start_cloud_training():
                 logger.info(f"Starting async cloud training process for model: {model_name}")
                 success = train_service.start_process()
                 if not success:
-                    logger.error("Async cloud training process failed")
+                    # 检查是否是由于用户停止导致的
+                    if train_service.is_stopped:
+                        logger.info("Async cloud training process was stopped by user")
+                    else:
+                        logger.error("Async cloud training process failed")
                 else:
                     logger.info(f"Async cloud training process completed successfully with job_id: {train_service.job_id}")
             except Exception as e:
@@ -254,21 +263,16 @@ def get_cloud_training_progress():
             # 尝试从现有的训练服务实例获取进度
             train_service = CloudTrainProcessService.get_instance()
             if train_service:
-                # 如果有正在运行的训练服务，使用其进度
                 progress_holder = train_service.progress
                 job_id = train_service.job_id
             else:
-                # 如果没有正在运行的训练服务，直接加载进度文件
                 try:
                     # 直接读取文件内容
                     with open(progress_file, "r", encoding="utf-8") as f:
                         progress_data = json.load(f)
                     
-                    # 获取job_id
-                    job_id = progress_data.get("job_id")
-                    
                     # 创建一个新的进度持有者
-                    progress_holder = CloudProgressHolder(model_name=progress_data.get("model_name"), job_id=job_id)
+                    progress_holder = CloudProgressHolder(model_name=progress_data.get("model_name"), job_id=progress_data.get("job_id"))
                     progress_holder.progress.data = progress_data
                     progress_holder._rebuild_mappings()
                     
@@ -303,48 +307,143 @@ def get_cloud_training_progress():
 def reset_cloud_training_progress():
     """重置云端训练的进度信息并强制初始化cloud_progress.json文件"""
     try:
+        # 获取当前的CloudTrainProcessService实例
+        train_service = CloudTrainProcessService.get_instance()
+        
+        # 如果有训练服务实例，立即终止它
+        if train_service:
+            logger.info(f"Found running CloudTrainProcessService instance, forcibly terminating it...")
+            
+            # 设置停止标志
+            train_service.is_stopped = True
+            
+            # 终止进程的通用函数
+            def kill_process_with_children(pid, process_name):
+                try:
+                    if not psutil.pid_exists(pid):
+                        logger.warning(f"{process_name} with PID {pid} no longer exists")
+                        return
+                        
+                    logger.info(f"Forcibly terminating {process_name} with PID: {pid}")
+                    process = psutil.Process(pid)
+                    
+                    # 获取并终止所有子进程
+                    children = process.children(recursive=True)
+                    for child in children:
+                        try:
+                            logger.info(f"Killing child process with PID: {child.pid}")
+                            child.kill()  # 直接使用 kill 而不是 terminate，确保立即终止
+                        except Exception as e:
+                            logger.error(f"Error killing child process: {str(e)}")
+                    
+                    # 终止主进程
+                    try:
+                        process.kill()  # 直接使用 kill 而不是 terminate
+                        logger.info(f"Successfully killed {process_name} with PID: {pid}")
+                    except Exception as e:
+                        logger.error(f"Error killing main process: {str(e)}")
+                except Exception as e:
+                    logger.error(f"Error in kill_process_with_children for {process_name}: {str(e)}", exc_info=True)
+            
+            # 终止数据处理进程
+            if hasattr(train_service, '_data_processing_process') and train_service._data_processing_process and train_service._data_processing_pid:
+                kill_process_with_children(train_service._data_processing_pid, "data processing process")
+                
+            # 终止等待任务完成进程
+            if hasattr(train_service, '_wait_completion_process') and train_service._wait_completion_process and train_service._wait_completion_pid:
+                kill_process_with_children(train_service._wait_completion_pid, "wait completion process")
+            
+            # 如果有任务ID，记录下来但不等待取消结果
+            job_id = None
+            if hasattr(train_service, 'job_id') and train_service.job_id:
+                job_id = train_service.job_id
+                logger.info(f"Found running job: {job_id}, will be cancelled separately")
+            
+            # 强制重置实例变量，不等待任何进程或线程完成
+            CloudTrainProcessService._instance = None
+            CloudTrainProcessService._initialized = False
+            logger.info("Forcibly reset CloudTrainProcessService instance variables")
+            
+            # 如果有任务ID，在后台发送取消请求
+            if job_id:
+                try:
+                    # 创建新的CloudService实例取消任务，避免使用已重置的train_service
+                    cloud_service = CloudService()
+                    
+                    # 定义取消任务的进程函数
+                    def cancel_job_process(job_id):
+                        try:
+                            # 注册信号处理程序
+                            def handle_sigterm(signum, frame):
+                                logger.info(f"Cancel job process received SIGTERM signal, exiting...")
+                                sys.exit(0)
+                                
+                            signal.signal(signal.SIGTERM, handle_sigterm)
+                            
+                            # 发送取消请求
+                            cloud_service.cancel_fine_tune_job(job_id)
+                        except Exception as e:
+                            logger.error(f"Error in cancel job process: {str(e)}", exc_info=True)
+                    
+                    # 使用进程发送取消请求，不阻塞主进程
+                    cancel_process = Process(
+                        target=cancel_job_process,
+                        args=(job_id,),
+                        name="CancelJobProcess",
+                        daemon=True
+                    )
+                    cancel_process.start()
+                    logger.info(f"Started background process to cancel job {job_id} with PID: {cancel_process.pid}")
+                except Exception as e:
+                    logger.error(f"Error starting job cancellation thread: {str(e)}")
+        
         # 清除现有的CloudTrainProcessService实例相关文件
         params_dir = Path("data/cloud_progress")
         params_dir.mkdir(parents=True, exist_ok=True)
         
-        # 删除训练参数文件，强制重置训练服务
-        params_file = params_dir / "cloud_training_params.json"
-        if params_file.exists():
-            os.remove(params_file)
-            logger.info(f"Deleted training params file: {params_file}")
+        # 删除所有相关文件
+        files_to_delete = [
+            "cloud_training_params.json",  # 训练参数文件
+            "cloud_progress.json",         # 进度文件
+            "job_id.json"                 # 任务ID文件
+        ]
         
-        # 删除进度文件
-        progress_file = params_dir / "cloud_progress.json"
-        if progress_file.exists():
-            os.remove(progress_file)
-            logger.info(f"Deleted existing progress file: {progress_file}")
+        for file_name in files_to_delete:
+            file_path = params_dir / file_name
+            if file_path.exists():
+                try:
+                    os.remove(file_path)
+                    logger.info(f"Deleted file: {file_path}")
+                except Exception as e:
+                    logger.error(f"Error deleting file {file_path}: {str(e)}")
         
-        # 强制重置CloudTrainProcessService._instance为None
+        # 强制重置CloudTrainProcessService的实例变量
         CloudTrainProcessService._instance = None
-        logger.info("Reset CloudTrainProcessService instance to None")
+        CloudTrainProcessService._initialized = False  # 重置初始化标志
+        logger.info("Reset CloudTrainProcessService instance variables")
         
-        # 获取job_id和model_name（如果需要保留）
-        job_id = None
-        model_name = None
-        
-        # 可以从环境变量或其他地方获取这些值，或者完全不使用
-        # 这里我们选择不使用任何已存在的值，完全重置
-        
-        # 创建一个全新的进度持有者，不使用任何已存在的值
+        # 创建全新的进度持有者
         new_progress_holder = CloudProgressHolder()
         
         # 重置进度
         new_progress_holder.progress.reset()
         
-        # 保存初始化的进度
+        gc.collect()
+        logger.info("Forced garbage collection to clean up any lingering references")
+        
+        # 定义进度文件路径
+        progress_file_path = params_dir / "cloud_progress.json"
+        
+        # 保存初始化的进度（只保存一次）
         new_progress_holder.save_progress()
-        logger.info(f"Created new progress file with completely fresh state: {progress_file}")
+        logger.info(f"Created new progress file with completely fresh state: {progress_file_path}")
         
         # 创建一个空的训练参数文件，确保下次不会加载旧的训练服务
         empty_params = {
             "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "reset": True
         }
+        params_file = params_dir / "cloud_training_params.json"
         with open(params_file, "w", encoding="utf-8") as f:
             json.dump(empty_params, f, indent=2, ensure_ascii=False)
         logger.info(f"Created empty training params file to prevent loading old service: {params_file}")
