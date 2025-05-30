@@ -35,10 +35,10 @@ class CloudService:
 
         self.file_id = None
         self.job_id = None
-        self.model_id = None  # 微调生成的模型的ID
+        self.model_id = None  # ID of the fine-tuned model
 
     def upload_training_file(self, file_path = "resources/L2/data/merged.json", description=None):
-        """上传训练数据文件"""
+        """Upload training data file"""
         url = f"{self.base_url}/files"
 
         project_root = Path(__file__).resolve().parent.parent.parent.parent.parent
@@ -69,7 +69,7 @@ class CloudService:
         return True
 
     def create_fine_tune_job(self, base_model="qwen2.5-7b-instruct", training_type="efficient_sft", hyper_parameters=None):
-        """创建模型调优任务"""
+        """Create fine-tuning job"""
         if not self.file_id:
             raise ValueError("Please upload the training data file first!")
 
@@ -103,7 +103,7 @@ class CloudService:
         return self.job_id
 
     def check_fine_tune_status(self, job_id):
-        """检查模型调优任务状态"""
+        """Check fine-tuning job status"""
 
         url = f"{self.base_url}/fine-tunes/{job_id}"
         headers = {**self.headers, "Content-Type": "application/json"}
@@ -125,7 +125,7 @@ class CloudService:
         return status
 
     def get_fine_tune_logs(self, offset=0, line=1000):
-        """获取模型调优过程日志"""
+        """Get fine-tuning logs"""
         if not self.job_id:
             raise ValueError("Please create a tuning task first!")
 
@@ -142,34 +142,8 @@ class CloudService:
         logs = response_data.get('output', {}).get('logs', "")
         return logs
 
-    def deploy_model(self, capacity=2):
-        """部署调优后的模型"""
-        if not self.model_id:
-            raise ValueError("Please complete the model tuning first")
-
-        logger.info(f"Deploying model: {self.model_id}...")
-
-        url = f"{self.base_url}/deployments"
-        headers = {**self.headers, "Content-Type": "application/json"}
-
-        payload = {
-            "model_name": self.model_id,
-            "capacity": capacity
-        }
-
-        response = requests.post(url, headers=headers, json=payload)
-        response_data = response.json()
-
-        if response.status_code != 200:
-            logger.error(f"Model deployment failed! Error: {response_data}")
-            return False
-
-        self.model_id = response_data.get('output', {}).get('deployment_id')
-        logger.info(f"Model deployment created successfully! Deployment ID: {self.model_id}")
-        return True
-
     def check_deployment_status(self, model_id):
-        """检查模型部署状态"""
+        """Check model deployment status"""
 
         url = f"{self.base_url}/deployments/{model_id}"
         headers = {**self.headers, "Content-Type": "application/json"}
@@ -186,7 +160,7 @@ class CloudService:
         return status
     
     def list_deployments(self):
-        """获取所有已部署的模型列表"""
+        """Get list of all deployed models"""
         
         url = f"{self.base_url}/deployments"
         headers = {**self.headers, "Content-Type": "application/json"}
@@ -251,13 +225,13 @@ class CloudService:
 
     def handle_cloud_stream_response(self, response_iter):
         """
-        处理云服务的流式响应，将阿里云DashScope格式转换为与本地接口完全一致的格式
+        Process cloud service streaming response, converting Alibaba Cloud DashScope format to a format consistent with the local interface
         
         Args:
-            response_iter: 响应生成器
+            response_iter: Response generator
             
         Returns:
-            Flask Response 对象，包含流式响应
+            Flask Response object containing streaming response
         """
         from flask import Response
         import uuid
@@ -499,20 +473,20 @@ class CloudService:
         logger.info(f"Creating Response with headers: {headers}")
         return Response(generate(), mimetype='text/event-stream', headers=headers, direct_passthrough=True)
     
-    def run_inference(self, messages, model_id, stream=False, temperature=0.1, max_tokens=2000):
-        """使用调优后的模型进行推理
+    def run_inference(self, messages, model_id, stream=False, temperature=0.7, max_tokens=2048):
+        """Run inference using fine-tuned model
         
         Args:
-            messages: 消息列表，OpenAI格式
-            model_id: 模型ID
-            stream: 是否使用流式输出
-            temperature: 温度参数
-            max_tokens: 最大生成token数
+            messages: Message list in OpenAI format
+            model_id: Model ID
+            stream: Whether to use streaming output
+            temperature: Temperature parameter
+            max_tokens: Maximum tokens to generate
             
         Returns:
-            如果stream=True，返回一个 Flask Response 对象，否则返回完整响应
+            If stream=True, returns a Flask Response object, otherwise returns complete response
         """
-        # 记录请求参数
+        # Record request parameters
         logger.info(f"Cloud inference request - model_id: {model_id}, stream: {stream}, temperature: {temperature}, max_tokens: {max_tokens}")
         logger.debug(f"Messages: {messages}")
         

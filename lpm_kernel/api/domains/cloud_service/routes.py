@@ -200,7 +200,7 @@ def stop_cloud_training():
         if not train_service:
             return jsonify(APIResponse.error("No training parameters found. Please use /train/start endpoint for initial training."))
         
-        # 停止训练进程
+        # Stop training process
         success = train_service.stop_process()
         
         if success:
@@ -260,7 +260,7 @@ def start_cloud_training():
                 logger.info(f"Starting async cloud training process for model: {model_name}")
                 success = train_service.start_process()
                 if not success:
-                    # 检查是否是由于用户停止导致的
+                    # Check if it was stopped by user
                     if train_service.is_stopped:
                         logger.info("Async cloud training process was stopped by user")
                     else:
@@ -301,27 +301,27 @@ def get_cloud_training_status(job_id):
 
 @cloud_bp.route("/train/progress", methods=["GET"])
 def get_cloud_training_progress():
-    """获取云端训练的详细进度信息"""
+    """Get detailed progress information for cloud training"""
     try:
-        # 获取进度数据
+        # Get progress data
         progress_holder = None
         job_id = None
         
-        # 先检查进度文件是否存在
+        # First check if progress file exists
         progress_file = Path("data/cloud_progress/cloud_progress.json")
         if progress_file.exists():
-            # 尝试从现有的训练服务实例获取进度
+            # Try to get progress from existing training service instance
             train_service = CloudTrainProcessService.get_instance()
             if train_service:
                 progress_holder = train_service.progress
                 job_id = train_service.job_id
             else:
                 try:
-                    # 直接读取文件内容
+                    # Read file content directly
                     with open(progress_file, "r", encoding="utf-8") as f:
                         progress_data = json.load(f)
                     
-                    # 创建一个新的进度持有者
+                    # Create a new progress holder
                     progress_holder = CloudProgressHolder(model_name=progress_data.get("model_name"), job_id=progress_data.get("job_id"))
                     progress_holder.progress.data = progress_data
                     progress_holder._rebuild_mappings()
@@ -329,19 +329,19 @@ def get_cloud_training_progress():
                     logger.info(f"Loaded progress data directly from file: {progress_file}")
                 except Exception as e:
                     logger.error(f"Error reading progress file directly: {str(e)}")
-                    # 如果直接读取失败，尝试使用get_latest_progress
+                    # If direct reading fails, try using get_latest_progress
                     progress_holder, job_id = CloudProgressHolder.get_latest_progress()
         
-        # 如果还是没有找到进度数据，创建一个新的空进度
+        # If still no progress data found, create a new empty progress
         if not progress_holder:
             progress_holder = CloudProgressHolder()
             job_id = None
             logger.info("Created new empty progress holder as no existing progress was found")
         
-        # 获取进度数据
+        # Get progress data
         progress_data = progress_holder.get_progress()
         
-        # 添加一些额外的元数据
+        # Add some extra metadata
         response_data = {
             "progress": progress_data,
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -355,19 +355,19 @@ def get_cloud_training_progress():
 
 @cloud_bp.route("/train/progress/reset", methods=["POST"])
 def reset_cloud_training_progress():
-    """重置云端训练的进度信息并强制初始化cloud_progress.json文件"""
+    """Reset cloud training progress and force initialize cloud_progress.json file"""
     try:
-        # 获取当前的CloudTrainProcessService实例
+        # Get current CloudTrainProcessService instance
         train_service = CloudTrainProcessService.get_instance()
         
-        # 如果有训练服务实例，立即终止它
+        # If training service instance exists, terminate it immediately
         if train_service:
             logger.info(f"Found running CloudTrainProcessService instance, forcibly terminating it...")
             
-            # 设置停止标志
+            # Set stop flag
             train_service.is_stopped = True
             
-            # 终止进程的通用函数
+            # General function to terminate process
             def kill_process_with_children(pid, process_name):
                 try:
                     if not psutil.pid_exists(pid):
@@ -377,65 +377,65 @@ def reset_cloud_training_progress():
                     logger.info(f"Forcibly terminating {process_name} with PID: {pid}")
                     process = psutil.Process(pid)
                     
-                    # 获取并终止所有子进程
+                    # Get and terminate all child processes
                     children = process.children(recursive=True)
                     for child in children:
                         try:
                             logger.info(f"Killing child process with PID: {child.pid}")
-                            child.kill()  # 直接使用 kill 而不是 terminate，确保立即终止
+                            child.kill()  # Use kill instead of terminate to ensure immediate termination
                         except Exception as e:
                             logger.error(f"Error killing child process: {str(e)}")
                     
-                    # 终止主进程
+                    # Terminate main process
                     try:
-                        process.kill()  # 直接使用 kill 而不是 terminate
+                        process.kill()  # Use kill instead of terminate
                         logger.info(f"Successfully killed {process_name} with PID: {pid}")
                     except Exception as e:
                         logger.error(f"Error killing main process: {str(e)}")
                 except Exception as e:
                     logger.error(f"Error in kill_process_with_children for {process_name}: {str(e)}", exc_info=True)
             
-            # 终止数据处理进程
+            # Terminate data processing process
             if hasattr(train_service, '_data_processing_process') and train_service._data_processing_process and train_service._data_processing_pid:
                 kill_process_with_children(train_service._data_processing_pid, "data processing process")
                 
-            # 终止等待任务完成进程
+            # Terminate wait completion process
             if hasattr(train_service, '_wait_completion_process') and train_service._wait_completion_process and train_service._wait_completion_pid:
                 kill_process_with_children(train_service._wait_completion_pid, "wait completion process")
             
-            # 如果有任务ID，记录下来但不等待取消结果
+            # If there's a job ID, record it but don't wait for cancellation result
             job_id = None
             if hasattr(train_service, 'job_id') and train_service.job_id:
                 job_id = train_service.job_id
                 logger.info(f"Found running job: {job_id}, will be cancelled separately")
             
-            # 强制重置实例变量，不等待任何进程或线程完成
+            # Force reset instance variables without waiting for any process or thread to complete
             CloudTrainProcessService._instance = None
             CloudTrainProcessService._initialized = False
             logger.info("Forcibly reset CloudTrainProcessService instance variables")
             
-            # 如果有任务ID，在后台发送取消请求
+            # If there's a job ID, send cancellation request in the background
             if job_id:
                 try:
-                    # 创建新的CloudService实例取消任务，避免使用已重置的train_service
+                    # Create new CloudService instance to cancel the task, avoid using the reset train_service
                     cloud_service = CloudService()
                     
-                    # 定义取消任务的进程函数
+                    # Define process function to cancel the job
                     def cancel_job_process(job_id):
                         try:
-                            # 注册信号处理程序
+                            # Register signal handler
                             def handle_sigterm(signum, frame):
                                 logger.info(f"Cancel job process received SIGTERM signal, exiting...")
                                 sys.exit(0)
                                 
                             signal.signal(signal.SIGTERM, handle_sigterm)
                             
-                            # 发送取消请求
+                            # Send cancellation request
                             cloud_service.cancel_fine_tune_job(job_id)
                         except Exception as e:
                             logger.error(f"Error in cancel job process: {str(e)}", exc_info=True)
                     
-                    # 使用进程发送取消请求，不阻塞主进程
+                    # Use process to send cancellation request without blocking main process
                     cancel_process = Process(
                         target=cancel_job_process,
                         args=(job_id,),
@@ -447,15 +447,15 @@ def reset_cloud_training_progress():
                 except Exception as e:
                     logger.error(f"Error starting job cancellation thread: {str(e)}")
         
-        # 清除现有的CloudTrainProcessService实例相关文件
+        # Clear files related to existing CloudTrainProcessService instance
         params_dir = Path("data/cloud_progress")
         params_dir.mkdir(parents=True, exist_ok=True)
         
-        # 删除所有相关文件
+        # Delete all related files
         files_to_delete = [
-            "cloud_training_params.json",  # 训练参数文件
-            "cloud_progress.json",         # 进度文件
-            "job_id.json"                 # 任务ID文件
+            "cloud_training_params.json",  # Training parameters file
+            "cloud_progress.json",         # Progress file
+            "job_id.json"                 # Job ID file
         ]
         
         for file_name in files_to_delete:
@@ -467,28 +467,28 @@ def reset_cloud_training_progress():
                 except Exception as e:
                     logger.error(f"Error deleting file {file_path}: {str(e)}")
         
-        # 强制重置CloudTrainProcessService的实例变量
+        # Force reset CloudTrainProcessService instance variables
         CloudTrainProcessService._instance = None
-        CloudTrainProcessService._initialized = False  # 重置初始化标志
+        CloudTrainProcessService._initialized = False  # Reset initialization flag
         logger.info("Reset CloudTrainProcessService instance variables")
         
-        # 创建全新的进度持有者
+        # Create brand new progress holder
         new_progress_holder = CloudProgressHolder()
         
-        # 重置进度
+        # Reset progress
         new_progress_holder.progress.reset()
         
         gc.collect()
         logger.info("Forced garbage collection to clean up any lingering references")
         
-        # 定义进度文件路径
+        # Define progress file path
         progress_file_path = params_dir / "cloud_progress.json"
         
-        # 保存初始化的进度（只保存一次）
+        # Save initialized progress (only save once)
         new_progress_holder.save_progress()
         logger.info(f"Created new progress file with completely fresh state: {progress_file_path}")
         
-        # 创建一个空的训练参数文件，确保下次不会加载旧的训练服务
+        # Create an empty training parameters file to ensure old training service won't be loaded next time
         empty_params = {
             "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "reset": True
@@ -503,10 +503,10 @@ def reset_cloud_training_progress():
         logger.error(f"Reset cloud training progress failed: {str(e)}", exc_info=True)
         return jsonify(APIResponse.error(f"Failed to reset cloud training progress: {str(e)}"))
 
-# ... (其他代码保持不变)
+# ... (other code remains unchanged)
 def search_job_info():
     try:
-        # 使用data/cloud_progress文件夹存储job_id.json
+        # Use data/cloud_progress folder to store job_id.json
         params_dir = Path("data/cloud_progress")
         params_dir.mkdir(parents=True, exist_ok=True)
         job_file_path = params_dir / "job_id.json"
@@ -527,31 +527,6 @@ def search_job_info():
     except Exception as e:
         logger.error(f"Get job info failed: {str(e)}", exc_info=True)
         return jsonify(APIResponse.error(f"Failed to get job information: {str(e)}"))
-
-@cloud_bp.route("/train/deploy", methods=["POST"])
-def deploy_cloud_model():
-    """Deploy fine-tuned model"""
-    try:
-        data = request.json
-        model_id = data.get("model_id")
-        capacity = data.get("capacity", 2)
-        
-        if not model_id:
-            return jsonify(APIResponse.error("model_id is required"))
-        
-        cloud_service = CloudService()
-        
-        model_id = cloud_service.deploy_model( capacity=capacity)
-        
-        if not model_id:
-            return jsonify(APIResponse.error("Failed to deploy model"))
-        
-        return jsonify(APIResponse.success(message="Model deployment started", data={
-            "model_id": model_id
-        }))
-    except Exception as e:
-        logger.error(f"Deploy model failed: {str(e)}", exc_info=True)
-        return jsonify(APIResponse.error(f"Failed to deploy model: {str(e)}"))
 
 @cloud_bp.route("/train/deployment_status/<model_id>", methods=["GET"])
 def check_cloud_deployment_status(model_id):
@@ -597,27 +572,27 @@ def run_cloud_inference():
             logger.error(f"Invalid request format: {str(e)}")
             return jsonify(APIResponse.error(f"Invalid request format: {str(e)}"))
         
-        # 1. 检查必要参数
+        # 1. Check required parameters
         if not body.messages:
             return jsonify(APIResponse.error("messages are required"))
         if not body.model_id:
             return jsonify(APIResponse.error("model_id is required"))
 
-        # 2. 执行本地知识检索（如果启用）
+        # 2. Perform local knowledge retrieval (if enabled)
         enhanced_messages = body.messages.copy()
         
         if body.enable_l0_retrieval or body.enable_l1_retrieval:
             logger.info("Performing local knowledge retrieval before cloud inference")
             
-            # 从本地 ChatService 获取知识增强的消息
+            # Get knowledge-enhanced messages from local ChatService
             from lpm_kernel.api.domains.kernel2.dto.chat_dto import ChatRequest
             from lpm_kernel.api.domains.kernel2.services.chat_service import chat_service
             
-            # 构造临时的 ChatRequest 对象用于知识检索
+            # Create temporary ChatRequest object for knowledge retrieval
             temp_chat_request = ChatRequest(
-                message="",  # 将通过 messages 字段传递
+                message="",  
                 messages=body.messages,
-                model="",  # 云端推理不需要本地模型
+                model="",  
                 temperature=body.temperature,
                 max_tokens=body.max_tokens,
                 metadata={
@@ -627,20 +602,20 @@ def run_cloud_inference():
                 }
             )
             
-            # 使用 ChatService 构建增强的消息（仅用于知识检索和prompt构建）
+            # Use ChatService to build enhanced messages (only for knowledge retrieval and prompt building)
             try:
                 enhanced_messages = chat_service._build_messages(temp_chat_request)
                 logger.info(f"Enhanced messages with local knowledge: {len(enhanced_messages)} messages")
             except Exception as e:
                 logger.error(f"Local knowledge retrieval failed: {str(e)}")
-                # 如果知识检索失败，继续使用原始消息
+                # If knowledge retrieval fails, continue using original messages
                 enhanced_messages = body.messages
 
-        # 3. 创建CloudService实例
+        # 3. Create CloudService instance
         cloud_service = CloudService()
 
         try:
-            # 4. 调用run_inference方法，使用增强后的消息
+            # 4. Call run_inference method using enhanced messages
             response = cloud_service.run_inference(
                 messages=enhanced_messages,
                 model_id=body.model_id,
@@ -649,11 +624,11 @@ def run_cloud_inference():
                 max_tokens=body.max_tokens
             )
             
-            # 5. 处理流式或非流式响应
+            # 5. Handle streaming or non-streaming response
             if body.stream:
                 return response
             else:
-                # 对于非流式响应，返回完整的JSON响应
+                # For non-streaming response, return complete JSON response
                 if not response:
                     return jsonify(APIResponse.error("Failed to run inference"))
                 return jsonify(APIResponse.success(data=response))
@@ -669,7 +644,7 @@ def run_cloud_inference():
                 }
             }
             
-            # 根据请求类型返回错误响应
+            # Return error response based on request type
             if body.stream:
                 return local_llm_service.handle_stream_response(iter([error_response]))
             else:
@@ -681,7 +656,7 @@ def run_cloud_inference():
 
 @cloud_bp.route("/train/list_deployments", methods=["GET"])
 def list_deployments():
-    """获取所有已部署的模型列表"""
+    """Get list of all deployed models"""
     try:
         cloud_service = CloudService()
         deployments = cloud_service.list_deployments()

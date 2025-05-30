@@ -176,7 +176,7 @@ class CloudProgress:
         
         # Stage mapping for process steps
         self._stage_mapping = {
-            # 数据处理步骤映射（使用ProcessStep来保持与本地一致）
+            # Data processing step mapping (using ProcessStep to maintain consistency with local)
             ProcessStep.LIST_DOCUMENTS: "activating_the_memory_matrix",
             ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS: "activating_the_memory_matrix",
             ProcessStep.CHUNK_DOCUMENT: "activating_the_memory_matrix",
@@ -190,7 +190,7 @@ class CloudProgress:
             ProcessStep.REINFORCE_IDENTITY: "prepare_training_data_for_deep_comprehension",
             ProcessStep.AUGMENT_CONTENT_RETENTION: "prepare_training_data_for_deep_comprehension",
             
-            # 云端训练步骤映射
+            # Cloud training step mapping
             CloudProcessStep.UPLOAD_TRAINING_DATA: "training_to_create_second_me",
             CloudProcessStep.CREATE_FINE_TUNE_JOB: "training_to_create_second_me",
             CloudProcessStep.WAIT_FOR_FINE_TUNE_COMPLETION: "training_to_create_second_me",
@@ -279,13 +279,13 @@ class CloudProgress:
             stage_data["current_step"] = step_data["name"]
             self.data["current_stage"] = stage_data["name"]
         elif step_data["status"] == CloudStatus.IN_PROGRESS:
-            # 只有当前步骤是IN_PROGRESS状态时，才将阶段设置为IN_PROGRESS
+            # Only set stage to IN_PROGRESS when current step is in IN_PROGRESS state
             stage_data["status"] = CloudStatus.IN_PROGRESS
             stage_data["current_step"] = step_data["name"]
             self.data["current_stage"] = stage_data["name"]
         else:
-            # 当前步骤不是IN_PROGRESS状态，保持阶段状态不变
-            # 但仍然更新当前步骤
+            # Current step is not in IN_PROGRESS state, keep stage status unchanged
+            # But still update the current step
             stage_data["current_step"] = step_data["name"]
     
     def _update_overall_progress(self):
@@ -324,42 +324,42 @@ class CloudProgressHolder:
         self.job_id = job_id
         self.progress = CloudProgress()
         
-        # 设置进度数据中的标识符
+        # Set identifiers in progress data
         if model_name:
             self.progress.data["model_name"] = model_name
         if job_id:
             self.progress.data["job_id"] = job_id
             
-        # 设置进度文件路径 - 始终使用同一个文件
+        # Set progress file path - always use the same file
         progress_dir = Path("data/cloud_progress")
         progress_dir.mkdir(parents=True, exist_ok=True)
         
-        # 使用固定的文件名
+        # Use fixed filename
         self.progress_file = progress_dir / "cloud_progress.json"
         self._load_progress()
     
     @staticmethod
     def get_latest_progress():
         """
-        获取最新的进度数据
+        Get the latest progress data
         
         Returns:
-            tuple: (CloudProgressHolder, job_id) 如果找到进度数据，返回(CloudProgressHolder实例, job_id)；否则返回(None, None)
+            tuple: (CloudProgressHolder, job_id) Returns (CloudProgressHolder instance, job_id) if progress data is found; otherwise returns (None, None)
         """
         progress_file = Path("data/cloud_progress/cloud_progress.json")
         if not progress_file.exists():
             return None, None
             
         try:
-            # 读取文件内容
+            # Read file content
             with open(progress_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 
-            # 获取模型名称和job_id
+            # Get model name and job_id
             model_name = data.get("model_name")
             job_id = data.get("job_id")
             
-            # 创建进度持有者实例
+            # Create progress holder instance
             holder = CloudProgressHolder(model_name=model_name, job_id=job_id)
             holder.progress.data = data
             holder._rebuild_mappings()
@@ -371,7 +371,7 @@ class CloudProgressHolder:
             return None, None
     
     def _rebuild_mappings(self):
-        """重新创建进度数据的映射"""
+        """Rebuild progress data mappings"""
         # 重新创建映射
         self.progress.stage_map = {}
         for stage in self.progress.data["stages"]:
@@ -387,7 +387,7 @@ class CloudProgressHolder:
         
     def _load_progress(self):
         """
-        从文件加载进度数据
+        Load progress data from file
         """
         if not self.progress_file or not os.path.exists(self.progress_file):
             return
@@ -396,19 +396,19 @@ class CloudProgressHolder:
             with open(self.progress_file, "r", encoding="utf-8") as f:
                 saved_data = json.load(f)
                 
-                # 加载进度数据
+                # Load progress data
                 self.progress.data = saved_data
                 
-                # 如果没有指定模型名称或job_id，从文件中加载
+                # If model name or job_id not specified, load from file
                 if not self.model_name:
                     self.model_name = saved_data.get("model_name")
                 if not self.job_id:
                     self.job_id = saved_data.get("job_id")
                 
-                # 重新创建映射
+                # Rebuild mappings
                 self._rebuild_mappings()
                 
-                # 重置正在进行的状态
+                # Reset in-progress status
                 self._reset_in_progress_status()
                 
                 logger.debug(f"Loaded progress data from {self.progress_file}")
@@ -421,20 +421,20 @@ class CloudProgressHolder:
         """
         need_save = False
         
-        # 检查整体状态
+        # Check overall status
         if self.progress.data["status"] == CloudStatus.IN_PROGRESS:
             self.progress.data["status"] = CloudStatus.FAILED
             need_save = True
             logger.info("Reset overall in_progress status to failed")
         
-        # 检查每个阶段
+        # Check each stage
         for stage in self.progress.data["stages"]:
             if stage["status"] == CloudStatus.IN_PROGRESS:
                 stage["status"] = CloudStatus.FAILED
                 need_save = True
                 logger.info(f"Reset stage '{stage['name']}' in_progress status to failed")
             
-            # 检查阶段中的每个步骤
+            # Check each step in the stage
             for step in stage["steps"]:
                 if step["status"] == CloudStatus.IN_PROGRESS:
                     step["status"] = CloudStatus.FAILED
@@ -442,7 +442,7 @@ class CloudProgressHolder:
                     need_save = True
                     logger.info(f"Reset step '{step['name']}' in_progress status to failed")
         
-        # 如果有任何更改，保存进度
+        # If there are any changes, save progress
         if need_save:
             self.save_progress()
             logger.info("Saved progress after resetting in_progress statuses")
@@ -452,15 +452,15 @@ class CloudProgressHolder:
         Update progress in memory (no file saving)
         """
         try:
-            # 更新时间戳
+            # Update timestamp
             self.progress.data["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
             
-            # 确保进度文件路径存在
+            # Ensure progress file path exists
             progress_dir = Path("data/cloud_progress")
             progress_dir.mkdir(parents=True, exist_ok=True)
             self.progress_file = progress_dir / "cloud_progress.json"
             
-            # 保存进度数据
+            # Save progress data
             with open(self.progress_file, "w", encoding="utf-8") as f:
                 json.dump(self.progress.data, f, ensure_ascii=False, indent=2)
                 
@@ -480,7 +480,7 @@ class CloudProgressHolder:
         try:
             # 处理不同类型的step参数
             if hasattr(step, 'value') and isinstance(step.value, str):
-                # 如果是枚举类型（具有value属性的对象）
+                # If it's an enum type (object with value attribute)
                 stage_name = self.progress._stage_mapping[step]
                 step_name = step.value
             else:
@@ -490,13 +490,13 @@ class CloudProgressHolder:
                 if step_name is None:
                     step_name = stage_name
             
-            # 确保 status 是字符串类型
+            # Ensure status is string type
             if hasattr(status, 'value') and isinstance(status.value, str):
                 status_str = status.value
             else:
                 status_str = str(status)
                 
-            # 更新步骤状态
+            # Update step status
             self.progress.update_progress(stage_name, step_name, status_str)
             
             # 保存进度
