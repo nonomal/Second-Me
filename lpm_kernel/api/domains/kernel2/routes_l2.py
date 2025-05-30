@@ -597,8 +597,6 @@ def convert_model():
                 code=400
             ))
 
-        logger.info("开始开始开始12312")
-
         # Get GGUF output directory
         gguf_dir = paths["gguf_dir"]
         logger.info(f"GGUF output directory: {gguf_dir}")
@@ -619,7 +617,6 @@ def convert_model():
         # Save training parameters to a JSON file in the GGUF directory
         training_params_path = os.path.join(gguf_dir, f"{timestamp}.json")
         try:
-            # 添加模型路径到训练参数
             training_params["model_path"] = gguf_path
 
             with open(training_params_path, 'w', encoding='utf-8') as f:
@@ -647,12 +644,10 @@ def convert_model():
             with DatabaseSession.session() as session:
                 update_count = session.query(Memory).filter(Memory.status == "active").update(
                     {"is_trained": True},
-                    synchronize_session=False  # 不同步会话状态，提高性能
+                    synchronize_session=False  
                 )
 
-                # 提交更改
                 session.commit()
-            logger.info("结束结束")
             logger.info(f"Updated training status for {update_count} memory records")
         except Exception as e:
             logger.error(f"Failed to update memory training status: {str(e)}", exc_info=True)
@@ -1008,7 +1003,7 @@ def chat(body: ChatRequest):
             }
             # Return as regular JSON response for non-stream or stream-compatible error
             if not body.stream:
-                return APIResponse.error(message="服务暂时不可用", code=503), 503
+                return APIResponse.error(message="Service unavailable", code=503), 503
             return local_llm_service.handle_stream_response(iter([error_response]))
 
         try:

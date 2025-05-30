@@ -1089,7 +1089,6 @@ class TrainProcessService:
             # Save training parameters to a JSON file in the GGUF directory
             training_params_path = os.path.join(gguf_dir, f"{timestamp}.json")
             try:
-                # 添加模型路径到训练参数
                 training_params["model_path"] = gguf_path
                 
                 with open(training_params_path, 'w', encoding='utf-8') as f:
@@ -1127,10 +1126,9 @@ class TrainProcessService:
                 with DatabaseSession.session() as session:
                     update_count = session.query(Memory).filter(Memory.status == "active").update(
                         {"is_trained": True},
-                        synchronize_session=False  # 不同步会话状态，提高性能
+                        synchronize_session=False  
                     )
                     
-                    # 提交更改
                     session.commit()
                 logger.info(f"Updated training status for {update_count} memory records")
             except Exception as e:

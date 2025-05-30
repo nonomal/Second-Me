@@ -20,7 +20,7 @@ class Memory(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     status = Column(Enum("active", "deleted"), nullable=False, default="active")
-    is_trained = Column(Boolean, nullable=False, default=False)  # 是否已用于训练
+    is_trained = Column(Boolean, nullable=False, default=False)  
 
     def __init__(self, name, size, path, metadata=None):
         import uuid

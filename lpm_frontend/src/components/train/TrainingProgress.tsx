@@ -20,13 +20,11 @@ const TrainingProgress = (props: TrainingProgressProps): JSX.Element => {
     cloudJobId // Use new prop
   } = props;
 
-  // 根据训练类型条件渲染对应的组件
   if (trainingType === 'cloud') {
     // Pass cloudProgressData and cloudJobId to CloudTrainingProgress
     return <CloudTrainingProgress cloudProgressData={cloudProgressData || null} cloudJobId={cloudJobId || null} />;
   }
 
-  // 默认显示本地训练进度
   return <LocalTrainingProgress status={status} trainingProgress={trainingProgress} />;
 };
 

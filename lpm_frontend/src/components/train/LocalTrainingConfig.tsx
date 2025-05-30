@@ -57,19 +57,14 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
   const thinkingModelConfig = useModelConfigStore((state) => state.thinkingModelConfig);
 
   useEffect(() => {
-    // 当有可用的基础模型选项时，确保设置第一个为默认选中
-    // 只有在LocalTrainingConfig中才设置本地模型
     if (baseModelOptions.length > 0) {
-      // 检查当前选择的模型是否在可用选项中
       const currentModelIsValid = baseModelOptions.some(
         (m) => m.value === trainingParams.model_name
       );
 
-      // 只有在没有有效选择时才设置默认值
       if (!trainingParams.model_name || !currentModelIsValid) {
         const defaultModel = baseModelOptions[0].value;
 
-        // 避免不必要的更新
         if (
           trainingParams.model_name !== defaultModel ||
           trainingParams.local_model_name !== defaultModel
@@ -81,9 +76,7 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
           });
         }
       } else {
-        // 确保 local_model_name 与当前的 model_name 同步，但只在需要时更新
         if (trainingParams.local_model_name !== trainingParams.model_name) {
-          // 此处只更新 local_model_name，不改变 model_name
           updateTrainingParams({
             ...trainingParams,
             local_model_name: trainingParams.model_name
@@ -91,7 +84,6 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
         }
       }
     } else {
-      // 如果没有可用的模型选项，清空当前选择，但只在需要时更新
       if (trainingParams.model_name !== '' || trainingParams.local_model_name !== '') {
         updateTrainingParams({
           ...trainingParams,
@@ -214,7 +206,6 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
           <Listbox
             disabled={disabledChangeParams}
             onChange={(value) => {
-              // 检查是否真的发生了变化，避免不必要的更新
               if (value !== trainingParams.model_name) {
                 updateTrainingParams({
                   ...trainingParams,

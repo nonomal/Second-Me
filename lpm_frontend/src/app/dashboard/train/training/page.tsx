@@ -100,7 +100,6 @@ export default function TrainingPage(): JSX.Element {
   const [showCelebration, setShowCelebration] = useState(false);
   const [showMemoryModal, setShowMemoryModal] = useState(false);
 
-  // 云端训练相关状态
   const [trainingType, setTrainingType] = useState<'local' | 'cloud'>('local');
   const [cloudProgress, setCloudProgress] = useState<CloudProgressData | null>(null);
   const [cloudJobId, setCloudJobId] = useState<string | null>(null);
@@ -119,15 +118,13 @@ export default function TrainingPage(): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
   const firstLoadRef = useRef<boolean>(true);
   const pollingStopRef = useRef<boolean>(false);
-  const cloudPollingRef = useRef<NodeJS.Timeout | null>(null); // 用于云训练轮询的引用
+  const cloudPollingRef = useRef<NodeJS.Timeout | null>(null); 
 
   const [cudaAvailable, setCudaAvailable] = useState<boolean>(false);
   const trainSuspended = useTrainingStore((state) => state.trainSuspended);
   const setTrainSuspended = useTrainingStore((state) => state.setTrainSuspended);
 
-  // 开始云端训练轮询
   const startCloudTrainingPolling = () => {
-    // 设置状态为训练中
     setStatus('training');
     setIsTraining(true);
     pollingStopRef.current = false; // Reset polling stop flag
@@ -247,7 +244,6 @@ export default function TrainingPage(): JSX.Element {
       });
   };
 
-  // 停止云端轮询
   const stopCloudPolling = () => {
     pollingStopRef.current = true;
 
@@ -449,7 +445,7 @@ export default function TrainingPage(): JSX.Element {
   // Cleanup when component unmounts
   useEffect(() => {
     return () => {
-      stopPolling(); // 停止本地训练轮询
+      stopPolling(); 
       if (cloudPollingRef.current) { // Ensure cloud polling is stopped
         clearTimeout(cloudPollingRef.current);
       }
@@ -850,7 +846,6 @@ export default function TrainingPage(): JSX.Element {
     }
   };
 
-  // 统一处理本地和云端训练的动作
   const handleTrainingAction = async (type: 'local' | 'cloud' = 'local') => {
     if (trainActionLoading) {
       message.info('Please wait a moment...');
@@ -866,7 +861,6 @@ export default function TrainingPage(): JSX.Element {
 
     setTrainActionLoading(true);
 
-    // 更新当前活动的训练类型
     setTrainingType(type);
 
     // If training is in progress, stop it
@@ -885,9 +879,7 @@ export default function TrainingPage(): JSX.Element {
       return;
     }
 
-    // 根据训练类型选择不同的处理方法
     if (type === 'cloud') {
-      // 云端训练流程
       if (cloudTrainSuspended) {
         // Resume cloud training
         await handleResumeCloudTraining();
@@ -902,7 +894,6 @@ export default function TrainingPage(): JSX.Element {
         await handleStartCloudTraining();
       }
     } else {
-      // 本地训练流程
       if (status === 'trained') {
         await handleRetrainModel();
       } else {
@@ -913,19 +904,15 @@ export default function TrainingPage(): JSX.Element {
     setTrainActionLoading(false);
   };
 
-  // 云端训练相关方法
-  // 启动云端训练
   const handleStartCloudTraining = async () => {
     setIsTraining(true);
     setStatus('training');
     setCloudTrainingStatus('training');
     
-    // 清除训练日志
     setTrainingDetails([]);
     localStorage.removeItem('trainingLogs');
     localStorage.removeItem('hasShownCloudTrainingComplete'); // Reset celebration flag
     
-    // 重置训练状态
     resetTrainingState();
     setCloudProgress(null); // Reset cloud progress
     setCloudJobId(null); // Reset cloud job ID
@@ -948,7 +935,6 @@ export default function TrainingPage(): JSX.Element {
           setCloudJobId(returnedJobId);
         }
         
-        // 保存训练配置并开始轮询
         localStorage.setItem('trainingParams', JSON.stringify(trainingParams));
         scrollPageToBottom();
         setTrainingType('cloud');
@@ -970,7 +956,6 @@ export default function TrainingPage(): JSX.Element {
     }
   };
 
-  // 清理资源
   useEffect(() => {
     return () => {
       stopPolling();

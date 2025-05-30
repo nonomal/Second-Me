@@ -81,20 +81,17 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
     if (open) {
       setLoadingCloudModels(true);
 
-      // 获取真实的云端部署模型数据
       listDeployments()
         .then((res) => {
           if (res.data.code === 0 && res.data.data.deployments) {
             const deploymentModels: ModelInfo[] = res.data.data.deployments.map((deployment: CloudDeployment) => {
 
-                // 从deployed_model中提取时间戳并转换为标准格式
                 const timestampMatch = deployment.deployed_model.match(/ft-(\d{12})/);
                 let extractedTimestamp;
                 if (timestampMatch) {
                   const rawTimestamp = timestampMatch[1];
-                  // 将 YYYYMMDDHHMM 格式转换为标准时间戳
                   const year = parseInt(rawTimestamp.slice(0, 4));
-                  const month = parseInt(rawTimestamp.slice(4, 6)) - 1; // JavaScript月份从0开始
+                  const month = parseInt(rawTimestamp.slice(4, 6)) - 1; 
                   const day = parseInt(rawTimestamp.slice(6, 8));
                   const hour = parseInt(rawTimestamp.slice(8, 10));
                   const minute = parseInt(rawTimestamp.slice(10, 12));
@@ -104,16 +101,16 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
                 }
                 
                 const modelInfo = {
-                  model_path: `cloud/${deployment.name}`, // 保持路径前缀为cloud
+                  model_path: `cloud/${deployment.name}`, 
                   full_path: `/models/cloud/${deployment.deployed_model}`,
-                  file_size: 0, // 云端模型不适用此参数
-                  created_time: extractedTimestamp, 
+                  file_size: 0, 
+                  created_time: extractedTimestamp,
                   training_params: {
                     type: 'fine-tuned',
-                    base_model: deployment.base_model, // 保存base_model用于显示
+                    base_model: deployment.base_model,
                     deployed_model: deployment.deployed_model,
                     status: deployment.status,
-                    created_at: deployment.deployed_model // 使用deployed_model用于获取创建时间
+                    created_at: deployment.deployed_model
                   }
                 };
                 
@@ -166,13 +163,8 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
 
   const renderModelItem = (model: ModelInfo, index: number, isCloud: boolean = false) => {
     const fileName = model.model_path.split('/')[1];
-    // 判断是否为云端模型（拥有特定格式的文件名如ft-202505231047-cf9e）
     const isCloudDeployment = isCloud || (fileName && model.model_path.startsWith('cloud/'));
-
-    // 显示原始文件名，不再提取和格式化时间戳用于标题显示
     const timeStamp = fileName?.replace('.gguf', '') || 'Unknown version';
-
-    // 获取模型名称，对于云模型使用更友好的显示方式
     const modelName = model.model_path.split('/')[0];
 
     // Check if this is the newest model in its category
@@ -212,12 +204,10 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
               placement="left"
               title={
                 <div className="text-xs max-w-xs">
-                  {/* 模型名称作为标题 */}
                   <div className="font-semibold text-white mb-2 text-sm border-b border-white/20 pb-2">
                     {timeStamp}
                   </div>
                   
-                  {/* 基础模型信息 - 对本地和云端模型都显示 */}
                   {model.training_params.base_model && (
                     <div className="mb-2">
                       <div className="text-blue-200 text-xs mb-1">Base Model</div>
@@ -225,11 +215,9 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
                     </div>
                   )}
                   
-                  {/* 创建时间 - 本地和云端都显示，统一格式 */}
                   <div className="mb-2">
                     <div className="text-blue-200 text-xs mb-1">Created</div>
                     {(() => {
-                      // 统一的时间格式化函数
                       const formatTime = (timestamp: number) => {
                         const date = new Date(timestamp * 1000);
                         const year = date.getFullYear();
@@ -241,47 +229,37 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
                       };
 
                       if (isCloudDeployment) {
-                        // 云端模型使用 created_time
                         return <div className="text-white/90 text-xs">{formatTime(model.created_time)}</div>;
                       } else {
-                        // 本地模型也使用 created_time
                         return <div className="text-white/90 text-xs">{formatTime(model.created_time)}</div>;
                       }
                     })()}
                   </div>
 
-                  {/* 所有训练参数（按重要性排序，避免重复） */}
                   <div className="space-y-1 border-t border-white/10 pt-2">
                     {Object.entries(model.training_params).length > 0 ? (
                       (() => {
-                        // 定义参数重要性排序
                         const priorityOrder = [
                           'type',
                           'status',
                           'deployed_model'
-                          // 其他参数按字母顺序
                         ];
 
-                        // 过滤和排序参数
                         return Object.entries(model.training_params)
                           .filter(([key]) => {
-                            // 过滤掉不需要的参数
                             if (key === 'created_at') return false; 
-                            if (key === 'base_model') return false; // 已经单独显示，避免重复
-                            if (key === 'model_name') return false; // 已经映射为base_model，避免重复
+                            if (key === 'base_model') return false; 
+                            if (key === 'model_name') return false; 
                             if (!isCloudDeployment && key === 'model_path') return false;
                             return true;
                           })
                           .sort((a, b) => {
-                            // 按照优先级数组排序
                             const indexA = priorityOrder.indexOf(a[0]);
                             const indexB = priorityOrder.indexOf(b[0]);
 
-                            // 在优先级列表中的排在前面
                             if (indexA !== -1 && indexB !== -1) return indexA - indexB;
                             if (indexA !== -1) return -1;
                             if (indexB !== -1) return 1;
-                            // 其他按字母顺序
                             return a[0].localeCompare(b[0]);
                           })
                           .map(([key, value]) => (
@@ -509,12 +487,9 @@ export function ModelStatus() {
       const res = await getModelList();
 
       if (res.data.code === 0) {
-        // 处理本地模型，为它们添加 base_model 字段并统一格式
         const processedModels = res.data.data.map((model: ModelInfo) => {
-          // 为本地模型添加 base_model 字段
           const updatedTrainingParams = {
             ...model.training_params,
-            // 如果没有 base_model 但有 model_name，则使用 model_name 作为 base_model
             base_model: model.training_params.base_model || model.training_params.model_name || 'Unknown'
           };
           
@@ -726,11 +701,9 @@ export function ModelStatus() {
   const handleStartServiceConfirmed = () => {
     if (!selectedModelForConfirmation) return;
 
-    // 检查是否为云端模型
     const isCloudModel = selectedModelForConfirmation.model_path.includes('cloud/');
 
     if (isCloudModel) {
-      // 对于云端模型，使用云端服务启动API
       setServiceStarting(true);
       
       const cloudStartRequest = {
@@ -758,7 +731,6 @@ export function ModelStatus() {
           setServiceStarting(false);
         });
     } else {
-      // 对于本地模型，使用原有的启动逻辑
       setServiceStarting(true);
       startService(selectedModelForConfirmation)
         .then((res) => {
@@ -943,12 +915,10 @@ export function ModelStatus() {
                   placement="left"
                   title={
                     <div className="text-xs max-w-xs">
-                      {/* 模型名称作为标题 */}
                       <div className="font-semibold text-white mb-2 text-sm border-b border-white/20 pb-2">
                         {selectedModelForConfirmation.model_path.split('/')[1]}
                       </div>
                       
-                      {/* 基础模型信息 - 对本地和云端模型都显示 */}
                       {selectedModelForConfirmation.training_params.base_model && (
                         <div className="mb-2">
                           <div className="text-blue-200 text-xs mb-1">Base Model</div>
@@ -956,11 +926,9 @@ export function ModelStatus() {
                         </div>
                       )}
                       
-                      {/* 创建时间 - 本地和云端都显示，统一格式 */}
                       <div className="mb-2">
                         <div className="text-blue-200 text-xs mb-1">Created</div>
                         {(() => {
-                          // 统一的时间格式化函数
                           const formatTime = (timestamp: number) => {
                             const date = new Date(timestamp * 1000);
                             const year = date.getFullYear();
@@ -971,45 +939,36 @@ export function ModelStatus() {
                             return `${year}-${month}-${day} ${hour}:${minute}`;
                           };
 
-                          // 使用 created_time 字段进行统一的时间显示
                           return <div className="text-white/90 text-xs">{formatTime(selectedModelForConfirmation.created_time)}</div>;
                         })()}
                       </div>
                       
-                      {/* 所有训练参数（按重要性排序） */}
                       <div className="space-y-1 border-t border-white/10 pt-2">
                         {Object.entries(selectedModelForConfirmation.training_params).length > 0 ? (
                           (() => {
-                            // 定义参数重要性排序
                             const priorityOrder = [
                               'type', 
                               'status', 
                               'base_model', 
                               'deployed_model',
-                              // 其他参数按字母顺序
                             ];
                             
-                            // 过滤和排序参数
                             return Object.entries(selectedModelForConfirmation.training_params)
                               .filter(([key]) => {
-                                // 过滤掉不需要的参数
                                 if (key === 'created_at') return false; 
-                                if (key === 'base_model') return false; // 已经单独显示，避免重复
-                                if (key === 'model_name') return false; // 已经映射为base_model，避免重复
+                                if (key === 'base_model') return false; 
+                                if (key === 'model_name') return false; 
                                 if (!selectedModelForConfirmation.model_path.includes('cloud/') && key === 'model_path') return false;
                                 return true;
                               })
                               .sort((a, b) => {
-                                // 按照优先级数组排序
                                 const indexA = priorityOrder.indexOf(a[0]);
                                 const indexB = priorityOrder.indexOf(b[0]);
                                 
-                                // 在优先级列表中的排在前面
                                 if (indexA !== -1 && indexB !== -1) return indexA - indexB;
                                 if (indexA !== -1) return -1;
                                 if (indexB !== -1) return 1;
                                 
-                                // 其他按字母顺序
                                 return a[0].localeCompare(b[0]);
                               })
                               .map(([key, value]) => (

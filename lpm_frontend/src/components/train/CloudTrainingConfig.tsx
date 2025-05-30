@@ -105,30 +105,23 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
             setAvailableCloudModels(fetchedModels);
 
             if (fetchedModels.length > 0) {
-              // 首先检查是否有 cloud_model_name 并且它在可用模型中
               let validCloudModelName = false;
               if (trainingParams.cloud_model_name) {
                 validCloudModelName = fetchedModels.some(m => m.model_id === trainingParams.cloud_model_name);
               }
 
-              // 然后检查 model_name 是否在可用模型中
               const currentModelIsValid = fetchedModels.some(m => m.model_id === trainingParams.model_name);
               
-              // 决定要使用的模型ID
               let modelToUse = '';
               
               if (validCloudModelName) {
-                // 如果有有效的 cloud_model_name，优先使用它
                 modelToUse = trainingParams.cloud_model_name as string;
               } else if (currentModelIsValid) {
-                // 其次使用当前有效的 model_name
                 modelToUse = trainingParams.model_name;
               } else {
-                // 最后使用第一个可用模型
                 modelToUse = fetchedModels[0].model_id;
               }
               
-              // 只有在需要更新时才更新状态
               if (trainingParams.model_name !== modelToUse || trainingParams.cloud_model_name !== modelToUse) {
                 updateTrainingParams({ 
                   ...trainingParams, 
@@ -137,7 +130,6 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
                 });
               }
             } else {
-              // 如果没有获取到模型，且当前有模型选择，则清空选择
               if (trainingParams.model_name !== '' || trainingParams.cloud_model_name !== '') {
                 updateTrainingParams({ 
                   ...trainingParams, 
@@ -149,7 +141,6 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
           } else {
             message.error(res.data.message || 'Failed to fetch available cloud models');
             setAvailableCloudModels([]);
-            // 只有在当前有模型选择的情况下才清空
             if (trainingParams.model_name !== '' || trainingParams.cloud_model_name !== '') {
               updateTrainingParams({ 
                 ...trainingParams, 
@@ -162,7 +153,6 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
           message.error(error.message || 'Error fetching cloud models');
           setAvailableCloudModels([]);
 
-          // 只有在当前有模型选择的情况下才清空
           if (trainingParams.model_name !== '' || trainingParams.cloud_model_name !== '') {
              updateTrainingParams({ 
                ...trainingParams, 
@@ -176,7 +166,6 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
         setLoadingModels(false);
       } else {
         setAvailableCloudModels([]);
-        // 只有在当前有模型选择的情况下才清空
         if (trainingParams.model_name !== '' || trainingParams.cloud_model_name !== '') {
           updateTrainingParams({ 
             ...trainingParams, 
@@ -188,11 +177,9 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
     };
 
     fetchModels();
-  }, [hasCloudServiceApiKey]); // 移除 trainingParams.model_name 依赖，避免循环请求
+  }, [hasCloudServiceApiKey]); 
 
-  // 移除不必要的同步逻辑，避免循环更新
   // useEffect(() => {
-  //   // 确保云训练模型和当前模型同步
   //   if (trainingParams.cloud_model_name && trainingParams.model_name !== trainingParams.cloud_model_name) {
   //     updateTrainingParams({
   //       ...trainingParams,
@@ -386,7 +373,6 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
             <Listbox
               disabled={disabledChangeParams || !hasCloudServiceApiKey || loadingModels}
               onChange={(value) => {
-                // 检查是否真的发生了变化，避免不必要的更新
                 if (value !== trainingParams.model_name) {
                   updateTrainingParams({ 
                     ...trainingParams, 
@@ -406,12 +392,10 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
                 >
                   <span className="block truncate">
                     {(() => {
-                      // 尝试使用 model_name 查找选项
                       const currentOption = cloudModelOptions.find(
                         (option) => option.value === trainingParams.model_name
                       );
                       
-                      // 如果没找到，尝试使用 cloud_model_name 查找
                       if (!currentOption && trainingParams.cloud_model_name) {
                         const cloudOption = cloudModelOptions.find(
                           (option) => option.value === trainingParams.cloud_model_name
@@ -419,7 +403,6 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
                         if (cloudOption) return cloudOption.label;
                       }
                       
-                      // 返回找到的选项标签，或默认文本
                       return currentOption?.label || 
                              (cloudModelOptions.length > 0 
                                ? cloudModelOptions[0].label 
@@ -451,8 +434,6 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
                           value={option.value}
                         >
                           {({ selected }) => {
-                            // 额外检查 selected 状态是否与当前值匹配
-                            // 同时考虑 model_name 和 cloud_model_name
                             const isSelected = selected || 
                                               trainingParams.model_name === option.value || 
                                               trainingParams.cloud_model_name === option.value;

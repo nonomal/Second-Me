@@ -45,7 +45,6 @@ export const useCloudProviderStore = create<CloudProviderState>((set, get) => ({
   },
   fetchCloudConfig: async () => {
     try {
-      // 从模型配置中获取云服务配置
       const response = await getModelConfig();
       if (response.data.data && response.data.data.cloud_service_api_key) {
         set({

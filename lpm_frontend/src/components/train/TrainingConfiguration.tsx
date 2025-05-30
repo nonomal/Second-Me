@@ -50,7 +50,6 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
   setTrainingType,
   cloudTrainingStatus = 'idle'
 }) => {
-  // 使用从父组件传递下来的 trainingType 状态
   const activeTabKey = trainingType;
 
   const trainButtonText = useMemo(() => {
@@ -98,8 +97,7 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
       <PlayIcon className="h-5 w-5 mr-2" />
     );
   }, [isTraining, trainActionLoading]);
-  
-  // 处理不同模式的训练动作
+
   const handleTraining = async () => {
     if (!isTraining && !trainSuspended) {
       if (activeTabKey === 'cloud') {
@@ -110,10 +108,8 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
     }
 
     if (activeTabKey === 'local') {
-      // 调用本地训练功能
       await handleTrainingAction('local');
     } else {
-      // 检查是否设置了云服务 API Key
       if (!modelConfig?.cloud_service_api_key) {
         message.error('Please set up cloud service API key first');
 
@@ -121,17 +117,15 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
       }
 
       if (isTraining) {
-        // 如果正在训练，停止训练（无论是本地还是云端）
         await handleTrainingAction('cloud');
 
         return;
       }
 
-      // 直接调用云端训练方法
       await handleTrainingAction('cloud');
     }
   };
-  
+
   const tabItems: TabsProps['items'] = [
     {
       key: 'local',
@@ -196,12 +190,9 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
         className="mb-6"
         items={tabItems}
         onChange={(key) => {
-          // 首先设置活动标签，这样UI立即响应
           setTrainingType(key as 'local' | 'cloud');
 
-          // 当切换标签时，切换到对应环境的模型，但只在必要时更新
           if (key === 'local') {
-            // 从云端切换到本地，使用 local_model_name（如果存在）
             if (
               trainingParams.local_model_name &&
               trainingParams.model_name !== trainingParams.local_model_name
@@ -212,8 +203,6 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
               });
             }
           } else if (key === 'cloud') {
-            // 从本地切换到云端，优先使用 cloud_model_name（如果存在）
-            // 如果 cloud_model_name 存在，并且与 model_name 不同，则使用 cloud_model_name
             if (
               trainingParams.cloud_model_name &&
               trainingParams.model_name !== trainingParams.cloud_model_name

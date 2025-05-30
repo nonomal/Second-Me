@@ -1,3 +1,9 @@
+'''
+Author       : wyx-hhhh
+Date         : 2025-05-21
+LastEditTime : 2025-05-30
+Description  : 
+'''
 import aiohttp
 import logging
 from lpm_kernel.api.domains.upload.TrainingTags import TrainingTags
@@ -11,8 +17,8 @@ import requests
 from lpm_kernel.api.common.responses import ResponseHandler
 from lpm_kernel.api.domains.loads.load_service import LoadService
 from typing import Optional, List, Dict
-import os  # 添加用于文件路径操作
-from pathlib import Path  # 添加用于路径处理
+import os  
+from pathlib import Path 
 
 logger = logging.getLogger(__name__)
 
@@ -161,7 +167,6 @@ class RegistryClient:
             "role_id": request_data.get("role_id")
         }
         
-        # 从metadata中提取知识检索参数（如果存在）
         metadata = request_data.get("metadata", {})
         if metadata:
             cloud_request["enable_l0_retrieval"] = metadata.get("enable_l0_retrieval", False)
@@ -448,16 +453,12 @@ class RegistryClient:
                             request_data = data.get("request", {})
                             logger.info(f"[Request details: {json.dumps(request_data, ensure_ascii=False)}")
                             
-                            # 1. 检查当前服务状态
                             service_type, model_data = self._get_current_service_type()
                             logger.info(f"Current service type: {service_type}")
                             
-                            # 2. 根据服务类型选择不同的处理路径
                             if service_type == "cloud":
-                                # 使用云服务推理接口
                                 await self._handle_cloud_inference(websocket, data, request_data, model_data)
                             else:
-                                # 使用本地聊天接口（默认）
                                 await self._handle_local_chat(websocket, data, request_data)
 
                         except Exception as e:

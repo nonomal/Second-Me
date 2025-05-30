@@ -192,7 +192,6 @@ export const useTrainingStore = create<ModelState>((set, get) => ({
     set({ error: false });
 
     try {
-      // 确定要使用的模型名称，优先使用当前活动环境的模型名称
       const modelName =
         config.model_name ||
         config.local_model_name ||

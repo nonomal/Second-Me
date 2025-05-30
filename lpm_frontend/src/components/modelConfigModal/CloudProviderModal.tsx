@@ -34,35 +34,28 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
   const [loading, setLoading] = useState<boolean>(false);
   const [originalConfig, setOriginalConfig] = useState<CloudProviderConfig | null>(null);
 
-  // 使用useRef存储最新的props，避免useEffect依赖过多
   const configRef = useRef(cloudConfig);
   const updateConfigRef = useRef(updateCloudConfig);
 
-  // 更新ref的值
   useEffect(() => {
     configRef.current = cloudConfig;
     updateConfigRef.current = updateCloudConfig;
   }, [cloudConfig, updateCloudConfig]);
 
-  // 只在modal打开时获取API密钥
   useEffect(() => {
     if (open) {
-      // 保存原始配置
       setOriginalConfig({ ...configRef.current });
       setProviderType(configRef.current.provider_type || '');
 
-      // 如果选择了阿里云，请求模型配置
       if (configRef.current.provider_type === 'alibaba') {
         setLoading(true);
         getModelConfig()
           .then((res) => {
             if (res.data.data && res.data.data.cloud_service_api_key) {
-              // 更新originalConfig
               setOriginalConfig({
                 ...configRef.current,
                 cloud_service_api_key: res.data.data.cloud_service_api_key
               });
-              // 更新当前显示的值
               updateConfigRef.current({
                 ...configRef.current,
                 cloud_service_api_key: res.data.data.cloud_service_api_key
@@ -133,15 +126,12 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
     try {
       setLoading(true);
 
-      // 如果选择了阿里云，并且有API密钥，则调用更新模型配置接口
       if (providerType === 'alibaba' && configRef.current.cloud_service_api_key) {
-        // 获取当前配置
         const modelConfigResponse = await getModelConfig();
 
         if (modelConfigResponse.data.data) {
           const currentConfig = modelConfigResponse.data.data;
 
-          // 更新cloud_service_api_key
           await updateModelConfig({
             ...currentConfig,
             cloud_service_api_key: configRef.current.cloud_service_api_key
@@ -150,13 +140,11 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
           message.success('API key has been successfully saved');
         }
       } else if (providerType === '') {
-        // 如果选择了None，清空API密钥
         const modelConfigResponse = await getModelConfig();
 
         if (modelConfigResponse.data.data) {
           const currentConfig = modelConfigResponse.data.data;
 
-          // 清空cloud_service_api_key
           await updateModelConfig({
             ...currentConfig,
             cloud_service_api_key: ''
@@ -190,7 +178,6 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
   }, [providerType, renderAlibabaCloud]);
 
   const handleCancel = useCallback(() => {
-    // 恢复原始配置
     if (originalConfig) {
       updateConfigRef.current(originalConfig);
     }
@@ -237,7 +224,6 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
               updateConfigRef.current({
                 ...configRef.current,
                 provider_type: newProviderType,
-                // 如果不是阿里云，清空API密钥
                 cloud_service_api_key: newProviderType !== 'alibaba' ? '' : configRef.current.cloud_service_api_key
               });
             }}
