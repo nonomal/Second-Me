@@ -14,7 +14,7 @@ import type { ChatRequest } from '@/hooks/useSSE';
 import { useSSE } from '@/hooks/useSSE';
 import { useLoadInfoStore } from '@/store/useLoadInfoStore';
 import { getTrainingParams } from '@/service/train';
-import { getActiveCloudModel, getCurrentModelDisplayName } from '@/utils/cloudModelUtils';
+import { getActiveCloudModel, getCurrentModelDisplayNameAsync } from '@/utils/cloudModelUtils';
 
 // Use the Message type directly from storage
 type Message = StorageMessage;
@@ -48,6 +48,7 @@ export default function PlaygroundChat() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [modelType, setModelType] = useState<ModelType | undefined>(undefined);
+  const [currentModelName, setCurrentModelName] = useState<string>('Loading...');
 
   const originPrompt = useMemo(() => {
     const name = loadInfo?.name || 'user';
@@ -118,6 +119,26 @@ export default function PlaygroundChat() {
       .catch((error) => {
         console.error(error.message);
       });
+  }, []);
+
+  // Get current model display name
+  useEffect(() => {
+    const updateModelName = async () => {
+      try {
+        const modelName = await getCurrentModelDisplayNameAsync();
+        setCurrentModelName(modelName);
+      } catch (error) {
+        console.error('Failed to get current model name:', error);
+        setCurrentModelName('Model Status Unknown');
+      }
+    };
+
+    updateModelName();
+
+    // Update model name every 5 seconds to reflect service changes
+    const interval = setInterval(updateModelName, 5000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const scrollToBottom = () => {
@@ -342,7 +363,7 @@ export default function PlaygroundChat() {
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-semibold">Chat with Second Me</h2>
             <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
-              {getCurrentModelDisplayName()}
+              {currentModelName}
             </span>
           </div>
           <button className="text-sm text-gray-600 hover:text-gray-900" onClick={handleClearChat}>

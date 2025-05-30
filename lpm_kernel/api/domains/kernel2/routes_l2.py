@@ -6,8 +6,9 @@ import sys
 import torch  # Add torch import for CUDA detection
 import traceback
 from dataclasses import asdict
+from datetime import datetime
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, Response
 from flask_pydantic import validate
 
 from lpm_kernel.models.memory import Memory
@@ -49,6 +50,51 @@ kernel2_bp = Blueprint("kernel2", __name__, url_prefix="/api/kernel2")
 # Create script executor instance
 script_executor = ScriptExecutor()
 
+def get_service_status_file_path():
+    """Get the path for service status file"""
+    return os.path.join(os.getcwd(), "data", "service_status.json")
+
+def create_service_status_file(service_type: str, model_data: dict):
+    """Create service status file to track active service
+    
+    Args:
+        service_type: 'local' or 'cloud'
+        model_data: Dictionary containing model information
+    """
+    status_data = {
+        "service_type": service_type,
+        "model_data": model_data,
+        "created_at": datetime.now().isoformat(),
+        "status": "active"
+    }
+    
+    status_file_path = get_service_status_file_path()
+    os.makedirs(os.path.dirname(status_file_path), exist_ok=True)
+    
+    with open(status_file_path, 'w', encoding='utf-8') as f:
+        json.dump(status_data, f, indent=2, ensure_ascii=False)
+    
+    logger.info(f"Service status file created: {status_file_path}")
+
+def remove_service_status_file():
+    """Remove service status file when service is stopped"""
+    status_file_path = get_service_status_file_path()
+    if os.path.exists(status_file_path):
+        os.remove(status_file_path)
+        logger.info(f"Service status file removed: {status_file_path}")
+
+def get_service_status():
+    """Get current service status from file"""
+    status_file_path = get_service_status_file_path()
+    if not os.path.exists(status_file_path):
+        return None
+    
+    try:
+        with open(status_file_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to read service status file: {str(e)}")
+        return None
 
 @kernel2_bp.route("/health", methods=["GET"])
 def health_check():
@@ -558,7 +604,6 @@ def convert_model():
         logger.info(f"GGUF output directory: {gguf_dir}")
 
         # Generate timestamp for the filename
-        from datetime import datetime
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         gguf_filename = f"{timestamp}.gguf"
 
@@ -643,6 +688,14 @@ def start_llama_server():
         if "model_path" not in data and "full_path" not in data:
             return jsonify(APIResponse.error(message="Missing required parameter: model_path or full_path", code=400))
 
+        # Check if any service is already running
+        current_status = get_service_status()
+        if current_status and current_status.get("status") == "active":
+            return jsonify(APIResponse.error(
+                message=f"Another service is already running: {current_status.get('service_type', 'unknown')}",
+                code=400
+            ))
+
         # Get model path from appropriate field
         model_path = data.get("model_path") or data.get("full_path")
 
@@ -679,6 +732,17 @@ def start_llama_server():
         if not success:
             return jsonify(APIResponse.error(message="Failed to start llama-server", code=500))
             
+        # Create service status file for local service
+        model_data = {
+            "model_name": model_name,
+            "model_path": model_path,
+            "gguf_path": gguf_path,
+            "use_gpu": use_gpu and torch.cuda.is_available(),
+            "service_endpoint": "local_llm"
+        }
+        
+        create_service_status_file("local", model_data)
+            
         # Get updated service status
         status = local_llm_service.get_server_status()
         
@@ -687,6 +751,7 @@ def start_llama_server():
         return jsonify(
             APIResponse.success(
                 data={
+                    "service_type": "local",
                     "model_name": model_name,
                     "gguf_path": gguf_path,
                     "status": "running" if status.is_running else "starting",
@@ -717,11 +782,22 @@ def stop_llama_server():
         if _stopping_server:
             return jsonify(APIResponse.success(message="llama-server service is stopping"))
 
+        # Check if local service is actually running
+        current_status = get_service_status()
+        if not current_status or current_status.get("service_type") != "local":
+            return jsonify(APIResponse.error(
+                message="No local service is currently running",
+                code=400
+            ))
+
         _stopping_server = True  # Set stopping flag
 
         try:
             # use improved local_llm_service.stop_server() to stop all llama-server process
             status = local_llm_service.stop_server()
+
+            # Remove service status file
+            remove_service_status_file()
 
             # check if there are still processes running
             if status.is_running and status.process_info:
@@ -732,7 +808,10 @@ def stop_llama_server():
                     data={"running_pid": pid}
                 ))
             else:
-                return jsonify(APIResponse.success(message="llama-server service has been stopped successfully"))
+                return jsonify(APIResponse.success(
+                    data={"service_type": "local", "status": "stopped"},
+                    message="llama-server service has been stopped successfully"
+                ))
 
         except Exception as e:
             logger.error(f"Error while stopping llama-server: {str(e)}")
@@ -749,10 +828,31 @@ def stop_llama_server():
 @kernel2_bp.route("/llama/status", methods=["GET"])
 @validate()
 def get_llama_server_status():
-    """Get llama-server service status"""
+    """Get llama-server service status with service file information"""
     try:
+        # Get llama server status
         status = local_llm_service.get_server_status()
-        return APIResponse.success(asdict(status))
+        
+        # Get service status from file
+        service_status = get_service_status()
+        
+        # Combine both status information
+        response_data = asdict(status)
+        
+        if service_status and service_status.get("service_type") == "local":
+            response_data.update({
+                "service_type": "local",
+                "service_file_status": "active",
+                "model_data": service_status.get("model_data")
+            })
+        else:
+            response_data.update({
+                "service_type": None,
+                "service_file_status": "inactive",
+                "model_data": None
+            })
+        
+        return APIResponse.success(response_data)
 
     except Exception as e:
         logger.error(f"Error getting llama-server status: {str(e)}", exc_info=True)

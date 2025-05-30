@@ -5,6 +5,7 @@ import {
   type TrainProgress,
   type ServiceStatusRes
 } from '@/service/train';
+import { getCloudServiceStatus } from '@/service/cloudService';
 import type { CommonResponse } from '@/types/responseModal';
 
 export type ModelStatus = 'seed_identity' | 'memory_upload' | 'training' | 'trained';
@@ -123,26 +124,59 @@ export const useTrainingStore = create<ModelState>((set, get) => ({
     set({ status });
   },
   fetchServiceStatus: () => {
-    return getServiceStatus().then((res) => {
-      if (res.data.code === 0) {
-        const isRunning = res.data.data.is_running;
-
-        // 检查是否有活跃的云端模型
-        const activeCloudModel = localStorage.getItem('activeCloudModel');
-        
-        if (activeCloudModel) {
-          // 如果有云端模型，设置服务为已启动
-          set({ serviceStarted: true });
-        } else if (isRunning) {
-          // 本地模型服务正在运行
-          set({ serviceStarted: true });
-        } else {
-          // 没有任何服务运行
-          set({ serviceStarted: false });
+    // Check both local and cloud service status
+    return Promise.all([
+      getServiceStatus().catch(() => ({ data: { code: -1, data: { is_running: false } } })),
+      getCloudServiceStatus().catch(() => ({
+        data: {
+          code: -1,
+          data: {
+            status: 'stopped',
+            service_type: '',
+            model_data: null
+          }
         }
+      }))
+    ]).then(([localRes, cloudRes]) => {
+      let serviceStarted = false;
+      
+      // Check local service status (uses is_running field)
+      if (localRes.data.code === 0 && localRes.data.data.is_running) {
+        serviceStarted = true;
+        // Clear cloud model when local service is active
+        import('@/utils/cloudModelUtils').then(({ clearActiveCloudModel }) => {
+          clearActiveCloudModel();
+        });
       }
+      
+      // Check cloud service status (uses status field with 'active'/'stopped')
+      if (cloudRes.data.code === 0 && cloudRes.data.data.status === 'active') {
+        serviceStarted = true;
+        
+        // Set active cloud model when cloud service is active
+        const modelData = cloudRes.data.data.model_data;
 
-      return res;
+        if (modelData) {
+          import('@/utils/cloudModelUtils').then(({ setActiveCloudModel }) => {
+            setActiveCloudModel({
+              name: modelData.model_name || 'Unknown Cloud Model',
+              deployed_model: modelData.model_id || '',
+              base_model: modelData.base_model || '',
+              status: 'active'
+            });
+          });
+        }
+      } else {
+        // Clear cloud model when cloud service is not active
+        import('@/utils/cloudModelUtils').then(({ clearActiveCloudModel }) => {
+          clearActiveCloudModel();
+        });
+      }
+      
+      set({ serviceStarted });
+      
+      // Return the local service response for backward compatibility
+      return localRes;
     });
   },
   setError: (error) => set({ error }),
@@ -159,10 +193,11 @@ export const useTrainingStore = create<ModelState>((set, get) => ({
 
     try {
       // 确定要使用的模型名称，优先使用当前活动环境的模型名称
-      const modelName = config.model_name || 
-                      config.local_model_name || 
-                      config.cloud_model_name || 
-                      'Qwen2.5-0.5B-Instruct';
+      const modelName =
+        config.model_name ||
+        config.local_model_name ||
+        config.cloud_model_name ||
+        'Qwen2.5-0.5B-Instruct';
       
       const res = await getTrainProgress({
         model_name: modelName,

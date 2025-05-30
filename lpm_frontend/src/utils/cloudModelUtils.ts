@@ -32,7 +32,7 @@ export const getActiveCloudModel = (): ActiveCloudModel | null => {
     const cloudModelInfo = localStorage.getItem('activeCloudModel');
 
     if (!cloudModelInfo) return null;
-    
+
     return JSON.parse(cloudModelInfo) as ActiveCloudModel;
   } catch (error) {
     console.error('Failed to parse cloud model info:', error);
@@ -64,14 +64,113 @@ export const clearActiveCloudModel = (): void => {
 };
 
 /**
+ * Extract clean model name from full model path or name
+ */
+const extractModelName = (modelName: string): string => {
+  if (!modelName) return 'Unknown Model';
+  
+  // Remove file extensions
+  let cleanName = modelName.replace(/\.(gguf|bin|safetensors)$/i, '');
+  
+  // If it contains a path separator, take the directory name (base model)
+  if (cleanName.includes('/')) {
+    cleanName = cleanName.split('/')[0];
+  }
+  
+  return cleanName;
+};
+
+/**
  * Get display name for current model (cloud or local)
+ * This function checks localStorage for model information as a fallback
+ * For real-time status, use getCurrentModelDisplayNameAsync instead
  */
 export const getCurrentModelDisplayName = (): string => {
+  // Check cloud model first
   const cloudModel = getActiveCloudModel();
 
-  if (cloudModel) {
-    return `Cloud: ${cloudModel.name}`;
+  if (cloudModel && cloudModel.status === 'active') {
+    return `Cloud: ${extractModelName(cloudModel.name)}`;
   }
 
-  return 'Local Model';
+  // Check local model from training params
+  try {
+    const storedParams = localStorage.getItem('trainingParams');
+
+    if (storedParams) {
+      const params = JSON.parse(storedParams);
+
+      if (params.model_name) {
+        return `Local: ${extractModelName(params.model_name)}`;
+      }
+    }
+  } catch {
+    // Ignore parsing error
+  }
+
+  // Default fallback
+  return 'Model Status Unknown';
+};
+
+/**
+ * Get current model display name with real-time service status check
+ * This function fetches the actual service status from backend
+ */
+export const getCurrentModelDisplayNameAsync = async (): Promise<string> => {
+  try {
+    // Import the service functions dynamically to avoid circular dependencies
+    const trainModule = await import('../service/train');
+    const cloudModule = await import('../service/cloudService');
+
+    // Check both local and cloud service status
+    const [localRes, cloudRes] = await Promise.allSettled([
+      trainModule.getServiceStatus(),
+      cloudModule.getCloudServiceStatus()
+    ]);
+
+    // Check cloud service first
+    if (
+      cloudRes.status === 'fulfilled' &&
+      cloudRes.value.data.code === 0 &&
+      cloudRes.value.data.data.status === 'active'
+    ) {
+      const modelData = cloudRes.value.data.data.model_data;
+
+      if (modelData) {
+        return `Cloud: ${extractModelName(modelData.model_name || 'Unknown Cloud Model')}`;
+      }
+
+      return 'Cloud Model';
+    }
+
+    // Check local service
+    if (
+      localRes.status === 'fulfilled' &&
+      localRes.value.data.code === 0 &&
+      localRes.value.data.data.is_running
+    ) {
+      // Get local model name from stored data if available
+      const storedParams = localStorage.getItem('trainingParams');
+
+      if (storedParams) {
+        try {
+          const params = JSON.parse(storedParams);
+
+          return `Local: ${extractModelName(params.model_name || 'Local Model')}`;
+        } catch {
+          // Ignore parsing error
+        }
+      }
+
+      return 'Local Model';
+    }
+
+    // If no service is running, return default
+    return 'No Model Running';
+  } catch (error) {
+    console.error('Failed to get current service status:', error);
+    // Fallback to localStorage method
+
+    return getCurrentModelDisplayName();
+  }
 };

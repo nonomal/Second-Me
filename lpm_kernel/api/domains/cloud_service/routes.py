@@ -30,6 +30,56 @@ from lpm_kernel.configs.logging import get_train_process_logger
 logger = get_train_process_logger()
 cloud_bp = Blueprint("cloud_service", __name__, url_prefix="/api/cloud_service")
 
+# Global variables for tracking cloud service status
+_cloud_service_active = False
+_cloud_service_model_id = None
+
+def get_service_status_file_path():
+    """Get the path for service status file"""
+    return os.path.join(os.getcwd(), "data", "service_status.json")
+
+def create_service_status_file(service_type: str, model_data: dict):
+    """Create service status file to track active service
+    
+    Args:
+        service_type: 'local' or 'cloud'
+        model_data: Dictionary containing model information
+    """
+    status_data = {
+        "service_type": service_type,
+        "model_data": model_data,
+        "created_at": datetime.now().isoformat(),
+        "status": "active"
+    }
+    
+    status_file_path = get_service_status_file_path()
+    os.makedirs(os.path.dirname(status_file_path), exist_ok=True)
+    
+    with open(status_file_path, 'w', encoding='utf-8') as f:
+        json.dump(status_data, f, indent=2, ensure_ascii=False)
+    
+    logger.info(f"Service status file created: {status_file_path}")
+
+def remove_service_status_file():
+    """Remove service status file when service is stopped"""
+    status_file_path = get_service_status_file_path()
+    if os.path.exists(status_file_path):
+        os.remove(status_file_path)
+        logger.info(f"Service status file removed: {status_file_path}")
+
+def get_service_status():
+    """Get current service status from file"""
+    status_file_path = get_service_status_file_path()
+    if not os.path.exists(status_file_path):
+        return None
+    
+    try:
+        with open(status_file_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to read service status file: {str(e)}")
+        return None
+
 @cloud_bp.route("/set_api_key", methods=["POST"])
 def set_api_key():
     """
@@ -691,3 +741,177 @@ def delete_fine_tune_job():
     except Exception as e:
         logger.error(f"Delete fine-tune job failed: {str(e)}", exc_info=True)
         return jsonify(APIResponse.error(f"Failed to delete fine-tune job: {str(e)}"))
+
+@cloud_bp.route("/service/start", methods=["POST"])
+def start_cloud_service():
+    """Start cloud inference service
+    
+    Request: JSON object, containing:
+    - model_id: str, Cloud model deployment ID
+    - model_name: str, optional, Model name for display
+    
+    Returns:
+    {
+        "code": int,
+        "message": str,
+        "data": {
+            "service_type": "cloud",
+            "model_id": str,
+            "status": "active"
+        }
+    }
+    """
+    global _cloud_service_active, _cloud_service_model_id
+    
+    try:
+        data = request.get_json()
+        if not data or "model_id" not in data:
+            return jsonify(APIResponse.error(message="Missing required parameter: model_id", code=400))
+
+        model_id = data["model_id"]
+        model_name = data.get("model_name", model_id)
+
+        # Check if any service is already running
+        current_status = get_service_status()
+        if current_status and current_status.get("status") == "active":
+            return jsonify(APIResponse.error(
+                message=f"Another service is already running: {current_status.get('service_type', 'unknown')}",
+                code=400
+            ))
+
+        # Verify the cloud model deployment exists
+        cloud_service = CloudService()
+        try:
+            # Verify deployment exists by checking deployed_model field
+            deployments = cloud_service.list_deployments()
+            if not any(dep.get("deployed_model") == model_id or dep.get("name") == model_id for dep in deployments):
+                return jsonify(APIResponse.error(
+                    message=f"Cloud model deployment '{model_id}' not found",
+                    code=404
+                ))
+        except Exception as e:
+            logger.warning(f"Could not verify cloud deployment: {str(e)}")
+
+        # Create service status file for cloud service
+        model_data = {
+            "model_id": model_id,
+            "model_name": model_name,
+            "model_path": f"cloud/{model_id}",
+            "service_endpoint": "cloud_inference"
+        }
+        
+        create_service_status_file("cloud", model_data)
+
+        # Set global status
+        _cloud_service_active = True
+        _cloud_service_model_id = model_id
+
+        logger.info(f"Cloud service started with model: {model_id}")
+        
+        return jsonify(APIResponse.success(
+            data={
+                "service_type": "cloud",
+                "model_id": model_id,
+                "model_name": model_name,
+                "status": "active"
+            },
+            message="Cloud inference service started successfully"
+        ))
+
+    except Exception as e:
+        error_msg = f"Failed to start cloud service: {str(e)}"
+        logger.error(error_msg)
+        return jsonify(APIResponse.error(message=error_msg, code=500))
+
+
+@cloud_bp.route("/service/stop", methods=["POST"])
+def stop_cloud_service():
+    """Stop cloud inference service
+    
+    Returns:
+    {
+        "code": int,
+        "message": str,
+        "data": {
+            "service_type": "cloud",
+            "status": "stopped"
+        }
+    }
+    """
+    global _cloud_service_active, _cloud_service_model_id
+    
+    try:
+        # Check if cloud service is actually running
+        current_status = get_service_status()
+        if not current_status or current_status.get("service_type") != "cloud":
+            return jsonify(APIResponse.error(
+                message="No cloud service is currently running",
+                code=400
+            ))
+
+        # Remove service status file
+        remove_service_status_file()
+
+        # Clear global status
+        _cloud_service_active = False
+        _cloud_service_model_id = None
+
+        logger.info("Cloud service stopped successfully")
+        
+        return jsonify(APIResponse.success(
+            data={
+                "service_type": "cloud",
+                "status": "stopped"
+            },
+            message="Cloud inference service stopped successfully"
+        ))
+
+    except Exception as e:
+        error_msg = f"Failed to stop cloud service: {str(e)}"
+        logger.error(error_msg)
+        return jsonify(APIResponse.error(message=error_msg, code=500))
+
+
+@cloud_bp.route("/service/status", methods=["GET"])
+def get_cloud_service_status():
+    """Get cloud inference service status
+    
+    Returns:
+    {
+        "code": int,
+        "message": str,
+        "data": {
+            "service_type": "cloud" | null,
+            "model_id": str | null,
+            "status": "active" | "stopped",
+            "model_data": dict | null
+        }
+    }
+    """
+    try:
+        current_status = get_service_status()
+        
+        if current_status and current_status.get("service_type") == "cloud":
+            return jsonify(APIResponse.success(
+                data={
+                    "service_type": "cloud",
+                    "model_id": current_status.get("model_data", {}).get("model_id"),
+                    "status": "active",
+                    "model_data": current_status.get("model_data")
+                }
+            ))
+        else:
+            return jsonify(APIResponse.success(
+                data={
+                    "service_type": None,
+                    "model_id": None,
+                    "status": "stopped",
+                    "model_data": None
+                }
+            ))
+
+    except Exception as e:
+        error_msg = f"Failed to get cloud service status: {str(e)}"
+        logger.error(error_msg)
+        return jsonify(APIResponse.error(message=error_msg, code=500))
+

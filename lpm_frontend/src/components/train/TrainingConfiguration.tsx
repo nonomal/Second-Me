@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { PlayIcon, StopIcon } from '@heroicons/react/24/outline';
 import { Tabs, message, Spin } from 'antd';
 import type { TabsProps } from 'antd';
@@ -9,22 +9,15 @@ import type { TrainingConfig } from '@/service/train';
 import type { IModelConfig } from '@/service/modelConfig';
 import LocalTrainingConfig from './LocalTrainingConfig';
 import CloudTrainingConfig from './CloudTrainingConfig';
-import { startCloudTraining } from '@/service/cloudService';
-import type { CommonResponse } from '@/types/responseModal';
 
 interface BaseModelOption {
   value: string;
   label: string;
 }
 
-interface ModelConfig {
-  provider_type?: string;
-  [key: string]: any;
-}
-
 interface TrainingConfigurationProps {
   baseModelOptions: BaseModelOption[];
-  modelConfig: ModelConfig | null;
+  modelConfig: IModelConfig | null;
   isTraining: boolean;
   updateTrainingParams: (params: TrainingConfig) => void;
   status: string;
@@ -37,6 +30,7 @@ interface TrainingConfigurationProps {
   cudaAvailable: boolean;
   trainingType: 'local' | 'cloud';
   setTrainingType: (type: 'local' | 'cloud') => void;
+  cloudTrainingStatus?: 'idle' | 'training' | 'trained' | 'failed' | 'suspended';
 }
 
 const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
@@ -53,26 +47,45 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
   setSelectedInfo,
   cudaAvailable,
   trainingType,
-  setTrainingType
+  setTrainingType,
+  cloudTrainingStatus = 'idle'
 }) => {
   // 使用从父组件传递下来的 trainingType 状态
   const activeTabKey = trainingType;
 
-  const disabledChangeParams = useMemo(() => {
-    return isTraining || trainSuspended;
-  }, [isTraining, trainSuspended]);
-
   const trainButtonText = useMemo(() => {
     if (isTraining) {
       return 'Stop Training';
-    } else if (status === 'trained') {
-      return activeTabKey === 'local' ? 'Retrain Locally' : 'Retrain on Cloud';
-    } else if (trainSuspended) {
-      return 'Resume Training';
-    } else {
-      return activeTabKey === 'local' ? 'Start Local Training' : 'Start Cloud Training';
     }
-  }, [isTraining, status, trainSuspended, activeTabKey]);
+    
+    if (activeTabKey === 'cloud') {
+      // Cloud training button logic
+      if (cloudTrainingStatus === 'trained') {
+        return 'Retrain on Cloud';
+      }
+
+      if (cloudTrainingStatus === 'suspended' || trainSuspended) {
+        return 'Resume Training';
+      }
+
+      if (cloudTrainingStatus === 'failed') {
+        return 'Retry Cloud Training';
+      }
+
+      return 'Start Cloud Training';
+    }
+    
+    // Local training button logic
+    if (status === 'trained') {
+      return 'Retrain Locally';
+    }
+
+    if (trainSuspended) {
+      return 'Resume Training';
+    }
+
+    return 'Start Local Training';
+  }, [isTraining, status, trainSuspended, activeTabKey, cloudTrainingStatus]);
 
   const trainButtonIcon = useMemo(() => {
     return isTraining ? (
@@ -88,8 +101,12 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
   
   // 处理不同模式的训练动作
   const handleTraining = async () => {
-    if (!isTraining) {
-      message.warning('Please do not shutdown your computer during training');
+    if (!isTraining && !trainSuspended) {
+      if (activeTabKey === 'cloud') {
+        message.warning('Please ensure stable internet connection during cloud training');
+      } else {
+        message.warning('Please do not shutdown your computer during training');
+      }
     }
 
     if (activeTabKey === 'local') {
@@ -99,12 +116,14 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
       // 检查是否设置了云服务 API Key
       if (!modelConfig?.cloud_service_api_key) {
         message.error('Please set up cloud service API key first');
+
         return;
       }
 
       if (isTraining) {
         // 如果正在训练，停止训练（无论是本地还是云端）
         await handleTrainingAction('cloud');
+
         return;
       }
 
@@ -120,13 +139,13 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
       children: (
         <LocalTrainingConfig
           baseModelOptions={baseModelOptions}
-          modelConfig={modelConfig}
+          cudaAvailable={cudaAvailable}
           isTraining={isTraining}
-          updateTrainingParams={updateTrainingParams}
+          modelConfig={modelConfig}
           status={status}
           trainSuspended={trainSuspended}
           trainingParams={trainingParams}
-          cudaAvailable={cudaAvailable}
+          updateTrainingParams={updateTrainingParams}
         />
       )
     },
@@ -135,13 +154,13 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
       label: 'Cloud Training',
       children: (
         <CloudTrainingConfig
-          modelConfig={modelConfig as IModelConfig | null}
+          cudaAvailable={cudaAvailable}
           isTraining={isTraining}
-          updateTrainingParams={updateTrainingParams}
+          modelConfig={modelConfig as IModelConfig | null}
           status={status}
           trainSuspended={trainSuspended}
           trainingParams={trainingParams}
-          cudaAvailable={cudaAvailable}
+          updateTrainingParams={updateTrainingParams}
         />
       )
     }
@@ -172,8 +191,10 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
         {`Configure how your Second Me will be trained using your memory data and identity. Then click '${activeTabKey === 'local' ? 'Start Local Training' : 'Start Cloud Training'}'.`}
       </p>
 
-      <Tabs 
+      <Tabs
         activeKey={activeTabKey}
+        className="mb-6"
+        items={tabItems}
         onChange={(key) => {
           // 首先设置活动标签，这样UI立即响应
           setTrainingType(key as 'local' | 'cloud');
@@ -181,27 +202,29 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
           // 当切换标签时，切换到对应环境的模型，但只在必要时更新
           if (key === 'local') {
             // 从云端切换到本地，使用 local_model_name（如果存在）
-            if (trainingParams.local_model_name && 
-                trainingParams.model_name !== trainingParams.local_model_name) {
-              updateTrainingParams({ 
-                ...trainingParams, 
-                model_name: trainingParams.local_model_name 
+            if (
+              trainingParams.local_model_name &&
+              trainingParams.model_name !== trainingParams.local_model_name
+            ) {
+              updateTrainingParams({
+                ...trainingParams,
+                model_name: trainingParams.local_model_name
               });
             }
           } else if (key === 'cloud') {
             // 从本地切换到云端，优先使用 cloud_model_name（如果存在）
             // 如果 cloud_model_name 存在，并且与 model_name 不同，则使用 cloud_model_name
-            if (trainingParams.cloud_model_name && 
-                trainingParams.model_name !== trainingParams.cloud_model_name) {
-              updateTrainingParams({ 
-                ...trainingParams, 
-                model_name: trainingParams.cloud_model_name 
+            if (
+              trainingParams.cloud_model_name &&
+              trainingParams.model_name !== trainingParams.cloud_model_name
+            ) {
+              updateTrainingParams({
+                ...trainingParams,
+                model_name: trainingParams.cloud_model_name
               });
             }
           }
         }}
-        items={tabItems}
-        className="mb-6"
       />
 
       <div className="flex justify-end items-center gap-4 pt-4 border-t mt-4">
@@ -212,12 +235,17 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
           </div>
         )}
 
-        {trainButtonText === 'Resume Training' && (
+        {((activeTabKey === 'local' && trainSuspended) || 
+          (activeTabKey === 'cloud' && (cloudTrainingStatus === 'suspended' || cloudTrainingStatus === 'failed'))) && (
           <button
             className={`inline-flex items-center justify-center px-4 py-2 bg-red-600 hover:bg-red-700 border border-transparent text-sm font-medium rounded-md shadow-sm text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
             onClick={() => {
-              if (!isTraining) {
-                message.warning('Please do not shutdown your computer during training');
+              if (!isTraining && !trainSuspended) {
+                if (activeTabKey === 'cloud') {
+                  message.warning('Please ensure stable internet connection during cloud training');
+                } else {
+                  message.warning('Please do not shutdown your computer during training');
+                }
               }
 
               handleResetProgress();

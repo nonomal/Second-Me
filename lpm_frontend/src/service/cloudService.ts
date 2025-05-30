@@ -34,10 +34,36 @@ export interface CloudTrainingProgressResponseData {
   timestamp: string;
 }
 
-export const getCloudTrainingProgress = (): AxiosPromise<CommonResponse<CloudTrainingProgressResponseData>> => {
+export const getCloudTrainingProgress = (): AxiosPromise<
+  CommonResponse<CloudTrainingProgressResponseData>
+> => {
   return Request<CommonResponse<CloudTrainingProgressResponseData>>({
     method: 'get',
     url: '/api/cloud_service/train/progress'
+  });
+};
+
+// Stop cloud training
+export const stopCloudTraining = (): AxiosPromise<CommonResponse<unknown>> => {
+  return Request<CommonResponse<unknown>>({
+    method: 'post',
+    url: '/api/cloud_service/train/stop'
+  });
+};
+
+// Reset cloud training progress
+export const resetCloudTrainingProgress = (): AxiosPromise<CommonResponse<unknown>> => {
+  return Request<CommonResponse<unknown>>({
+    method: 'post',
+    url: '/api/cloud_service/train/progress/reset'
+  });
+};
+
+// Resume cloud training
+export const resumeCloudTraining = (): AxiosPromise<CommonResponse<unknown>> => {
+  return Request<CommonResponse<unknown>>({
+    method: 'post',
+    url: '/api/cloud_service/train/resume'
   });
 };
 
@@ -60,7 +86,9 @@ export const startCloudTraining = (params: {
   });
 };
 
-export const getCloudTrainingStatus = (jobId: string): AxiosPromise<CommonResponse<CloudTrainingStatus>> => {
+export const getCloudTrainingStatus = (
+  jobId: string
+): AxiosPromise<CommonResponse<CloudTrainingStatus>> => {
   return Request<CommonResponse<CloudTrainingStatus>>({
     method: 'get',
     url: `/api/cloud_service/train/status/training/${jobId}`
@@ -121,4 +149,51 @@ export const runCloudInference = async (
   }
 
   return response;
+};
+
+// Cloud service control interfaces
+export interface CloudServiceStartRequest {
+  model_id: string;
+  model_name?: string;
+}
+
+export interface CloudServiceResponse {
+  service_type: string;
+  model_id?: string;
+  model_name?: string;
+  status: string;
+  model_data?: {
+    model_id: string;
+    model_name: string;
+    model_path: string;
+    service_endpoint: string;
+    base_model?: string;
+  };
+}
+
+// Start cloud service
+export const startCloudService = (
+  request: CloudServiceStartRequest
+): AxiosPromise<CommonResponse<CloudServiceResponse>> => {
+  return Request<CommonResponse<CloudServiceResponse>>({
+    method: 'post',
+    url: '/api/cloud_service/service/start',
+    data: request
+  });
+};
+
+// Stop cloud service
+export const stopCloudService = (): AxiosPromise<CommonResponse<CloudServiceResponse>> => {
+  return Request<CommonResponse<CloudServiceResponse>>({
+    method: 'post',
+    url: '/api/cloud_service/service/stop'
+  });
+};
+
+// Get cloud service status
+export const getCloudServiceStatus = (): AxiosPromise<CommonResponse<CloudServiceResponse>> => {
+  return Request<CommonResponse<CloudServiceResponse>>({
+    method: 'get',
+    url: '/api/cloud_service/service/status'
+  });
 };

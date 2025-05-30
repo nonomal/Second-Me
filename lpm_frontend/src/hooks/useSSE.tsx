@@ -149,28 +149,13 @@ export const useSSE = (): {
 
             const parsedData = JSON.parse(jsonChunk);
             
-            let content = '';
-            
-            if (isCloudModel) {
-              // Cloud API format: {"output": {"choices": [{"message": {"content": "...", "role": "assistant"}}]}}
-              content = parsedData?.output?.choices?.[0]?.message?.content || '';
-              // For cloud API, content is already accumulated, so we set it directly
+            // Both cloud and local APIs now use the same format: {"choices": [{"delta": {"content": "..."}}]}
+            const content = parsedData?.choices?.[0]?.delta?.content || '';
 
-              if (content) {
-                setFirstContentLoading(false);
-                streamContentRef.current = content;
-                setStreamContent(content);
-              }
-            } else {
-              // Local API format: {"choices": [{"delta": {"content": "..."}}]}
-              content = parsedData?.choices?.[0]?.delta?.content || '';
-              // For local API, we need to accumulate the content
-
-              if (content) {
-                setFirstContentLoading(false);
-                streamContentRef.current += content;
-                setStreamContent(streamContentRef.current);
-              }
+            if (content) {
+              setFirstContentLoading(false);
+              streamContentRef.current += content;
+              setStreamContent(streamContentRef.current);
             }
           }
         } catch {
