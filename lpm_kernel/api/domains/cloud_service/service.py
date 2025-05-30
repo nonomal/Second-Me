@@ -251,7 +251,7 @@ class CloudService:
 
     def handle_cloud_stream_response(self, response_iter):
         """
-        处理云服务的流式响应，直接返回原始格式
+        处理云服务的流式响应，将阿里云DashScope格式转换为与本地接口完全一致的格式
         
         Args:
             response_iter: 响应生成器
@@ -260,53 +260,240 @@ class CloudService:
             Flask Response 对象，包含流式响应
         """
         from flask import Response
+        import uuid
+        from datetime import datetime
         
         def generate():
-            logger.info("=== Starting cloud stream response handler (raw mode) ===")
+            logger.info("=== Starting cloud stream response handler (exact local format match mode) ===")
             
             try:
                 # 处理响应流
                 chunk_count = 0
+                # 使用固定格式的ID，与本地接口保持一致
+                response_id = f"chatcmpl-{uuid.uuid4().hex[:22]}"  # 生成与本地接口一致的ID格式
+                system_fingerprint = f"b170-{uuid.uuid4().hex[:8]}"  # 生成与本地接口一致的fingerprint格式
+                
                 for chunk in response_iter:
                     chunk_count += 1
                     logger.debug(f"Processing chunk #{chunk_count}: {type(chunk)}")
                     
-                    # 将Python对象转换为JSON字符串，然后转换为字节数据
-                    data_str = json.dumps(chunk)
-                    logger.debug(f"Yielding raw chunk: {data_str}")
-                    output = f"data: {data_str}\n\n".encode('utf-8')
-                    yield output
+                    # 转换为与本地接口完全一致的格式
+                    openai_format = None
+                    
+                    # 处理错误响应
+                    if isinstance(chunk, dict) and "error" in chunk:
+                        error_msg = chunk.get("error", "Unknown error")
+                        logger.error(f"Error in response: {error_msg}")
+                        error_data = {
+                            "id": response_id,
+                            "object": "chat.completion.chunk",
+                            "created": int(datetime.now().timestamp()),
+                            "model": "models/lpm",  # 与本地接口完全一致
+                            "system_fingerprint": system_fingerprint,
+                            "choices": [
+                                {
+                                    "index": 0,
+                                    "delta": {
+                                        "content": f"Error: {error_msg}"
+                                    },
+                                    "finish_reason": "stop"
+                                }
+                            ]
+                        }
+                        data_str = json.dumps(error_data)
+                        yield f"data: {data_str}\n\n".encode('utf-8')
+                        yield b"data: [DONE]\n\n"
+                        return
+                    
+                    # 处理阿里云DashScope格式
+                    if isinstance(chunk, dict) and "output" in chunk and "choices" in chunk["output"]:
+                        choices = chunk["output"]["choices"]
+                        if choices and len(choices) > 0:
+                            choice = choices[0]
+                            content = ""
+                            finish_reason = None
+                            
+                            # 提取内容
+                            if "message" in choice and "content" in choice["message"]:
+                                # 获取当前内容
+                                current_content = choice["message"]["content"]
+                                
+                                # 如果是第一个块，保存完整内容作为基准
+                                if chunk_count == 1:
+                                    # 初始化完整内容跟踪
+                                    self._full_content = current_content
+                                    content = current_content
+                                else:
+                                    # 如果不是第一个块，计算新增的内容
+                                    if not hasattr(self, '_full_content'):
+                                        self._full_content = ""
+                                    
+                                    # 找出新增的内容
+                                    if current_content.startswith(self._full_content):
+                                        content = current_content[len(self._full_content):]
+                                        self._full_content = current_content
+                                    else:
+                                        # 如果无法确定新增内容，则使用当前内容
+                                        content = current_content
+                                        self._full_content = current_content
+                                        logger.warning(f"Unable to determine incremental content, using full content")
+                            else:
+                                content = ""
+                            
+                            # 提取finish_reason
+                            if "finish_reason" in choice:
+                                finish_reason = choice["finish_reason"]
+                            
+                            # 创建与本地接口完全一致的格式
+                            openai_format = {
+                                "id": response_id,
+                                "object": "chat.completion.chunk",
+                                "created": int(datetime.now().timestamp()),
+                                "model": "models/lpm",  # 与本地接口完全一致
+                                "system_fingerprint": system_fingerprint,
+                                "choices": [
+                                    {
+                                        "index": 0,
+                                        "delta": {
+                                            "content": content
+                                        },
+                                        "finish_reason": finish_reason
+                                    }
+                                ]
+                            }
+                    
+                    # 如果无法解析为OpenAI格式，尝试使用原始数据
+                    if not openai_format and isinstance(chunk, dict):
+                        logger.warning(f"Unable to parse chunk into OpenAI format: {chunk}")
+                        # 尝试创建一个与本地接口完全一致的格式
+                        current_content = ""
+                        
+                        # 尝试从不同的可能的字段中提取内容
+                        if "content" in chunk:
+                            current_content = chunk["content"]
+                        elif "text" in chunk:
+                            current_content = chunk["text"]
+                        elif "message" in chunk:
+                            current_content = chunk.get("message", "")
+                        else:
+                            # 如果无法提取，则使用字符串表示
+                            current_content = str(chunk)
+                        
+                        # 计算新增的内容
+                        if chunk_count == 1 or not hasattr(self, '_raw_full_content'):
+                            # 初始化完整内容跟踪
+                            self._raw_full_content = current_content
+                            content = current_content
+                        else:
+                            # 找出新增的内容
+                            if current_content.startswith(self._raw_full_content):
+                                content = current_content[len(self._raw_full_content):]
+                                self._raw_full_content = current_content
+                            else:
+                                # 如果无法确定新增内容，则使用当前内容
+                                content = current_content
+                                self._raw_full_content = current_content
+                                logger.warning(f"Unable to determine incremental content for raw data, using full content")
+                            
+                        openai_format = {
+                            "id": response_id,
+                            "object": "chat.completion.chunk",
+                            "created": int(datetime.now().timestamp()),
+                            "model": "models/lpm",  # 与本地接口完全一致
+                            "system_fingerprint": system_fingerprint,
+                            "choices": [
+                                {
+                                    "index": 0,
+                                    "delta": {
+                                        "content": content
+                                    },
+                                    "finish_reason": None
+                                }
+                            ]
+                        }
+                    
+                    if openai_format:
+                        data_str = json.dumps(openai_format)
+                        logger.debug(f"Yielding exact local format match: {data_str[:100]}...")
+                        yield f"data: {data_str}\n\n".encode('utf-8')
                 
+                # 添加结束标记，与本地接口完全一致
+                # 发送一个空内容的消息
+                empty_content = {
+                    "id": response_id,
+                    "object": "chat.completion.chunk",
+                    "created": int(datetime.now().timestamp()),
+                    "model": "models/lpm",
+                    "system_fingerprint": system_fingerprint,
+                    "choices": [
+                        {
+                            "index": 0,
+                            "delta": {
+                                "content": ""
+                            },
+                            "finish_reason": None
+                        }
+                    ]
+                }
+                empty_str = json.dumps(empty_content)
+                yield f"data: {empty_str}\n\n".encode('utf-8')
+                
+                # 发送结束标记
+                final_message = {
+                    "id": response_id,
+                    "object": "chat.completion.chunk",
+                    "created": int(datetime.now().timestamp()),
+                    "model": "models/lpm",
+                    "system_fingerprint": system_fingerprint,
+                    "choices": [
+                        {
+                            "index": 0,
+                            "delta": {
+                                "content": None
+                            },
+                            "finish_reason": "stop"
+                        }
+                    ]
+                }
+                final_str = json.dumps(final_message)
+                yield f"data: {final_str}\n\n".encode('utf-8')
+                
+                # 发送最终的[DONE]标记
                 logger.info(f"Stream complete, processed {chunk_count} chunks")
-                # 发送流结束标记
                 yield b"data: [DONE]\n\n"
                 
             except Exception as e:
                 logger.error(f"Error in stream response handler: {str(e)}", exc_info=True)
-                # 返回错误信息，使用与阿里云 DashScope API 相同的格式
+                # 返回错误信息，使用与本地接口完全一致的格式
+                response_id = f"chatcmpl-{uuid.uuid4().hex[:22]}"
+                system_fingerprint = f"b170-{uuid.uuid4().hex[:8]}"
                 error_response = {
-                    "output": {
-                        "choices": [
-                            {
-                                "message": {
-                                    "content": f"发生错误: {str(e)}",
-                                    "role": "assistant"
-                                },
-                                "finish_reason": "stop"
-                            }
-                        ]
-                    }
+                    "id": response_id,
+                    "object": "chat.completion.chunk",
+                    "created": int(datetime.now().timestamp()),
+                    "model": "models/lpm",
+                    "system_fingerprint": system_fingerprint,
+                    "choices": [
+                        {
+                            "index": 0,
+                            "delta": {
+                                "content": f"Error: {str(e)}"
+                            },
+                            "finish_reason": "stop"
+                        }
+                    ]
                 }
                 error_str = json.dumps(error_response)
                 yield f"data: {error_str}\n\n".encode('utf-8')
                 yield b"data: [DONE]\n\n"
         
-        # 设置正确的 MIME 类型和头部
+        # 设置正确的 MIME 类型和头部，与本地接口完全一致
         headers = {
             'Cache-Control': 'no-cache, no-transform',
             'X-Accel-Buffering': 'no',
             'Content-Type': 'text/event-stream',
-            'Connection': 'keep-alive'
+            'Connection': 'keep-alive',
+            'Transfer-Encoding': 'chunked'  # 与本地接口完全一致
         }
         
         logger.info(f"Creating Response with headers: {headers}")
@@ -379,6 +566,7 @@ class CloudService:
                                     ]
                                 }
                             }
+                            # 直接返回原始数据，转换将在handle_cloud_stream_response中进行
                             yield error_response
                             return
                         
@@ -402,7 +590,7 @@ class CloudService:
                                 try:
                                     chunk_data = json.loads(data)
                                     
-                                    # 直接返回原始数据，不做任何转换
+                                    # 记录原始数据
                                     chunk_count += 1
                                     logger.debug(f"Processing chunk #{chunk_count}: {json.dumps(chunk_data)[:100]}...")
                                     
@@ -413,6 +601,7 @@ class CloudService:
                                             content = choice['message']['content']
                                             logger.info(f"Chunk #{chunk_count} content: {content[:50]}...")
                                     
+                                    # 直接返回原始数据，转换将在handle_cloud_stream_response中进行
                                     yield chunk_data
                                 except json.JSONDecodeError as e:
                                     logger.error(f"Failed to decode JSON: {e} - Raw data: {data}")
@@ -437,6 +626,7 @@ class CloudService:
                                     ]
                                 }
                             }
+                            # 直接返回原始数据，转换将在handle_cloud_stream_response中进行
                             yield empty_data
                             
                 except Exception as e:
@@ -456,6 +646,7 @@ class CloudService:
                             ]
                         }
                     }
+                    # 直接返回原始数据，转换将在handle_cloud_stream_response中进行
                     yield error_response
             
             # 直接将生成器函数传递给handle_cloud_stream_response，保持真正的流式响应
