@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { PlayIcon, StopIcon } from '@heroicons/react/24/outline';
 import { Tabs, message, Spin, Tooltip } from 'antd';
 import type { TabsProps } from 'antd';
-import type { TrainingConfig, LocalTrainingParams, CloudTrainingParams } from '@/service/train';
+import type { LocalTrainingParams, CloudTrainingParams } from '@/service/train';
 import type { IModelConfig } from '@/service/modelConfig';
 import LocalTrainingConfig from './LocalTrainingConfig';
 import CloudTrainingConfig from './CloudTrainingConfig';

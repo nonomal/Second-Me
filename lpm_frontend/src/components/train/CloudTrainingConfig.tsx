@@ -6,7 +6,7 @@ import { Listbox, Transition } from '@headlessui/react'; // Removed HeadlessRadi
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import { InputNumber, message, Tooltip, Spin, Radio } from 'antd';
 import type { RadioChangeEvent } from 'antd'; // Added RadioChangeEvent for typing
-import type { TrainingConfig } from '@/service/train';
+import type { CloudTrainingParams } from '@/service/train';
 import { EVENT } from '../../utils/event';
 import OpenAiModelIcon from '../svgs/OpenAiModelIcon';
 import CustomModelIcon from '../svgs/CustomModelIcon';
@@ -24,10 +24,10 @@ import type { IModelConfig } from '@/service/modelConfig';
 interface CloudTrainingConfigProps {
   modelConfig: IModelConfig | null;
   isTraining: boolean;
-  updateTrainingParams: (params: TrainingConfig) => void;
+  updateTrainingParams: (params: Partial<CloudTrainingParams>) => void;
   status: string;
   trainSuspended: boolean;
-  trainingParams: TrainingConfig;
+  trainingParams: CloudTrainingParams;
   cudaAvailable: boolean; 
 }
 
@@ -48,6 +48,7 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
   const [openCloudProviderModal, setOpenCloudProviderModal] = useState<boolean>(false);
   const [availableCloudModels, setAvailableCloudModels] = useState<CloudModel[]>([]);
   const [loadingModels, setLoadingModels] = useState<boolean>(false);
+  const [dataSynthesisMode, setDataSynthesisMode] = useState<string>('medium'); // Add local state for synthesis mode
   const cloudConfig = useCloudProviderStore((state) => state.cloudConfig);
   const updateCloudConfig = useCloudProviderStore((state) => state.updateCloudConfig);
   const fetchCloudConfig = useCloudProviderStore((state) => state.fetchCloudConfig);
@@ -118,8 +119,8 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
 
             if (fetchedModels.length > 0) {
               let validCloudModelName = false;
-              if (trainingParams.cloud_model_name) {
-                validCloudModelName = fetchedModels.some(m => m.model_id === trainingParams.cloud_model_name);
+              if (trainingParams.base_model) {
+                validCloudModelName = fetchedModels.some(m => m.model_id === trainingParams.base_model);
               }
 
               const currentModelIsValid = fetchedModels.some(m => m.model_id === trainingParams.model_name);
@@ -127,37 +128,37 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
               let modelToUse = '';
               
               if (validCloudModelName) {
-                modelToUse = trainingParams.cloud_model_name as string;
+                modelToUse = trainingParams.base_model as string;
               } else if (currentModelIsValid) {
                 modelToUse = trainingParams.model_name;
               } else {
                 modelToUse = fetchedModels[0].model_id;
               }
               
-              if (trainingParams.model_name !== modelToUse || trainingParams.cloud_model_name !== modelToUse) {
+              if (trainingParams.model_name !== modelToUse || trainingParams.base_model !== modelToUse) {
                 updateTrainingParams({ 
                   ...trainingParams, 
                   model_name: modelToUse,
-                  cloud_model_name: modelToUse 
+                  base_model: modelToUse 
                 });
               }
             } else {
-              if (trainingParams.model_name !== '' || trainingParams.cloud_model_name !== '') {
+              if (trainingParams.model_name !== '' || trainingParams.base_model !== '') {
                 updateTrainingParams({ 
                   ...trainingParams, 
                   model_name: '',
-                  cloud_model_name: '' 
+                  base_model: '' 
                 });
               }
             }
           } else {
             message.error(res.data.message || 'Failed to fetch available cloud models');
             setAvailableCloudModels([]);
-            if (trainingParams.model_name !== '' || trainingParams.cloud_model_name !== '') {
+            if (trainingParams.model_name !== '' || trainingParams.base_model !== '') {
               updateTrainingParams({ 
                 ...trainingParams, 
                 model_name: '',
-                cloud_model_name: '' 
+                base_model: '' 
               });
             }
           }
@@ -165,11 +166,11 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
           message.error(error.message || 'Error fetching cloud models');
           setAvailableCloudModels([]);
 
-          if (trainingParams.model_name !== '' || trainingParams.cloud_model_name !== '') {
+          if (trainingParams.model_name !== '' || trainingParams.base_model !== '') {
              updateTrainingParams({ 
                ...trainingParams, 
                model_name: '',
-               cloud_model_name: '' 
+               base_model: '' 
              });
           }
 
@@ -178,11 +179,11 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
         setLoadingModels(false);
       } else {
         setAvailableCloudModels([]);
-        if (trainingParams.model_name !== '' || trainingParams.cloud_model_name !== '') {
+        if (trainingParams.model_name !== '' || trainingParams.base_model !== '') {
           updateTrainingParams({ 
             ...trainingParams, 
             model_name: '',
-            cloud_model_name: '' 
+            base_model: '' 
           });
         }
       }
@@ -208,11 +209,8 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
   }, [availableCloudModels]);
 
   const handleSynthesisModeChange = (e: RadioChangeEvent) => {
-    // Added type for event
-    updateTrainingParams({
-      ...trainingParams,
-      data_synthesis_mode: e.target.value
-    });
+    // Store synthesis mode in local state since it's not part of CloudTrainingParams
+    setDataSynthesisMode(e.target.value);
   };
 
 
@@ -360,7 +358,7 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
               onChange={handleSynthesisModeChange} // Use typed handler
               optionType="button"
               options={synthesisModeOptions}
-              value={trainingParams.data_synthesis_mode}
+              value={dataSynthesisMode}
             />
             <span className="text-xs text-gray-500">
               Low: Fast data synthesis. Medium: Balanced synthesis and speed. High: Rich
@@ -385,15 +383,15 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
             <Listbox
               disabled={disabledChangeParams || !hasCloudServiceApiKey || loadingModels}
               onChange={(value) => {
-                if (value !== trainingParams.model_name) {
+                if (value !== trainingParams.base_model) {
                   updateTrainingParams({ 
                     ...trainingParams, 
                     model_name: value,
-                    cloud_model_name: value 
+                    base_model: value 
                   });
                 }
               }}
-              value={trainingParams.model_name || trainingParams.cloud_model_name || ''}
+              value={trainingParams.base_model || trainingParams.model_name || ''}
             >
               <div className="relative mt-1">
                 <Listbox.Button
@@ -405,14 +403,14 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
                   <span className="block truncate">
                     {(() => {
                       const currentOption = cloudModelOptions.find(
-                        (option) => option.value === trainingParams.model_name
+                        (option) => option.value === trainingParams.base_model
                       );
                       
-                      if (!currentOption && trainingParams.cloud_model_name) {
-                        const cloudOption = cloudModelOptions.find(
-                          (option) => option.value === trainingParams.cloud_model_name
+                      if (!currentOption && trainingParams.model_name) {
+                        const modelOption = cloudModelOptions.find(
+                          (option) => option.value === trainingParams.model_name
                         );
-                        if (cloudOption) return cloudOption.label;
+                        if (modelOption) return modelOption.label;
                       }
                       
                       return currentOption?.label || 
@@ -447,8 +445,8 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
                         >
                           {({ selected }) => {
                             const isSelected = selected || 
-                                              trainingParams.model_name === option.value || 
-                                              trainingParams.cloud_model_name === option.value;
+                                              trainingParams.base_model === option.value || 
+                                              trainingParams.model_name === option.value;
                             return (
                               <>
                                 <span
@@ -506,15 +504,22 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
                 min={0.00003}
                 onChange={(value) => {
                   if (value == null) return;
-                  updateTrainingParams({ ...trainingParams, learning_rate: value });
+                  updateTrainingParams({ 
+                    ...trainingParams, 
+                    hyper_parameters: {
+                      ...trainingParams.hyper_parameters,
+                      learning_rate: value
+                    }
+                  });
                 }}
                 status={
-                  trainingParams.learning_rate === 0.005 || trainingParams.learning_rate === 0.00003
+                  trainingParams.hyper_parameters?.learning_rate === 0.005 || 
+                  trainingParams.hyper_parameters?.learning_rate === 0.00003
                     ? 'warning'
                     : undefined
                 }
                 step={0.0001}
-                value={trainingParams.learning_rate}
+                value={trainingParams.hyper_parameters?.learning_rate}
               />
               <div className="text-xs text-gray-500">
                 Enter a value between 0.00003 and 0.005 (recommended: 0.0001)
@@ -534,15 +539,22 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
                 min={1}
                 onChange={(value) => {
                   if (value == null) return;
-                  updateTrainingParams({ ...trainingParams, number_of_epochs: value });
+                  updateTrainingParams({ 
+                    ...trainingParams, 
+                    hyper_parameters: {
+                      ...trainingParams.hyper_parameters,
+                      n_epochs: value
+                    }
+                  });
                 }}
                 status={
-                  trainingParams.number_of_epochs === 10 || trainingParams.number_of_epochs === 1
+                  trainingParams.hyper_parameters?.n_epochs === 10 || 
+                  trainingParams.hyper_parameters?.n_epochs === 1
                     ? 'warning'
                     : undefined
                 }
                 step={1}
-                value={trainingParams.number_of_epochs}
+                value={trainingParams.hyper_parameters?.n_epochs}
               />
               <div className="text-xs text-gray-500">
                 Enter an integer between 1 and 10 (recommended: 3)
