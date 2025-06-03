@@ -5,7 +5,7 @@ from typing import List
 class CloudProcessStep(Enum):
     """Cloud training process steps"""
     
-    # 云端训练步骤
+    # Cloud training steps
     PREPARE_TRAINING_DATA = "prepare_training_data"
     UPLOAD_TRAINING_DATA = "upload_training_data"
     CREATE_FINE_TUNE_JOB = "create_fine_tune_job"
@@ -15,7 +15,7 @@ class CloudProcessStep(Enum):
     def get_ordered_steps(cls) -> List["CloudProcessStep"]:
         """Get ordered steps"""
         return [
-            # 云端训练步骤
+            # Cloud training steps
             cls.PREPARE_TRAINING_DATA,
             cls.UPLOAD_TRAINING_DATA,
             cls.CREATE_FINE_TUNE_JOB,

@@ -159,13 +159,11 @@ class CloudProgress:
             "job_id": None
         }
         
-        # Create stage name to stage data mapping
         self.stage_map = {}
         for stage in self.data["stages"]:
             stage_name = stage["name"].lower().replace(" ", "_")
             self.stage_map[stage_name] = stage
             
-        # Create step name to step data mapping for each stage
         self.steps_map = {}
         for stage_name, stage in self.stage_map.items():
             self.steps_map[stage_name] = {}
@@ -176,7 +174,6 @@ class CloudProgress:
         
         # Stage mapping for process steps
         self._stage_mapping = {
-            # Data processing step mapping (using ProcessStep to maintain consistency with local)
             ProcessStep.LIST_DOCUMENTS: "activating_the_memory_matrix",
             ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS: "activating_the_memory_matrix",
             ProcessStep.CHUNK_DOCUMENT: "activating_the_memory_matrix",
@@ -190,7 +187,6 @@ class CloudProgress:
             ProcessStep.REINFORCE_IDENTITY: "prepare_training_data_for_deep_comprehension",
             ProcessStep.AUGMENT_CONTENT_RETENTION: "prepare_training_data_for_deep_comprehension",
             
-            # Cloud training step mapping
             CloudProcessStep.UPLOAD_TRAINING_DATA: "training_to_create_second_me",
             CloudProcessStep.CREATE_FINE_TUNE_JOB: "training_to_create_second_me",
             CloudProcessStep.WAIT_FOR_FINE_TUNE_COMPLETION: "training_to_create_second_me",
@@ -211,29 +207,22 @@ class CloudProgress:
         status_value = current_step_status if isinstance(current_step_status, str) else current_step_status
         step_data = self.steps_map[stage][step]
         
-        # Update step status
         step_data["status"] = status_value
         step_data["completed"] = status_value == CloudStatus.COMPLETED
         
-        # Update extra info if provided
         if extra_info:
             for key, value in extra_info.items():
                 if key in self.data:
                     self.data[key] = value
         
-        # Update stage progress
         self._update_stage_progress(stage_data, stage_progress)
         
-        # Update stage status and current step
         self._update_stage_status(stage_data, step_data)
         
-        # Update overall progress
         self._update_overall_progress()
         
-        # Update overall status
         self._update_overall_status()
         
-        # Update timestamp
         self.data["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
     
     def _update_stage_progress(self, stage_data: Dict, stage_progress: Optional[float] = None):
@@ -279,13 +268,10 @@ class CloudProgress:
             stage_data["current_step"] = step_data["name"]
             self.data["current_stage"] = stage_data["name"]
         elif step_data["status"] == CloudStatus.IN_PROGRESS:
-            # Only set stage to IN_PROGRESS when current step is in IN_PROGRESS state
             stage_data["status"] = CloudStatus.IN_PROGRESS
             stage_data["current_step"] = step_data["name"]
             self.data["current_stage"] = stage_data["name"]
         else:
-            # Current step is not in IN_PROGRESS state, keep stage status unchanged
-            # But still update the current step
             stage_data["current_step"] = step_data["name"]
     
     def _update_overall_progress(self):
@@ -324,17 +310,14 @@ class CloudProgressHolder:
         self.job_id = job_id
         self.progress = CloudProgress()
         
-        # Set identifiers in progress data
         if model_name:
             self.progress.data["model_name"] = model_name
         if job_id:
             self.progress.data["job_id"] = job_id
             
-        # Set progress file path - always use the same file
         progress_dir = Path("data/cloud_progress")
         progress_dir.mkdir(parents=True, exist_ok=True)
         
-        # Use fixed filename
         self.progress_file = progress_dir / "cloud_progress.json"
         self._load_progress()
     
@@ -351,15 +334,12 @@ class CloudProgressHolder:
             return None, None
             
         try:
-            # Read file content
             with open(progress_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 
-            # Get model name and job_id
             model_name = data.get("model_name")
             job_id = data.get("job_id")
             
-            # Create progress holder instance
             holder = CloudProgressHolder(model_name=model_name, job_id=job_id)
             holder.progress.data = data
             holder._rebuild_mappings()
@@ -372,7 +352,7 @@ class CloudProgressHolder:
     
     def _rebuild_mappings(self):
         """Rebuild progress data mappings"""
-        # 重新创建映射
+
         self.progress.stage_map = {}
         for stage in self.progress.data["stages"]:
             stage_name = stage["name"].lower().replace(" ", "_")
@@ -396,19 +376,15 @@ class CloudProgressHolder:
             with open(self.progress_file, "r", encoding="utf-8") as f:
                 saved_data = json.load(f)
                 
-                # Load progress data
                 self.progress.data = saved_data
                 
-                # If model name or job_id not specified, load from file
                 if not self.model_name:
                     self.model_name = saved_data.get("model_name")
                 if not self.job_id:
                     self.job_id = saved_data.get("job_id")
                 
-                # Rebuild mappings
                 self._rebuild_mappings()
                 
-                # Reset in-progress status
                 self._reset_in_progress_status()
                 
                 logger.debug(f"Loaded progress data from {self.progress_file}")
@@ -421,20 +397,17 @@ class CloudProgressHolder:
         """
         need_save = False
         
-        # Check overall status
         if self.progress.data["status"] == CloudStatus.IN_PROGRESS:
             self.progress.data["status"] = CloudStatus.FAILED
             need_save = True
             logger.info("Reset overall in_progress status to failed")
         
-        # Check each stage
         for stage in self.progress.data["stages"]:
             if stage["status"] == CloudStatus.IN_PROGRESS:
                 stage["status"] = CloudStatus.FAILED
                 need_save = True
                 logger.info(f"Reset stage '{stage['name']}' in_progress status to failed")
             
-            # Check each step in the stage
             for step in stage["steps"]:
                 if step["status"] == CloudStatus.IN_PROGRESS:
                     step["status"] = CloudStatus.FAILED
@@ -442,7 +415,6 @@ class CloudProgressHolder:
                     need_save = True
                     logger.info(f"Reset step '{step['name']}' in_progress status to failed")
         
-        # If there are any changes, save progress
         if need_save:
             self.save_progress()
             logger.info("Saved progress after resetting in_progress statuses")
@@ -452,15 +424,12 @@ class CloudProgressHolder:
         Update progress in memory (no file saving)
         """
         try:
-            # Update timestamp
             self.progress.data["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
             
-            # Ensure progress file path exists
             progress_dir = Path("data/cloud_progress")
             progress_dir.mkdir(parents=True, exist_ok=True)
             self.progress_file = progress_dir / "cloud_progress.json"
             
-            # Save progress data
             with open(self.progress_file, "w", encoding="utf-8") as f:
                 json.dump(self.progress.data, f, ensure_ascii=False, indent=2)
                 
@@ -478,28 +447,22 @@ class CloudProgressHolder:
             step_name: Optional step name (only used when step is a string)
         """
         try:
-            # 处理不同类型的step参数
+            
             if hasattr(step, 'value') and isinstance(step.value, str):
-                # If it's an enum type (object with value attribute)
                 stage_name = self.progress._stage_mapping[step]
                 step_name = step.value
             else:
-                # 如果是字符串，直接使用
                 stage_name = step
-                # 如果没有提供step_name，使用stage_name
                 if step_name is None:
                     step_name = stage_name
             
-            # Ensure status is string type
             if hasattr(status, 'value') and isinstance(status.value, str):
                 status_str = status.value
             else:
                 status_str = str(status)
                 
-            # Update step status
             self.progress.update_progress(stage_name, step_name, status_str)
             
-            # 保存进度
             self.save_progress()
         except Exception as e:
             logger.error(f"Error marking step status: {str(e)}")
@@ -517,12 +480,10 @@ class CloudProgressHolder:
             step_name: Optional step name (only used when step is a string)
         """
         try:
-            # 准备额外信息
             extra_info = {}
             if message:
                 extra_info["message"] = message
             
-            # 确定状态
             status = None
             if progress >= 100:
                 status = CloudStatus.COMPLETED
@@ -531,45 +492,36 @@ class CloudProgressHolder:
             else:
                 status = CloudStatus.PENDING
             
-            # 处理不同类型的step参数
+ 
             if hasattr(step, 'value') and isinstance(step.value, str):
-                # 如果是枚举类型（具有value属性的对象）
+ 
                 if hasattr(self.progress, '_stage_mapping') and step in self.progress._stage_mapping:
-                    # 如果是CloudProcessStep枚举且在映射中
+
                     stage_name = self.progress._stage_mapping.get(step)
                     if not stage_name:
                         logger.error(f"No stage mapping found for step: {step}")
                         return
                 else:
-                    # 如果是CloudProcessStep枚举但不在映射中，使用默认阶段名称
+
                     if isinstance(step, CloudProcessStep):
-                        # 对于MAP_YOUR_ENTITY_NETWORK步骤，使用synthesize_your_life_narrative阶段
                         if step == CloudProcessStep.MAP_YOUR_ENTITY_NETWORK:
                             stage_name = "synthesize_your_life_narrative"
-                        # 对于DECODE_PREFERENCE_PATTERNS步骤，使用prepare_training_data_for_deep_comprehension阶段
                         elif step == CloudProcessStep.DECODE_PREFERENCE_PATTERNS:
                             stage_name = "prepare_training_data_for_deep_comprehension"
                         else:
-                            # 其他CloudProcessStep枚举使用默认阶段
                             stage_name = "prepare_training_data_for_deep_comprehension"
                             logger.warning(f"CloudProcessStep {step} not found in _stage_mapping, using default stage")
                     else:
-                        # 如果是ProcessStep枚举或其他枚举，直接使用其值
                         stage_name = step.value.lower().replace(" ", "_")
                 
-                # 获取步骤名称
                 step_name = step.value.lower().replace(" ", "_")
             else:
-                # 如果是字符串，直接使用
                 stage_name = step
-                # 如果没有提供step_name，使用stage_name
                 if step_name is None:
                     step_name = stage_name
             
-            # 更新进度
             self.progress.update_progress(stage_name, step_name, status, progress, extra_info)
             
-            # 保存进度
             self.save_progress()
         except Exception as e:
             logger.error(f"Error updating step progress: {str(e)}")
@@ -585,25 +537,22 @@ class CloudProgressHolder:
         
     def is_stage_completed(self, stage_name):
         """
-        检查指定阶段是否已完成
+        Check if a specific stage is completed
         
         Args:
-            stage_name: 阶段名称（格式化后的，如"activating_the_memory_matrix"）
+            stage_name: Stage name
             
         Returns:
-            bool: 如果阶段已完成返回True，否则返回False
+            bool: If the stage is completed, returns True, otherwise returns False
         """
         try:
-            # 加载最新的进度数据
             self._load_progress()
             
-            # 获取阶段对象
             stage = self.progress.stage_map.get(stage_name)
             if not stage:
                 logger.warning(f"Stage {stage_name} not found in progress data")
                 return False
                 
-            # 检查阶段状态
             return stage.get("status") == CloudStatus.COMPLETED and stage.get("progress") == 100.0
         except Exception as e:
             logger.error(f"Error checking stage completion status: {str(e)}")
@@ -611,26 +560,23 @@ class CloudProgressHolder:
             
     def is_step_completed(self, stage_name, step_name):
         """
-        检查指定阶段中的特定步骤是否已完成
+        Check if a specific step in a stage is completed
         
         Args:
-            stage_name: 阶段名称（格式化后的，如"activating_the_memory_matrix"）
-            step_name: 步骤名称（如"list_documents"）
+            stage_name: Stage name 
+            step_name: Step name 
             
         Returns:
-            bool: 如果步骤已完成返回True，否则返回False
+            bool: If the step is completed, returns True, otherwise returns False
         """
         try:
-            # 加载最新的进度数据
             self._load_progress()
             
-            # 获取阶段对象
             stage = self.progress.stage_map.get(stage_name)
             if not stage:
                 logger.warning(f"Stage {stage_name} not found in progress data")
                 return False
                 
-            # 查找步骤
             for step in stage.get("steps", []):
                 if step.get("name") == step_name:
                     return step.get("completed", False) and step.get("status") == CloudStatus.COMPLETED
@@ -643,10 +589,10 @@ class CloudProgressHolder:
             
     def update_message(self, message: str):
         """
-        更新进度消息
+        Update progress message
         
         Args:
-            message: 新的消息内容
+            message: New message content
         """
         try:
             self.progress.data["message"] = message

@@ -117,17 +117,16 @@ class CloudTrainProcessService(TrainProcessService):
             stage_name = "activating_the_memory_matrix"
             stage = self.progress.progress.stage_map.get(stage_name)
             
-            # 检查该阶段是否已完成，如果已完成则跳过
+            # Check if stage is already completed
             if self.progress.is_stage_completed(stage_name):
                 logger.info(f"Stage '{stage_name}' already completed, skipping...")
             else:
-                # 1. List documents
+
                 logger.info("Step 1.1: Listing documents...")
-                # Check if process should stop
+ 
                 if should_stop_after_current_step:
                     logger.info("Process has been stopped, will complete current stage and then stop")
-                    # Continue with current step instead of returning immediately
-                # Check if step is already completed
+
                 if self.progress.is_step_completed(stage_name, "list_documents"):
                     logger.info("Step 'list_documents' already completed, skipping...")
                 else:
@@ -137,7 +136,7 @@ class CloudTrainProcessService(TrainProcessService):
             
                 # Update progress after completing first step
                 if stage:
-                    stage["progress"] = 25.0  # First step completed, progress 25%
+                    stage["progress"] = 25.0  
                     stage["status"] = CloudStatus.IN_PROGRESS
                     # Update step status
                     if len(stage["steps"]) > 0:
@@ -161,7 +160,7 @@ class CloudTrainProcessService(TrainProcessService):
                 # Update progress after completing second step
                 if stage:
                     stage["progress"] = 50.0  # Second step completed, progress 50%
-                    # Update step status
+
                     if len(stage["steps"]) > 1:
                         stage["steps"][1]["completed"] = True
                         stage["steps"][1]["status"] = CloudStatus.COMPLETED
@@ -209,22 +208,21 @@ class CloudTrainProcessService(TrainProcessService):
                     logger.info(f"Updated {stage_name} progress to 100% and status to COMPLETED")
                     self._update_overall_progress()
             
-            # Execute second stage steps (Synthesize Your Life Narrative)
+
             logger.info("Executing life narrative synthesis steps...")
             stage_name = "synthesize_your_life_narrative"
             stage = self.progress.progress.stage_map.get(stage_name)
             
-            # 检查该阶段是否已完成，如果已完成则跳过
+
             if self.progress.is_stage_completed(stage_name):
                 logger.info(f"Stage '{stage_name}' already completed, skipping...")
             else:
-                # 1. Extract dimensional topics
+ 
                 logger.info("Step 2.1: Extracting dimensional topics...")
-                # Check if process should stop
+ 
                 if should_stop_after_current_step:
                     logger.info("Process has been stopped, will complete current stage and then stop")
-                    # Continue with current step instead of returning immediately
-                # Check if step is already completed
+
                 if self.progress.is_step_completed(stage_name, "extract_dimensional_topics"):
                     logger.info("Step 'extract_dimensional_topics' already completed, skipping...")
                 else:
@@ -232,24 +230,22 @@ class CloudTrainProcessService(TrainProcessService):
                         logger.error("Failed to extract dimensional topics")
                         return PrepareDataResult.ERROR
             
-                # Update progress after completing first step
+ 
                 if stage:
-                    stage["progress"] = 33.0  # 第一步完成，进度33%
+                    stage["progress"] = 33.0  
                     stage["status"] = CloudStatus.IN_PROGRESS
-                    # Update step status
+
                     if len(stage["steps"]) > 0:
                         stage["steps"][0]["completed"] = True
                         stage["steps"][0]["status"] = CloudStatus.COMPLETED
                     logger.info(f"Updated {stage_name} progress to 33% after completing extract_dimensional_topics")
                     self._update_overall_progress()
             
-                # 2. 生成传记
+
                 logger.info("Step 2.2: Generating biography...")
-                # Check if process should stop
                 if should_stop_after_current_step:
                     logger.info("Process has been stopped, will complete current stage and then stop")
-                    # Continue with current step instead of returning immediately
-                # Check if step is already completed
+
                 if self.progress.is_step_completed(stage_name, "generate_biography"):
                     logger.info("Step 'generate_biography' already completed, skipping...")
                 else:
@@ -257,23 +253,17 @@ class CloudTrainProcessService(TrainProcessService):
                         logger.error("Failed to generate biography")
                         return PrepareDataResult.ERROR
             
-                # Update progress after completing second step
                 if stage:
-                    stage["progress"] = 66.0  # 第二步完成，进度66%
-                    # Update step status
+                    stage["progress"] = 66.0  
                     if len(stage["steps"]) > 1:
                         stage["steps"][1]["completed"] = True
                         stage["steps"][1]["status"] = CloudStatus.COMPLETED
                     logger.info(f"Updated {stage_name} progress to 66% after completing generate_biography")
                     self._update_overall_progress()
             
-                # 3. Map entity network
                 logger.info("Step 2.3: Mapping entity network...")
-                # Check if process should stop
                 if should_stop_after_current_step:
                     logger.info("Process has been stopped, will complete current stage and then stop")
-                    # Continue with current step instead of returning immediately
-                # Check if step is already completed
                 if self.progress.is_step_completed(stage_name, "map_your_entity_network"):
                     logger.info("Step 'map_your_entity_network' already completed, skipping...")
                 else:
@@ -281,33 +271,25 @@ class CloudTrainProcessService(TrainProcessService):
                         logger.error("Failed to map entity network")
                         return PrepareDataResult.ERROR
             
-                # Update progress to 100% after completing second stage
                 if stage:
-                    stage["progress"] = 100.0  # All completed, progress 100%
+                    stage["progress"] = 100.0  
                     stage["status"] = CloudStatus.COMPLETED
-                    # Update last step status
                     if len(stage["steps"]) > 2:
                         stage["steps"][2]["completed"] = True
                         stage["steps"][2]["status"] = CloudStatus.COMPLETED
                     logger.info(f"Updated {stage_name} progress to 100% and status to COMPLETED")
                     self._update_overall_progress()
             
-            # 执行第三阶段的步骤（Prepare Training Data for Deep Comprehension）
             logger.info("Executing training data preparation steps...")
             stage_name = "prepare_training_data_for_deep_comprehension"
             stage = self.progress.progress.stage_map.get(stage_name)
             
-            # 检查该阶段是否已完成，如果已完成则跳过
             if self.progress.is_stage_completed(stage_name):
                 logger.info(f"Stage '{stage_name}' already completed, skipping...")
             else:
-                # 1. Decode preference patterns
                 logger.info("Step 3.1: Decoding preference patterns...")
-                # Check if process should stop
                 if should_stop_after_current_step:
                     logger.info("Process has been stopped, will complete current stage and then stop")
-                    # Continue with current step instead of returning immediately
-                # Check if step is already completed
                 if self.progress.is_step_completed(stage_name, "decode_preference_patterns"):
                     logger.info("Step 'decode_preference_patterns' already completed, skipping...")
                 else:
@@ -315,24 +297,18 @@ class CloudTrainProcessService(TrainProcessService):
                         logger.error("Failed to decode preference patterns")
                         return PrepareDataResult.ERROR
             
-                # Update progress after completing first step
                 if stage:
-                    stage["progress"] = 33.0  # 第一步完成，进度33%
+                    stage["progress"] = 33.0  
                     stage["status"] = CloudStatus.IN_PROGRESS
-                    # Update step status
                     if len(stage["steps"]) > 0:
                         stage["steps"][0]["completed"] = True
                         stage["steps"][0]["status"] = CloudStatus.COMPLETED
                     logger.info(f"Updated {stage_name} progress to 33% after completing decode_preference_patterns")
                     self._update_overall_progress()
             
-                # 2. Reinforce identity
                 logger.info("Step 3.2: Reinforcing identity...")
-                # Check if process should stop
                 if should_stop_after_current_step:
                     logger.info("Process has been stopped, will complete current stage and then stop")
-                    # Continue with current step instead of returning immediately
-                # Check if step is already completed
                 if self.progress.is_step_completed(stage_name, "reinforce_identity"):
                     logger.info("Step 'reinforce_identity' already completed, skipping...")
                 else:
@@ -340,23 +316,17 @@ class CloudTrainProcessService(TrainProcessService):
                         logger.error("Failed to reinforce identity")
                         return PrepareDataResult.ERROR
             
-                # Update progress after completing second step
                 if stage:
-                    stage["progress"] = 66.0  # 第二步完成，进度66%
-                    # Update step status
+                    stage["progress"] = 66.0  
                     if len(stage["steps"]) > 1:
                         stage["steps"][1]["completed"] = True
                         stage["steps"][1]["status"] = CloudStatus.COMPLETED
                     logger.info(f"Updated {stage_name} progress to 66% after completing reinforce_identity")
                     self._update_overall_progress()
             
-                # 3. Augment content retention
                 logger.info("Step 3.3: Augmenting content retention...")
-                # Check if process should stop
                 if should_stop_after_current_step:
                     logger.info("Process has been stopped, will complete current stage and then stop")
-                    # Continue with current step instead of returning immediately
-                # Check if step is already completed
                 if self.progress.is_step_completed(stage_name, "augment_content_retention"):
                     logger.info("Step 'augment_content_retention' already completed, skipping...")
                 else:
@@ -364,21 +334,17 @@ class CloudTrainProcessService(TrainProcessService):
                         logger.error("Failed to augment content retention")
                         return PrepareDataResult.ERROR
             
-                # Update progress to 100% after completing the third stage and mark as completed
                 if stage:
-                    stage["progress"] = 100.0  # All completed, progress 100%
+                    stage["progress"] = 100.0  
                     stage["status"] = CloudStatus.COMPLETED
-                    # Update last step status
                     if len(stage["steps"]) > 2:
                         stage["steps"][2]["completed"] = True
                         stage["steps"][2]["status"] = CloudStatus.COMPLETED
                     logger.info(f"Updated {stage_name} progress to 100% and status to COMPLETED")
                     self._update_overall_progress()
             
-            # Calculate and update overall progress
             self._update_overall_progress()
             
-            # Check if process should stop after completing current step
             if should_stop_after_current_step:
                 logger.info("Data preparation completed current step, stopping as requested")
                 return PrepareDataResult.STOPPED
@@ -387,7 +353,6 @@ class CloudTrainProcessService(TrainProcessService):
             return PrepareDataResult.SUCCESS
         except Exception as e:
             logger.error(f"Prepare training data failed: {str(e)}")
-            # Try to mark current stage as failed
             current_stage = self.progress.get_progress().get("current_stage")
             if current_stage:
                 for step in self.progress.get_progress().get("stages", []):
@@ -410,17 +375,13 @@ class CloudTrainProcessService(TrainProcessService):
 
         logger.info("Step 1: Preparing training data...")
         
-        # 直接在主进程中执行数据准备工作，不创建子进程
         try:
-            # 准备训练数据
             if self.is_stopped:
                 logger.info("Process has been stopped, will complete current stage and then stop")
-                # Continue with current step instead of returning immediately
                 
             result = self.prepare_training_data()
             self._data_processing_result = result
             
-            # 检查数据处理结果
             success = self._data_processing_result
             logger.info(f"Training data preparation result: {success}")
             
@@ -433,12 +394,10 @@ class CloudTrainProcessService(TrainProcessService):
                 logger.error("Failed to prepare training data")
                 return False
 
-            # 检查是否已停止
             if self.is_stopped:
                 logger.info("Process has been stopped after data preparation")
                 return False
                 
-            # 部署到云端
             deploy_success = self.cloud_deploy()
             logger.info(f"Cloud deploy result: {deploy_success}")
             if not deploy_success:
@@ -453,7 +412,6 @@ class CloudTrainProcessService(TrainProcessService):
     def cloud_deploy(self) -> bool:
         try:
             logger.info("Step 7: Uploading training data...")
-            # 检查是否已停止
             if self.is_stopped:
                 logger.info("Process has been stopped, cancelling cloud deployment")
                 return False
@@ -483,7 +441,6 @@ class CloudTrainProcessService(TrainProcessService):
                     hyper_parameters=self.hyper_parameters
                 )
                 try:
-                    # 使用data/cloud_progress文件夹存储job_id.json
                     params_dir = Path("data/cloud_progress")
                     params_dir.mkdir(parents=True, exist_ok=True)
                     job_file_path = params_dir / "job_id.json"
@@ -523,13 +480,10 @@ class CloudTrainProcessService(TrainProcessService):
         
             self.progress.mark_step_status(CloudProcessStep.WAIT_FOR_FINE_TUNE_COMPLETION, CloudStatus.IN_PROGRESS)
         
-            # 直接在主进程中输出消息，不创建子进程
-            # 注意：实际的等待过程将通过定时请求API来检查状态
             logger.info(f"Fine-tune job {self.job_id} has been created and is now running")
             logger.info("The job will continue running in the background")
             logger.info("You can check the status using the cloud service API")
         
-            # 将进度标记为正在运行
             self.progress.mark_step_status(CloudProcessStep.WAIT_FOR_FINE_TUNE_COMPLETION, CloudStatus.IN_PROGRESS, 
                                           "Fine-tune job is running in the background")
         
@@ -543,7 +497,6 @@ class CloudTrainProcessService(TrainProcessService):
 
     def _wait_for_completion_process(self, cloud_service, job_id):
         try:
-            # 注册信号处理程序
             def handle_sigterm(signum, frame):
                 logger.info(f"Wait completion process received SIGTERM signal, exiting...")
                 import sys
@@ -553,12 +506,10 @@ class CloudTrainProcessService(TrainProcessService):
             
             logger.info(f"Async process: waiting for job {job_id} to complete")
             
-            # 定义进度回调函数
             def progress_callback(status, progress, message):
                 try:
                     logger.info(f"Progress update: {status}, {progress}%, {message}")
                     
-                    # 将状态映射到CloudStatus
                     status_mapping = {
                         "IN_PROGRESS": CloudStatus.IN_PROGRESS,
                         "COMPLETED": CloudStatus.COMPLETED,
@@ -568,14 +519,12 @@ class CloudTrainProcessService(TrainProcessService):
                     
                     cloud_status = status_mapping.get(status, CloudStatus.IN_PROGRESS)
                     
-                    # 更新进度条
                     self.progress.update_step_progress(
                         CloudProcessStep.WAIT_FOR_FINE_TUNE_COMPLETION,
                         progress,
                         message
                     )
                     
-                    # 如果完成或失败，更新状态
                     if status in ["COMPLETED", "FAILED", "CANCELLED"]:
                         self.progress.mark_step_status(
                             CloudProcessStep.WAIT_FOR_FINE_TUNE_COMPLETION,
@@ -585,7 +534,6 @@ class CloudTrainProcessService(TrainProcessService):
                 except Exception as e:
                     logger.error(f"Error in progress callback: {str(e)}", exc_info=True)
             
-            # 使用回调函数调用wait_for_job_completion
             success = cloud_service.wait_for_job_completion(
                 job_id=job_id,
                 progress_callback=progress_callback
@@ -624,7 +572,6 @@ class CloudTrainProcessService(TrainProcessService):
                 self.progress.progress.data["status"] = CloudStatus.COMPLETED
                 logger.info("All stages completed, setting overall status to COMPLETED")
             
-            # 保存进度
             self.progress.save_progress()
         except Exception as e:
             logger.error(f"Error updating overall progress: {str(e)}")
@@ -644,7 +591,7 @@ class CloudTrainProcessService(TrainProcessService):
             
             self.is_stopped = True
             
-            max_wait_time = 300  # 秒，减少等待时间以避免前端请求超时
+            max_wait_time = 300 
             wait_start = time.time()
             
             current_stage = self.progress.get_progress().get("current_stage")
@@ -656,7 +603,6 @@ class CloudTrainProcessService(TrainProcessService):
                     if stage["name"] == current_stage:
                         current_step_name = stage.get("current_step")
                         if current_step_name:
-                            # 先尝试从 CloudProcessStep 中查找
                             found = False
                             for step in CloudProcessStep:
                                 if step.value == current_step_name:
@@ -665,7 +611,6 @@ class CloudTrainProcessService(TrainProcessService):
                                     logger.info(f"Found step in CloudProcessStep: {current_step}")
                                     break
                             
-                            # 如果在 CloudProcessStep 中没有找到，尝试从 ProcessStep 中查找
                             if not found:
                                 for step in ProcessStep:
                                     if step.value == current_step_name:
@@ -676,22 +621,17 @@ class CloudTrainProcessService(TrainProcessService):
             
             logger.info(f"Current step when stopping: {current_step}")
             
-            # 等待当前步骤状态变化或超时
             while time.time() - wait_start < max_wait_time:
-                # 检查当前步骤的状态是否已经变化（完成、失败或取消）
                 if current_step:
-                    # 直接从进度数据中获取步骤状态
                     step_status = None
                     current_stage_data = None
                     
-                    # 找到当前阶段的数据
                     for stage in self.progress.progress.data["stages"]:
                         if stage["name"] == current_stage:
                             current_stage_data = stage
                             logger.info(f"Found current stage data: {stage['name']}")
                             break
                     
-                    # 如果找到当前阶段，则在其步骤中查找当前步骤
                     if current_stage_data:
                         step_name = current_step.value if hasattr(current_step, 'value') else str(current_step)
                         logger.info(f"Looking for step with name: {step_name}")
@@ -706,17 +646,13 @@ class CloudTrainProcessService(TrainProcessService):
                         logger.info(f"Step {current_step.value} has status {step_status}, continuing with stop process")
                         break
                 
-                # 短暂休眠以减少CPU使用
                 time.sleep(2)
             
-            # 如果等待超时，记录警告
             if time.time() - wait_start >= max_wait_time:
                 logger.warning(f"Waited {max_wait_time} seconds for current step to complete, proceeding with stop process")
             
-            # 尝试取消云端任务
             if not self.job_id:
                 try:
-                    # 使用data/cloud_progress文件夹存储job_id.json
                     params_dir = Path("data/cloud_progress")
                     job_file_path = params_dir / "job_id.json"
                     
@@ -741,17 +677,14 @@ class CloudTrainProcessService(TrainProcessService):
                 logger.warning("No active fine-tune job found to delete")
 
             if current_step:
-                # 获取当前步骤的最新状态
                 step_status = None
                 current_stage_data = None
                 
-                # 找到当前阶段的数据
                 for stage in self.progress.progress.data["stages"]:
                     if stage["name"] == current_stage:
                         current_stage_data = stage
                         break
                 
-                # 如果找到当前阶段，则在其步骤中查找当前步骤
                 if current_stage_data:
                     step_name = current_step.value if hasattr(current_step, 'value') else str(current_step)
                     for step in current_stage_data["steps"]:
@@ -759,7 +692,6 @@ class CloudTrainProcessService(TrainProcessService):
                             step_status = step["status"]
                             break
                 
-                # 只有当步骤状态不是COMPLETED时，才将其标记为CANCELLED
                 if step_status != CloudStatus.COMPLETED:
                     logger.info(f"Marking step {current_step} as CANCELLED because its status is {step_status}")
                     self.progress.mark_step_status(current_step, CloudStatus.CANCELLED, "Process cancelled by user")

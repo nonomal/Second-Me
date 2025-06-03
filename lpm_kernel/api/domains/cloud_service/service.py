@@ -241,20 +241,16 @@ class CloudService:
             logger.info("=== Starting cloud stream response handler (exact local format match mode) ===")
             
             try:
-                # 处理响应流
                 chunk_count = 0
-                # 使用固定格式的ID，与本地接口保持一致
-                response_id = f"chatcmpl-{uuid.uuid4().hex[:22]}"  # 生成与本地接口一致的ID格式
-                system_fingerprint = f"b170-{uuid.uuid4().hex[:8]}"  # 生成与本地接口一致的fingerprint格式
+                response_id = f"chatcmpl-{uuid.uuid4().hex[:22]}"  
+                system_fingerprint = f"b170-{uuid.uuid4().hex[:8]}"
                 
                 for chunk in response_iter:
                     chunk_count += 1
                     logger.debug(f"Processing chunk #{chunk_count}: {type(chunk)}")
                     
-                    # 转换为与本地接口完全一致的格式
                     openai_format = None
                     
-                    # 处理错误响应
                     if isinstance(chunk, dict) and "error" in chunk:
                         error_msg = chunk.get("error", "Unknown error")
                         logger.error(f"Error in response: {error_msg}")
@@ -262,7 +258,7 @@ class CloudService:
                             "id": response_id,
                             "object": "chat.completion.chunk",
                             "created": int(datetime.now().timestamp()),
-                            "model": "models/lpm",  # 与本地接口完全一致
+                            "model": "models/lpm", 
                             "system_fingerprint": system_fingerprint,
                             "choices": [
                                 {
@@ -279,7 +275,6 @@ class CloudService:
                         yield b"data: [DONE]\n\n"
                         return
                     
-                    # 处理阿里云DashScope格式
                     if isinstance(chunk, dict) and "output" in chunk and "choices" in chunk["output"]:
                         choices = chunk["output"]["choices"]
                         if choices and len(choices) > 0:
@@ -287,43 +282,35 @@ class CloudService:
                             content = ""
                             finish_reason = None
                             
-                            # 提取内容
                             if "message" in choice and "content" in choice["message"]:
-                                # 获取当前内容
                                 current_content = choice["message"]["content"]
                                 
-                                # 如果是第一个块，保存完整内容作为基准
                                 if chunk_count == 1:
-                                    # 初始化完整内容跟踪
                                     self._full_content = current_content
                                     content = current_content
                                 else:
-                                    # 如果不是第一个块，计算新增的内容
                                     if not hasattr(self, '_full_content'):
                                         self._full_content = ""
                                     
-                                    # 找出新增的内容
                                     if current_content.startswith(self._full_content):
                                         content = current_content[len(self._full_content):]
                                         self._full_content = current_content
                                     else:
-                                        # 如果无法确定新增内容，则使用当前内容
                                         content = current_content
                                         self._full_content = current_content
                                         logger.warning(f"Unable to determine incremental content, using full content")
                             else:
                                 content = ""
                             
-                            # 提取finish_reason
                             if "finish_reason" in choice:
                                 finish_reason = choice["finish_reason"]
                             
-                            # 创建与本地接口完全一致的格式
+                            
                             openai_format = {
                                 "id": response_id,
                                 "object": "chat.completion.chunk",
                                 "created": int(datetime.now().timestamp()),
-                                "model": "models/lpm",  # 与本地接口完全一致
+                                "model": "models/lpm",  
                                 "system_fingerprint": system_fingerprint,
                                 "choices": [
                                     {
@@ -336,13 +323,11 @@ class CloudService:
                                 ]
                             }
                     
-                    # 如果无法解析为OpenAI格式，尝试使用原始数据
                     if not openai_format and isinstance(chunk, dict):
                         logger.warning(f"Unable to parse chunk into OpenAI format: {chunk}")
-                        # 尝试创建一个与本地接口完全一致的格式
+                        
                         current_content = ""
                         
-                        # 尝试从不同的可能的字段中提取内容
                         if "content" in chunk:
                             current_content = chunk["content"]
                         elif "text" in chunk:
@@ -350,21 +335,16 @@ class CloudService:
                         elif "message" in chunk:
                             current_content = chunk.get("message", "")
                         else:
-                            # 如果无法提取，则使用字符串表示
                             current_content = str(chunk)
                         
-                        # 计算新增的内容
                         if chunk_count == 1 or not hasattr(self, '_raw_full_content'):
-                            # 初始化完整内容跟踪
                             self._raw_full_content = current_content
                             content = current_content
                         else:
-                            # 找出新增的内容
                             if current_content.startswith(self._raw_full_content):
                                 content = current_content[len(self._raw_full_content):]
                                 self._raw_full_content = current_content
                             else:
-                                # 如果无法确定新增内容，则使用当前内容
                                 content = current_content
                                 self._raw_full_content = current_content
                                 logger.warning(f"Unable to determine incremental content for raw data, using full content")
@@ -373,7 +353,7 @@ class CloudService:
                             "id": response_id,
                             "object": "chat.completion.chunk",
                             "created": int(datetime.now().timestamp()),
-                            "model": "models/lpm",  # 与本地接口完全一致
+                            "model": "models/lpm",  
                             "system_fingerprint": system_fingerprint,
                             "choices": [
                                 {
@@ -391,8 +371,6 @@ class CloudService:
                         logger.debug(f"Yielding exact local format match: {data_str[:100]}...")
                         yield f"data: {data_str}\n\n".encode('utf-8')
                 
-                # 添加结束标记，与本地接口完全一致
-                # 发送一个空内容的消息
                 empty_content = {
                     "id": response_id,
                     "object": "chat.completion.chunk",
@@ -412,7 +390,6 @@ class CloudService:
                 empty_str = json.dumps(empty_content)
                 yield f"data: {empty_str}\n\n".encode('utf-8')
                 
-                # 发送结束标记
                 final_message = {
                     "id": response_id,
                     "object": "chat.completion.chunk",
@@ -432,13 +409,11 @@ class CloudService:
                 final_str = json.dumps(final_message)
                 yield f"data: {final_str}\n\n".encode('utf-8')
                 
-                # 发送最终的[DONE]标记
                 logger.info(f"Stream complete, processed {chunk_count} chunks")
                 yield b"data: [DONE]\n\n"
                 
             except Exception as e:
                 logger.error(f"Error in stream response handler: {str(e)}", exc_info=True)
-                # 返回错误信息，使用与本地接口完全一致的格式
                 response_id = f"chatcmpl-{uuid.uuid4().hex[:22]}"
                 system_fingerprint = f"b170-{uuid.uuid4().hex[:8]}"
                 error_response = {
@@ -461,13 +436,12 @@ class CloudService:
                 yield f"data: {error_str}\n\n".encode('utf-8')
                 yield b"data: [DONE]\n\n"
         
-        # 设置正确的 MIME 类型和头部，与本地接口完全一致
         headers = {
             'Cache-Control': 'no-cache, no-transform',
             'X-Accel-Buffering': 'no',
             'Content-Type': 'text/event-stream',
             'Connection': 'keep-alive',
-            'Transfer-Encoding': 'chunked'  # 与本地接口完全一致
+            'Transfer-Encoding': 'chunked'  
         }
         
         logger.info(f"Creating Response with headers: {headers}")
@@ -493,10 +467,10 @@ class CloudService:
         url = f"{self.base_url}/services/aigc/text-generation/generation"
         logger.info(f"API URL: {url}")
         
-        # 创建基本的 headers
+        # Create basic headers
         headers = {**self.headers, "Content-Type": "application/json"}
         
-        # 如果是流式请求，添加特定的 header
+        # If stream is True, add specific header
         if stream:
             headers["X-DashScope-SSE"] = "enable"
 
@@ -514,7 +488,6 @@ class CloudService:
         }
 
         if stream:
-            # 流式响应处理
             def generate():
                 try:
                     logger.info(f"Sending stream request to {url}")
@@ -526,7 +499,6 @@ class CloudService:
                         if response.status_code != 200:
                             error_msg = f"Model inference failed! Status code: {response.status_code}"
                             logger.error(error_msg)
-                            # 返回错误信息，使用与阿里云 DashScope API 相同的格式
                             error_response = {
                                 "output": {
                                     "choices": [
@@ -540,7 +512,6 @@ class CloudService:
                                     ]
                                 }
                             }
-                            # 直接返回原始数据，转换将在handle_cloud_stream_response中进行
                             yield error_response
                             return
                         
@@ -563,19 +534,15 @@ class CloudService:
                                 
                                 try:
                                     chunk_data = json.loads(data)
-                                    
-                                    # 记录原始数据
                                     chunk_count += 1
                                     logger.debug(f"Processing chunk #{chunk_count}: {json.dumps(chunk_data)[:100]}...")
                                     
-                                    # 提取内容用于日志记录
                                     if 'output' in chunk_data and 'choices' in chunk_data['output'] and len(chunk_data['output']['choices']) > 0:
                                         choice = chunk_data['output']['choices'][0]
                                         if 'message' in choice and 'content' in choice['message']:
                                             content = choice['message']['content']
                                             logger.info(f"Chunk #{chunk_count} content: {content[:50]}...")
                                     
-                                    # 直接返回原始数据，转换将在handle_cloud_stream_response中进行
                                     yield chunk_data
                                 except json.JSONDecodeError as e:
                                     logger.error(f"Failed to decode JSON: {e} - Raw data: {data}")
@@ -584,7 +551,7 @@ class CloudService:
                         
                         logger.info(f"Processed {chunk_count} chunks from SSE response")
                         
-                        # 如果没有收到任何响应，返回一个空响应
+                        # If no response was received or no chunks were processed, return an empty response
                         if not response_received or chunk_count == 0:
                             logger.warning("No response received from API")
                             empty_data = {
@@ -600,11 +567,9 @@ class CloudService:
                                     ]
                                 }
                             }
-                            # 直接返回原始数据，转换将在handle_cloud_stream_response中进行
                             yield empty_data
                             
                 except Exception as e:
-                    # 处理所有可能的异常
                     error_msg = f"Exception during cloud inference: {str(e)}"
                     logger.error(error_msg, exc_info=True)
                     error_response = {
@@ -620,14 +585,11 @@ class CloudService:
                             ]
                         }
                     }
-                    # 直接返回原始数据，转换将在handle_cloud_stream_response中进行
                     yield error_response
             
-            # 直接将生成器函数传递给handle_cloud_stream_response，保持真正的流式响应
             logger.debug("Passing generator directly to handle_cloud_stream_response")
             return self.handle_cloud_stream_response(generate())
         else:
-            # 非流式响应处理
             try:
                 response = requests.post(url, headers=headers, json=payload)
                 response_data = response.json()
@@ -636,7 +598,6 @@ class CloudService:
                     logger.error(f"Model inference failed! Error: {response_data}")
                     return None
 
-                # 返回原始响应数据
                 logger.info(f"Received non-streaming response: {json.dumps(response_data)[:200]}...")
                 return response_data
             except Exception as e:
@@ -644,9 +605,14 @@ class CloudService:
                 return None
 
     def cancel_fine_tune_job(self, job_id):
-        """取消正在进行的模型调优任务
+        """
+        Cancel the fine-tuning job
         
-        根据API文档: POST /api/v1/fine-tunes/<job_id>/cancel
+        Args:
+            job_id: The ID of the fine-tuning job to cancel
+        
+        Returns:
+            bool: True if the job was successfully cancelled, False otherwise
         """
         url = f"{self.base_url}/fine-tunes/{job_id}/cancel"
         headers = {**self.headers, "Content-Type": "application/json"}
@@ -667,16 +633,18 @@ class CloudService:
             
     def wait_for_job_completion(self, job_id, check_interval=10, log_interval=10, progress_callback=None):
         """
-        等待微调任务完成，并通过回调函数更新进度
+        
+        Wait for the fine-tuning job to complete and update progress via the callback function
         
         Args:
-            job_id: 微调任务ID
-            check_interval: 检查间隔（秒）
-            log_interval: 日志获取间隔（秒）
-            progress_callback: 进度回调函数，接收参数(status, progress, message)
+            job_id: Fine-tuning job ID
+            check_interval: Check interval in seconds
+            log_interval: Log retrieval interval in seconds
+            progress_callback: Progress callback function, receives parameters (status, progress, message)
         
         Returns:
-            bool: 任务是否成功完成
+            bool: Whether the job completed successfully
+        
         """
         logger.info(f"Waiting for fine-tuning job to complete...")
         
@@ -771,12 +739,12 @@ class CloudService:
     
     def _fetch_and_print_logs(self, offset=0, line=1000):
         """
-        获取日志并解析估计时间信息
+        Fetch logs and parse estimated time information
         
         Returns:
             tuple: (new_offset, estimated_minutes)
-                new_offset: 新的日志偏移量
-                estimated_minutes: 从日志中解析的估计时间（分钟），如果没有找到则为None
+                new_offset: The new log offset
+                estimated_minutes: Estimated time (in minutes) parsed from the logs, or None if not found
         """
         estimated_minutes = None
         try:
@@ -796,15 +764,12 @@ class CloudService:
             log_lines = logs_text.splitlines()
             new_offset = offset + len(log_lines)
             
-            # 解析日志中的估计时间信息
             for log_line in log_lines:
                 if log_line.strip():
                     logger.info(f"[Fine-tune Log] {log_line}")
                     
-                    # 查找估计时间信息
                     if "Fine-tune estimated time:" in log_line:
                         try:
-                            # 提取时间值，格式如 "Fine-tune estimated time: 3.60 mins!"
                             time_str = log_line.split("Fine-tune estimated time:")[1].split("mins")[0].strip()
                             estimated_minutes = float(time_str)
                             logger.info(f"Parsed estimated fine-tune time: {estimated_minutes} minutes")
@@ -833,16 +798,16 @@ class CloudService:
 
     def _get_model_id_from_job(self, job_id):
         """
-        从微调任务中获取模型ID
+        Retrieve model ID from fine-tune job
         
         Args:
-            job_id: 微调任务ID
+            job_id: Fine-tune job ID
             
         Returns:
-            str: 模型ID或None
+            str: Model ID or None
         """
         try:
-            # 获取任务详情
+           
             url = f"{self.base_url}/fine-tunes/{job_id}"
             headers = {**self.headers, "Content-Type": "application/json"}
             
@@ -853,7 +818,6 @@ class CloudService:
                 logger.error(f"Failed to get fine-tune job details! Error: {response_data}")
                 return None
                 
-            # 从响应中提取模型ID
             model_id = response_data.get('output', {}).get('model_id')
             if model_id:
                 logger.info(f"Retrieved model ID {model_id} from job {job_id}")
@@ -866,7 +830,6 @@ class CloudService:
             return None
     
     def list_available_models(self):
-        """列出可用于调优的模型"""
         logger.info("Returning hardcoded list of models that support fine-tuning...")
         
         models = [
@@ -906,7 +869,7 @@ class CloudService:
             conversations = []
             for item in data:
                 if 'user' not in item or 'assistant' not in item:
-                    logger.warning(f"跳过缺少user或assistant字段的项: {item}")
+                    logger.warning(f"Skip items that are missing user or assistant fields: {item}")
                     continue
 
                 conversation = {
