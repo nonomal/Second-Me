@@ -36,10 +36,16 @@ export const useCloudProviderStore = create<CloudProviderState>((set, get) => ({
           ...currentConfig,
           cloud_service_api_key: cloudConfig.cloud_service_api_key || ''
         });
+
+        set({
+          cloudConfig: {
+            ...cloudConfig,
+            provider_type: cloudConfig.cloud_service_api_key ? 'alibaba' : '',
+          }
+        });
       }
     } catch (error) {
       console.error('Failed to save cloud config:', error);
-
       throw error;
     }
   },

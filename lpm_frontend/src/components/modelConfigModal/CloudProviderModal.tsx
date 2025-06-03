@@ -31,6 +31,7 @@ const options = [
 const CloudProviderModal = (props: IProps): JSX.Element => {
   const { open, onClose, cloudConfig, updateCloudConfig, saveCloudConfig } = props;
   const [providerType, setProviderType] = useState<string>('');
+  const [apiKey, setApiKey] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [originalConfig, setOriginalConfig] = useState<CloudProviderConfig | null>(null);
 
@@ -46,6 +47,7 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
     if (open) {
       setOriginalConfig({ ...configRef.current });
       setProviderType(configRef.current.provider_type || '');
+      setApiKey(configRef.current.cloud_service_api_key || '');
 
       if (configRef.current.provider_type === 'alibaba') {
         setLoading(true);
@@ -56,10 +58,7 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
                 ...configRef.current,
                 cloud_service_api_key: res.data.data.cloud_service_api_key
               });
-              updateConfigRef.current({
-                ...configRef.current,
-                cloud_service_api_key: res.data.data.cloud_service_api_key
-              });
+              setApiKey(res.data.data.cloud_service_api_key); // Set local API Key
             }
           })
           .catch((error) => {
@@ -97,13 +96,10 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
             <label className="block text-sm font-medium text-gray-700 mb-1">API Key</label>
             <Input.Password
               onChange={(e) => {
-                updateConfigRef.current({
-                  ...configRef.current,
-                  cloud_service_api_key: e.target.value
-                });
+                setApiKey(e.target.value); // Only update local state
               }}
               placeholder="Enter your Alibaba Cloud API Key"
-              value={configRef.current.cloud_service_api_key}
+              value={apiKey} // Use local state
             />
             <div className="mt-2 text-sm text-gray-500">
               You can find your API key in your{' '}
@@ -120,13 +116,13 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
         </div>
       </div>
     );
-  }, []);
+  }, [apiKey]); // Add apiKey dependency
 
   const handleUpdate = async (): Promise<void> => {
     try {
       setLoading(true);
 
-      if (providerType === 'alibaba' && configRef.current.cloud_service_api_key) {
+      if (providerType === 'alibaba' && apiKey) {
         const modelConfigResponse = await getModelConfig();
 
         if (modelConfigResponse.data.data) {
@@ -134,7 +130,14 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
 
           await updateModelConfig({
             ...currentConfig,
-            cloud_service_api_key: configRef.current.cloud_service_api_key
+            cloud_service_api_key: apiKey // Use local apiKey state
+          });
+
+          // Update global state to alibaba
+          updateConfigRef.current({
+            ...configRef.current,
+            provider_type: 'alibaba',
+            cloud_service_api_key: apiKey // Use local apiKey state
           });
 
           message.success('API key has been successfully saved');
@@ -150,10 +153,18 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
             cloud_service_api_key: ''
           });
 
+          // Update global state to empty
+          updateConfigRef.current({
+            ...configRef.current,
+            provider_type: '',
+            cloud_service_api_key: ''
+          });
+
           message.success('Cloud provider configuration removed');
         }
       }
 
+      // Call save method and ensure state update
       await saveCloudConfig();
 
       onClose();
@@ -180,6 +191,8 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
   const handleCancel = useCallback(() => {
     if (originalConfig) {
       updateConfigRef.current(originalConfig);
+      setProviderType(originalConfig.provider_type || '');
+      setApiKey(originalConfig.cloud_service_api_key || ''); // Restore local API Key
     }
     onClose();
   }, [onClose, originalConfig]);
@@ -187,12 +200,14 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
   return (
     <Modal
       centered
+      confirmLoading={loading}
       destroyOnClose
-      okButtonProps={{ disabled: !providerType || loading }}
+      okButtonProps={{
+        disabled: (providerType === 'alibaba' && !apiKey) || loading
+      }}
       onCancel={handleCancel}
       onOk={handleUpdate}
       open={open}
-      confirmLoading={loading}
       title={
         <div className="flex items-center gap-2">
           <div className="text-xl font-semibold leading-6 text-gray-900">
@@ -221,11 +236,11 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
               const newProviderType = e.target.value;
 
               setProviderType(newProviderType);
-              updateConfigRef.current({
-                ...configRef.current,
-                provider_type: newProviderType,
-                cloud_service_api_key: newProviderType !== 'alibaba' ? '' : configRef.current.cloud_service_api_key
-              });
+
+              // If switching to non-alibaba type, clear local API Key
+              if (newProviderType !== 'alibaba') {
+                setApiKey('');
+              }
             }}
             optionType="button"
             options={options}

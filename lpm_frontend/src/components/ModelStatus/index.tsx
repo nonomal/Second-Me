@@ -309,7 +309,7 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
   }) => (
     <div 
       className={`border border-gray-200 rounded-lg ${isCloud ? 'bg-blue-50/20' : 'bg-gray-50/30'}`}
-      style={{ height }}
+      style={{ height, minHeight: '150px' }}
     >
       {loading ? (
         <div className="flex items-center justify-center h-full">
@@ -345,7 +345,7 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
       width={650}
       style={{ top: 20 }}
     >
-      <div style={{ height: '60vh', maxHeight: '600px', minHeight: '400px' }}>
+      <div style={{ height: '60vh', maxHeight: '600px', minHeight: '550px' }}>
         {/* Local Models Section */}
         <div className="mb-6">
           <div className="text-base font-semibold mb-3 flex items-center text-gray-700 ">
@@ -358,7 +358,7 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
             models={sortedLocalModels}
             loading={loadingModels}
             emptyType="local"
-            height="180px"
+            height="200px"
           />
         </div>
 
@@ -378,7 +378,7 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
             loading={loadingCloudModels}
             emptyType="cloud"
             isCloud={true}
-            height="200px"
+            height="220px"
           />
         </div>
       </div>

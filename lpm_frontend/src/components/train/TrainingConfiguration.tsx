@@ -3,7 +3,7 @@
 import type React from 'react';
 import { useMemo } from 'react';
 import { PlayIcon, StopIcon } from '@heroicons/react/24/outline';
-import { Tabs, message, Spin } from 'antd';
+import { Tabs, message, Spin, Tooltip } from 'antd';
 import type { TabsProps } from 'antd';
 import type { TrainingConfig } from '@/service/train';
 import type { IModelConfig } from '@/service/modelConfig';
@@ -126,10 +126,123 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
     }
   };
 
+  // Handle tab change with training status check
+  const handleTabChange = (key: string) => {
+    // Check if any training is active (running or suspended)
+    const isLocalTrainingActive = trainingType === 'local' && (isTraining || trainSuspended);
+    const isCloudTrainingActive =
+      trainingType === 'cloud' && (isTraining || cloudTrainingStatus === 'suspended');
+    
+    // If any training is active, prevent switching and show warning
+    if (isLocalTrainingActive || isCloudTrainingActive) {
+      if (key === 'local' && trainingType === 'cloud') {
+        if (isTraining) {
+          message.warning(
+            'Cannot switch to local training while cloud training is in progress. Please stop cloud training first.'
+          );
+        } else {
+          message.warning(
+            'Cannot switch to local training while cloud training is suspended. Please reset or complete cloud training first.'
+          );
+        }
+
+        return;
+      }
+
+      if (key === 'cloud' && trainingType === 'local') {
+        if (isTraining) {
+          message.warning(
+            'Cannot switch to cloud training while local training is in progress. Please stop local training first.'
+          );
+        } else {
+          message.warning(
+            'Cannot switch to cloud training while local training is suspended. Please reset or complete local training first.'
+          );
+        }
+
+        return;
+      }
+    }
+
+    // Allow tab change if no training is active or switching to the same type
+    setTrainingType(key as 'local' | 'cloud');
+
+    if (key === 'local') {
+      if (
+        trainingParams.local_model_name &&
+        trainingParams.model_name !== trainingParams.local_model_name
+      ) {
+        updateTrainingParams({
+          ...trainingParams,
+          model_name: trainingParams.local_model_name
+        });
+      }
+    } else if (key === 'cloud') {
+      if (
+        trainingParams.cloud_model_name &&
+        trainingParams.model_name !== trainingParams.cloud_model_name
+      ) {
+        updateTrainingParams({
+          ...trainingParams,
+          model_name: trainingParams.cloud_model_name
+        });
+      }
+    }
+  };
+
+  // Helper function to get tooltip message for disabled tabs
+  const getDisabledTooltip = (tabType: 'local' | 'cloud'): string => {
+    if (tabType === 'local' && trainingType === 'cloud') {
+      if (isTraining) {
+        return 'Cannot switch to local training while cloud training is in progress. Please stop cloud training first.';
+      }
+
+      if (cloudTrainingStatus === 'suspended') {
+        return 'Cannot switch to local training while cloud training is suspended. Please reset or complete cloud training first.';
+      }
+    }
+    
+    if (tabType === 'cloud' && trainingType === 'local') {
+      if (isTraining) {
+        return 'Cannot switch to cloud training while local training is in progress. Please stop local training first.';
+      }
+
+      if (trainSuspended) {
+        return 'Cannot switch to cloud training while local training is suspended. Please reset or complete local training first.';
+      }
+    }
+    
+    return '';
+  };
+
   const tabItems: TabsProps['items'] = [
     {
       key: 'local',
-      label: 'Local Training',
+      label: (
+        <Tooltip
+          placement="top"
+          title={
+            (isTraining && trainingType === 'cloud') ||
+            (trainingType === 'cloud' && cloudTrainingStatus === 'suspended')
+              ? getDisabledTooltip('local')
+              : ''
+          }
+        >
+          <span
+            className={
+              (isTraining && trainingType === 'cloud') ||
+              (trainingType === 'cloud' && cloudTrainingStatus === 'suspended')
+                ? 'text-gray-400 cursor-not-allowed'
+                : ''
+            }
+          >
+            Local Training
+          </span>
+        </Tooltip>
+      ),
+      disabled:
+        (isTraining && trainingType === 'cloud') ||
+        (trainingType === 'cloud' && cloudTrainingStatus === 'suspended'),
       children: (
         <LocalTrainingConfig
           baseModelOptions={baseModelOptions}
@@ -145,7 +258,29 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
     },
     {
       key: 'cloud',
-      label: 'Cloud Training',
+      label: (
+        <Tooltip
+          placement="top"
+          title={
+            (isTraining && trainingType === 'local') || (trainingType === 'local' && trainSuspended)
+              ? getDisabledTooltip('cloud')
+              : ''
+          }
+        >
+          <span
+            className={
+              (isTraining && trainingType === 'local') ||
+              (trainingType === 'local' && trainSuspended)
+                ? 'text-gray-400 cursor-not-allowed'
+                : ''
+            }
+          >
+            Cloud Training
+          </span>
+        </Tooltip>
+      ),
+      disabled:
+        (isTraining && trainingType === 'local') || (trainingType === 'local' && trainSuspended),
       children: (
         <CloudTrainingConfig
           cudaAvailable={cudaAvailable}
@@ -185,36 +320,7 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
         {`Configure how your Second Me will be trained using your memory data and identity. Then click '${activeTabKey === 'local' ? 'Start Local Training' : 'Start Cloud Training'}'.`}
       </p>
 
-      <Tabs
-        activeKey={activeTabKey}
-        className="mb-6"
-        items={tabItems}
-        onChange={(key) => {
-          setTrainingType(key as 'local' | 'cloud');
-
-          if (key === 'local') {
-            if (
-              trainingParams.local_model_name &&
-              trainingParams.model_name !== trainingParams.local_model_name
-            ) {
-              updateTrainingParams({
-                ...trainingParams,
-                model_name: trainingParams.local_model_name
-              });
-            }
-          } else if (key === 'cloud') {
-            if (
-              trainingParams.cloud_model_name &&
-              trainingParams.model_name !== trainingParams.cloud_model_name
-            ) {
-              updateTrainingParams({
-                ...trainingParams,
-                model_name: trainingParams.cloud_model_name
-              });
-            }
-          }
-        }}
-      />
+      <Tabs activeKey={activeTabKey} className="mb-6" items={tabItems} onChange={handleTabChange} />
 
       <div className="flex justify-end items-center gap-4 pt-4 border-t mt-4">
         {isTraining && (
@@ -224,8 +330,9 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
           </div>
         )}
 
-        {((activeTabKey === 'local' && trainSuspended) || 
-          (activeTabKey === 'cloud' && (cloudTrainingStatus === 'suspended' || cloudTrainingStatus === 'failed'))) && (
+        {((activeTabKey === 'local' && trainSuspended) ||
+          (activeTabKey === 'cloud' &&
+            (cloudTrainingStatus === 'suspended' || cloudTrainingStatus === 'failed'))) && (
           <button
             className={`inline-flex items-center justify-center px-4 py-2 bg-red-600 hover:bg-red-700 border border-transparent text-sm font-medium rounded-md shadow-sm text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
             onClick={() => {

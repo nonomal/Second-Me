@@ -70,26 +70,38 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
   }, [isTraining, trainSuspended]);
 
   const hasCloudServiceApiKey = useMemo(() => {
-    return !!(modelConfig && modelConfig.cloud_service_api_key);
-  }, [modelConfig]);
+    return !!(
+      (modelConfig && modelConfig.cloud_service_api_key) || 
+      (cloudConfig && cloudConfig.cloud_service_api_key)
+    );
+  }, [modelConfig, cloudConfig]);
 
   useEffect(() => {
-    // This effect seems to manage cloudConfig.provider_type based on modelConfig
-    // It might be simplified or re-evaluated based on overall logic for provider_type
-    if (hasCloudServiceApiKey && cloudConfig.provider_type !== 'alibaba') {
-      updateCloudConfig({
-        ...cloudConfig,
-        provider_type: 'alibaba', // Assuming 'alibaba' is the only cloud provider for now
-        cloud_service_api_key: modelConfig?.cloud_service_api_key || ''
-      });
-    } else if (!hasCloudServiceApiKey && cloudConfig.provider_type !== '') {
+    // This effect manages cloudConfig.provider_type based on available API key
+    // Only update when the provider_type or API key has actually changed (not during input)
+    const hasApiKey = !!(
+      (modelConfig && modelConfig.cloud_service_api_key) || 
+      (cloudConfig && cloudConfig.cloud_service_api_key && cloudConfig.provider_type)
+    );
+    
+    if (hasApiKey && cloudConfig.provider_type === 'alibaba') {
+      // Only update if not already correctly set
+      const currentApiKey = modelConfig?.cloud_service_api_key || cloudConfig.cloud_service_api_key || '';
+      if (cloudConfig.cloud_service_api_key !== currentApiKey) {
+        updateCloudConfig({
+          ...cloudConfig,
+          provider_type: 'alibaba',
+          cloud_service_api_key: currentApiKey
+        });
+      }
+    } else if (!hasApiKey && cloudConfig.provider_type !== '') {
       updateCloudConfig({
         ...cloudConfig,
         provider_type: '',
         cloud_service_api_key: ''
       });
     }
-  }, [hasCloudServiceApiKey, modelConfig, cloudConfig, updateCloudConfig]);
+  }, [modelConfig?.cloud_service_api_key, cloudConfig.provider_type]);
 
   useEffect(() => {
     const fetchModels = async () => {
@@ -177,7 +189,7 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
     };
 
     fetchModels();
-  }, [hasCloudServiceApiKey]); 
+  }, [hasCloudServiceApiKey, cloudConfig.provider_type, cloudConfig.cloud_service_api_key]); // 添加依赖项
 
   // useEffect(() => {
   //   if (trainingParams.cloud_model_name && trainingParams.model_name !== trainingParams.cloud_model_name) {
@@ -543,7 +555,12 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
       <ThinkingModelModal onClose={() => setOpenThinkingModel(false)} open={openThinkingModel} />
       <CloudProviderModal
         open={openCloudProviderModal}
-        onClose={() => setOpenCloudProviderModal(false)}
+        onClose={() => {
+          setOpenCloudProviderModal(false);
+          setTimeout(() => {
+            fetchCloudConfig();
+          }, 100);
+        }}
         cloudConfig={cloudConfig} // Pass current cloudConfig from store
         updateCloudConfig={updateCloudConfig} // Pass update function from store
         saveCloudConfig={async () => { // Implement saveCloudConfig to align with modal props
