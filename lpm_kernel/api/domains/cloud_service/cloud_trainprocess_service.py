@@ -16,6 +16,8 @@ from lpm_kernel.api.domains.cloud_service.service import CloudService
 from lpm_kernel.api.domains.trainprocess.process_step import ProcessStep
 from lpm_kernel.api.domains.trainprocess.trainprocess_service import TrainProcessService
 from lpm_kernel.configs.logging import get_train_process_logger
+from lpm_kernel.models.memory import Memory
+from lpm_kernel.common.repository.database_session import DatabaseSession
 
 logger = get_train_process_logger()
 
@@ -550,12 +552,29 @@ class CloudTrainProcessService(TrainProcessService):
             
             if success:
                 self.progress.update_message("Fine-tuning job completed successfully!")
+                # Update is_trained flag for memory records after successful cloud training
+                self.update_memory_training_status()
             else:
                 logger.error(f"Fine-tuning job failed")
         except Exception as e:
             logger.error(f"Error in async wait thread: {str(e)}", exc_info=True)
             self.progress.mark_step_status("cloud_training", "wait_for_fine-tune_completion", CloudStatus.FAILED)
     
+    def update_memory_training_status(self):
+        """Update is_trained flag for memory records after successful cloud training"""
+        try:
+            
+            with DatabaseSession.session() as session:
+                update_count = session.query(Memory).filter(Memory.status == "active").update(
+                    {"is_trained": True},
+                    synchronize_session=False  
+                )
+                
+                session.commit()
+            logger.info(f"Updated training status for {update_count} memory records after cloud training")
+        except Exception as e:
+            logger.error(f"Failed to update memory training status: {str(e)}", exc_info=True)
+
     def _update_overall_progress(self):
         """Calculate and update the overall progress based on the stages' progress"""
         try:
