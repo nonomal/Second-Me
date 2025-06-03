@@ -119,7 +119,9 @@ class CloudService:
         logger.info(f"Fine-tuning job status: {status}")
 
         if status == "SUCCEEDED":
-            self.model_id = response_data.get('output', {}).get('finetuned_output')
+            # 尝试从多个可能的字段获取模型ID
+            output = response_data.get('output', {})
+            self.model_id = output.get('finetuned_output') or output.get('model_id')
             logger.info(f"Fine-tuning successful! Model ID: {self.model_id}")
 
         return status
@@ -612,7 +614,7 @@ class CloudService:
             job_id: The ID of the fine-tuning job to cancel
         
         Returns:
-            bool: True if the job was successfully cancelled, False otherwise
+            bool: True if the job was successfully canceled, False otherwise
         """
         url = f"{self.base_url}/fine-tunes/{job_id}/cancel"
         headers = {**self.headers, "Content-Type": "application/json"}
@@ -625,7 +627,7 @@ class CloudService:
                 logger.error(f"Failed to cancel fine-tune job! Error: {response_data}")
                 return False
                 
-            logger.info(f"Fine-tune job cancelled successfully! Job ID: {job_id}")
+            logger.info(f"Fine-tune job canceled successfully! Job ID: {job_id}")
             return True
         except Exception as e:
             logger.error(f"Exception during fine-tune job cancellation: {str(e)}")
@@ -678,7 +680,8 @@ class CloudService:
                         logger.info("Fine-tuning phase started")
                         
                         if progress_callback:
-                            progress_callback("IN_PROGRESS", 10, f"Data uploaded and fine-tune job created. Estimated time: {estimated_total_minutes} minutes")
+                            # Start fine-tuning phase at 66% progress
+                            progress_callback("IN_PROGRESS", 66, f"Data uploaded and fine-tune job created. Estimated time: {estimated_total_minutes} minutes")
                 
                 logs_content = self.get_fine_tune_logs(offset=0, line=1000)
                 logs_str = str(logs_content) if logs_content else ""
@@ -686,20 +689,22 @@ class CloudService:
                     queuing_phase = False
                     fine_tune_start_time = time.time()
                     logger.info("Fine-tuning phase started")
+                    
+                    if progress_callback:
+                        # Start fine-tuning phase at 66% progress
+                        progress_callback("IN_PROGRESS", 66, f"Fine-tuning phase started. Estimated time: {estimated_total_minutes if estimated_total_minutes else 'unknown'} minutes")
             
             if status == "SUCCEEDED":
                 new_offset, _ = self._fetch_and_print_logs(log_offset)
                 logger.info("Fine-tuning job completed successfully!")
                 
-                self.model_id = self._get_model_id_from_job(job_id)
-                
                 if progress_callback:
                     progress_callback("COMPLETED", 100, f"Fine-tuning job completed successfully! Model ID: {self.model_id}")
                 
                 return True
-            elif status in ["FAILED", "CANCELLED"]:
+            elif status in ["FAILED","CANCELED"]:
                 new_offset, _ = self._fetch_and_print_logs(log_offset)
-                error_message = f"Fine-tuning job failed, status: {status}"
+                error_message = f"Fine-tuning job failed or canceled, status: {status}"
                 logger.error(error_message)
                 
                 if progress_callback:
@@ -708,25 +713,34 @@ class CloudService:
                 return False
             
             if queuing_phase:
-                queue_progress = min(10, elapsed_minutes * 2)
-                estimated_progress = queue_progress
-                progress_message = f"Preparing data and creating fine-tune job. Elapsed time: {int(elapsed_minutes)} minutes"
+                # Set queue phase progress directly to 66%
+                estimated_progress = 66
+                progress_message = f"Preparing data and initializing fine-tune job. Elapsed time: {int(elapsed_minutes)} minutes"
             else:
                 if estimated_total_minutes is not None and fine_tune_start_time is not None:
                     fine_tune_elapsed = (time.time() - fine_tune_start_time) / 60
-                    progress_percent = (fine_tune_elapsed / estimated_total_minutes) * 85
-                    estimated_progress = min(95, 10 + progress_percent)
+                    # Calculate raw progress as a percentage of elapsed time vs total estimated time
+                    raw_progress_percent = (fine_tune_elapsed / estimated_total_minutes) * 100
                     
-                    if estimated_progress < 30:
+                    # Adjust progress: divide by 3 and add 66% (first two steps)
+                    # This ensures the progress goes from 66% to 100% during the fine-tuning step
+                    adjusted_progress_percent = 66 + (raw_progress_percent / 3)
+                    
+                    # Cap at 99% (100% is reserved for completion)
+                    estimated_progress = min(99, adjusted_progress_percent)
+                    
+                    # Determine stage description based on adjusted progress
+                    if estimated_progress < 75:  # First third of the final stage
                         stage_desc = "Initializing training environment"
-                    elif estimated_progress < 60:
+                    elif estimated_progress < 90:  # Second third of the final stage
                         stage_desc = "Training model with your data"
-                    else:
+                    else:  # Final third of the final stage
                         stage_desc = "Finalizing model training"
                         
                     progress_message = f"{stage_desc}. Elapsed: {int(fine_tune_elapsed)}/{estimated_total_minutes} minutes (~{int(estimated_progress)}%)"
                 else:
-                    estimated_progress = 15
+                    # If we can't calculate exact progress, default to 66% (start of fine-tuning phase)
+                    estimated_progress = 66
                     fine_tune_elapsed = (time.time() - fine_tune_start_time) / 60 if fine_tune_start_time else elapsed_minutes
                     progress_message = f"Waiting for training progress information. Elapsed time: {int(fine_tune_elapsed)} minutes"
             
@@ -789,45 +803,13 @@ class CloudService:
             if status == "RUNNING":
                 logger.info("Model deployment successful, now ready to use!")
                 return True
-            elif status in ["FAILED", "CANCELLED"]:
-                logger.error(f"Model deployment failed, status: {status}")
+            elif status in ["FAILED", "CANCELED"]:
+                logger.error(f"Model deployment failed or canceled, status: {status}")
                 return False
 
             logger.info(f"Model deployment in progress, checking again in {check_interval} seconds...")
             time.sleep(check_interval)
 
-    def _get_model_id_from_job(self, job_id):
-        """
-        Retrieve model ID from fine-tune job
-        
-        Args:
-            job_id: Fine-tune job ID
-            
-        Returns:
-            str: Model ID or None
-        """
-        try:
-           
-            url = f"{self.base_url}/fine-tunes/{job_id}"
-            headers = {**self.headers, "Content-Type": "application/json"}
-            
-            response = requests.get(url, headers=headers)
-            response_data = response.json()
-            
-            if response.status_code != 200:
-                logger.error(f"Failed to get fine-tune job details! Error: {response_data}")
-                return None
-                
-            model_id = response_data.get('output', {}).get('model_id')
-            if model_id:
-                logger.info(f"Retrieved model ID {model_id} from job {job_id}")
-                return model_id
-            else:
-                logger.warning(f"No model ID found in job {job_id}")
-                return None
-        except Exception as e:
-            logger.error(f"Exception when getting model ID from job: {str(e)}")
-            return None
     
     def list_available_models(self):
         logger.info("Returning hardcoded list of models that support fine-tuning...")

@@ -2,6 +2,8 @@ import time
 from werkzeug.utils import secure_filename
 from flask import Blueprint, jsonify, Response, request
 from charset_normalizer import from_path
+from pathlib import Path
+import json
 
 from lpm_kernel.api.domains.trainprocess.trainprocess_service import TrainProcessService
 from lpm_kernel.api.domains.trainprocess.training_params_manager import TrainingParamsManager
@@ -283,7 +285,7 @@ def get_step_output_content():
 @trainprocess_bp.route("/training_params", methods=["GET"])
 def get_training_params():
     """
-    Get the latest training parameters
+    Get the latest training parameters for both local and cloud training
     
     Returns:
         Response: JSON response
@@ -291,20 +293,52 @@ def get_training_params():
             "code": 0 for success, non-zero for failure,
             "message": "Error message",
             "data": {
-                "model_name": "Model name",
-                "learning_rate": "Learning rate",
-                "number_of_epochs": "Number of epochs",
-                "concurrency_threads": "Concurrency threads",
-                "data_synthesis_mode": "Data synthesis mode"
+                "local": {
+                    "model_name": "Model name",
+                    "learning_rate": "Learning rate",
+                    "number_of_epochs": "Number of epochs",
+                    "concurrency_threads": "Concurrency threads",
+                    "data_synthesis_mode": "Data synthesis mode"
+                },
+                "cloud": {
+                    "model_name": "Model name",
+                    "base_model": "Base model name",
+                    "training_type": "Training type",
+                    "hyper_parameters": {
+                        "n_epochs": "Number of epochs",
+                        "learning_rate": "Learning rate"
+                    },
+                    "created_at": "Creation timestamp"
+                }
             }
         }
     """
     try:
-        # Get the latest training parameters
+        # Get the latest local training parameters
         params_manager = TrainingParamsManager()
-        training_params = params_manager.get_latest_training_params()
+        local_training_params = params_manager.get_latest_training_params()
         
-        return jsonify(APIResponse.success(data=training_params))
+        # Get the latest cloud training parameters
+        project_root = Path(__file__).resolve().parent.parent.parent.parent.parent
+        cloud_params_file = project_root / "data/cloud_progress/cloud_training_params.json"
+        cloud_training_params = {}
+        
+        if cloud_params_file.exists():
+            try:
+                with open(cloud_params_file, 'r', encoding='utf-8') as f:
+                    cloud_training_params = json.load(f)
+            except Exception as e:
+                logger.error(f"Failed to load cloud training parameters: {str(e)}", exc_info=True)
+        else:
+            logger.error(f"Cloud training parameters file does not exist: {cloud_params_file}")
+        
+        # Combine both parameters
+        combined_params = {
+            "local": local_training_params,
+            "cloud": cloud_training_params
+        }
+        
+        return jsonify(APIResponse.success(data=combined_params))
     except Exception as e:
         logger.error(f"Error getting training parameters: {str(e)}", exc_info=True)
         return jsonify(APIResponse.error(message=f"Error getting training parameters: {str(e)}"))

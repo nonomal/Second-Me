@@ -481,9 +481,18 @@ class CloudTrainProcessService(TrainProcessService):
             self.progress.mark_step_status(CloudProcessStep.WAIT_FOR_FINE_TUNE_COMPLETION, CloudStatus.IN_PROGRESS)
         
             logger.info(f"Fine-tune job {self.job_id} has been created and is now running")
-            logger.info("The job will continue running in the background")
-            logger.info("You can check the status using the cloud service API")
-        
+            
+            # Start a separate process to monitor the job completion
+            logger.info("Starting a separate process to monitor the job completion")
+            self._wait_completion_process = multiprocessing.Process(
+                target=self._wait_for_completion_process,
+                args=(self.cloud_service, self.job_id)
+            )
+            self._wait_completion_process.daemon = True
+            self._wait_completion_process.start()
+            self._wait_completion_pid = self._wait_completion_process.pid
+            logger.info(f"Job monitoring process started with PID: {self._wait_completion_pid}")
+            
             self.progress.mark_step_status(CloudProcessStep.WAIT_FOR_FINE_TUNE_COMPLETION, CloudStatus.IN_PROGRESS, 
                                           "Fine-tune job is running in the background")
         
@@ -514,7 +523,7 @@ class CloudTrainProcessService(TrainProcessService):
                         "IN_PROGRESS": CloudStatus.IN_PROGRESS,
                         "COMPLETED": CloudStatus.COMPLETED,
                         "FAILED": CloudStatus.FAILED,
-                        "CANCELLED": CloudStatus.CANCELLED
+                        "CANCELED": CloudStatus.CANCELED  
                     }
                     
                     cloud_status = status_mapping.get(status, CloudStatus.IN_PROGRESS)
@@ -525,7 +534,7 @@ class CloudTrainProcessService(TrainProcessService):
                         message
                     )
                     
-                    if status in ["COMPLETED", "FAILED", "CANCELLED"]:
+                    if status in ["COMPLETED", "FAILED", "CANCELED"]:
                         self.progress.mark_step_status(
                             CloudProcessStep.WAIT_FOR_FINE_TUNE_COMPLETION,
                             cloud_status,
@@ -642,7 +651,7 @@ class CloudTrainProcessService(TrainProcessService):
                                 break
                     
                     logger.info(f"Current step status: {step_status}")
-                    if step_status in [CloudStatus.COMPLETED, CloudStatus.FAILED, CloudStatus.CANCELLED]:
+                    if step_status in [CloudStatus.COMPLETED, CloudStatus.FAILED, CloudStatus.CANCELED]:
                         logger.info(f"Step {current_step.value} has status {step_status}, continuing with stop process")
                         break
                 
@@ -665,12 +674,25 @@ class CloudTrainProcessService(TrainProcessService):
                 except Exception as e:
                     logger.error(f"Failed to read job ID from file: {str(e)}", exc_info=True)
             
+            # Terminate the wait completion process if it's running
+            if self._wait_completion_process and self._wait_completion_process.is_alive():
+                logger.info(f"Terminating wait completion process (PID: {self._wait_completion_pid})")
+                try:
+                    os.kill(self._wait_completion_pid, signal.SIGTERM)
+                    self._wait_completion_process.join(timeout=5)
+                    if self._wait_completion_process.is_alive():
+                        logger.warning(f"Wait completion process did not terminate gracefully, forcing termination")
+                        self._wait_completion_process.terminate()
+                    logger.info(f"Wait completion process terminated successfully")
+                except Exception as e:
+                    logger.error(f"Error terminating wait completion process: {str(e)}", exc_info=True)
+            
             if self.job_id:
                 logger.info(f"Attempting to cancel fine-tune job: {self.job_id}")
                 success = self.cloud_service.cancel_fine_tune_job(self.job_id)
                 
                 if success:
-                    logger.info(f"Successfully cancelled fine-tune job: {self.job_id}")
+                    logger.info(f"Successfully canceled fine-tune job: {self.job_id}")
                 else:
                     logger.error(f"Failed to cancel fine-tune job: {self.job_id}")
             else:
@@ -693,8 +715,8 @@ class CloudTrainProcessService(TrainProcessService):
                             break
                 
                 if step_status != CloudStatus.COMPLETED:
-                    logger.info(f"Marking step {current_step} as CANCELLED because its status is {step_status}")
-                    self.progress.mark_step_status(current_step, CloudStatus.CANCELLED, "Process cancelled by user")
+                    logger.info(f"Marking step {current_step} as CANCELED because its status is {step_status}")
+                    self.progress.mark_step_status(current_step, CloudStatus.CANCELED, "Process canceled by user")
                 else:
                     logger.info(f"Step {current_step} is already COMPLETED, preserving its status")
             

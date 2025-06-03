@@ -303,52 +303,47 @@ def get_cloud_training_status(job_id):
 def get_cloud_training_progress():
     """Get detailed progress information for cloud training"""
     try:
-        # Get progress data
-        progress_holder = None
-        job_id = None
-        
-        # First check if progress file exists
+        # Directly read JSON file content
         progress_file = Path("data/cloud_progress/cloud_progress.json")
+        
         if progress_file.exists():
-            # Try to get progress from existing training service instance
-            train_service = CloudTrainProcessService.get_instance()
-            if train_service:
-                progress_holder = train_service.progress
-                job_id = train_service.job_id
-            else:
-                try:
-                    # Read file content directly
-                    with open(progress_file, "r", encoding="utf-8") as f:
-                        progress_data = json.load(f)
-                    
-                    # Create a new progress holder
-                    progress_holder = CloudProgressHolder(model_name=progress_data.get("model_name"), job_id=progress_data.get("job_id"))
-                    progress_holder.progress.data = progress_data
-                    progress_holder._rebuild_mappings()
-                    
-                    logger.info(f"Loaded progress data directly from file: {progress_file}")
-                except Exception as e:
-                    logger.error(f"Error reading progress file directly: {str(e)}")
-                    # If direct reading fails, try using get_latest_progress
-                    progress_holder, job_id = CloudProgressHolder.get_latest_progress()
-        
-        # If still no progress data found, create a new empty progress
-        if not progress_holder:
-            progress_holder = CloudProgressHolder()
-            job_id = None
-            logger.info("Created new empty progress holder as no existing progress was found")
-        
-        # Get progress data
-        progress_data = progress_holder.get_progress()
-        
-        # Add some extra metadata
-        response_data = {
-            "progress": progress_data,
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "job_id": job_id
-        }
-        
-        return jsonify(APIResponse.success(data=response_data))
+            try:
+                # Directly read file content
+                with open(progress_file, "r", encoding="utf-8") as f:
+                    progress_data = json.load(f)
+                
+                # Build response data
+                response_data = {
+                    "progress": progress_data,
+                    "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "job_id": progress_data.get("job_id")
+                }
+                
+                return jsonify(APIResponse.success(data=response_data))
+            except Exception as e:
+                logger.error(f"Error reading progress file: {str(e)}")
+                return jsonify(APIResponse.error(f"Unable to read progress file: {str(e)}"))
+        else:
+            # If file doesn't exist, return empty progress
+            logger.warning(f"Progress file doesn't exist: {progress_file}")
+            empty_progress = {
+                "stages": [],
+                "overall_progress": 0,
+                "current_stage": None,
+                "status": "pending",
+                "message": "No training in progress",
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "model_name": None,
+                "job_id": None
+            }
+            
+            response_data = {
+                "progress": empty_progress,
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "job_id": None
+            }
+            
+            return jsonify(APIResponse.success(data=response_data))
     except Exception as e:
         logger.error(f"Get cloud training progress failed: {str(e)}", exc_info=True)
         return jsonify(APIResponse.error(f"Failed to get cloud training progress: {str(e)}"))

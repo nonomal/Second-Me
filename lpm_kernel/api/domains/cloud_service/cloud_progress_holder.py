@@ -17,7 +17,7 @@ class CloudStatus:
     COMPLETED = "completed"
     FAILED = "failed"
     SUSPENDED = "suspended"
-    CANCELLED = "cancelled"
+    CANCELED = "canceled"
 
 class CloudProgress:
     """Cloud training progress data structure"""
@@ -259,8 +259,8 @@ class CloudProgress:
             stage_data["status"] = CloudStatus.FAILED
             stage_data["current_step"] = step_data["name"]
             self.data["current_stage"] = stage_data["name"]
-        elif any(step["status"] == CloudStatus.CANCELLED for step in stage_data["steps"]):
-            stage_data["status"] = CloudStatus.CANCELLED
+        elif any(step["status"] == CloudStatus.CANCELED for step in stage_data["steps"]):
+            stage_data["status"] = CloudStatus.CANCELED
             stage_data["current_step"] = step_data["name"]
             self.data["current_stage"] = stage_data["name"]
         elif any(step["status"] == CloudStatus.SUSPENDED for step in stage_data["steps"]):
@@ -285,8 +285,8 @@ class CloudProgress:
             self.data["status"] = CloudStatus.COMPLETED
         elif any(s["status"] == CloudStatus.FAILED for s in self.data["stages"]):
             self.data["status"] = CloudStatus.FAILED
-        elif any(s["status"] == CloudStatus.CANCELLED for s in self.data["stages"]):
-            self.data["status"] = CloudStatus.CANCELLED
+        elif any(s["status"] == CloudStatus.CANCELED for s in self.data["stages"]):
+            self.data["status"] = CloudStatus.CANCELED
         elif any(s["status"] == CloudStatus.SUSPENDED for s in self.data["stages"]):
             self.data["status"] = CloudStatus.SUSPENDED
         elif any(s["status"] == CloudStatus.IN_PROGRESS for s in self.data["stages"]):
@@ -500,19 +500,6 @@ class CloudProgressHolder:
                     stage_name = self.progress._stage_mapping.get(step)
                     if not stage_name:
                         logger.error(f"No stage mapping found for step: {step}")
-                        return
-                else:
-
-                    if isinstance(step, CloudProcessStep):
-                        if step == CloudProcessStep.MAP_YOUR_ENTITY_NETWORK:
-                            stage_name = "synthesize_your_life_narrative"
-                        elif step == CloudProcessStep.DECODE_PREFERENCE_PATTERNS:
-                            stage_name = "prepare_training_data_for_deep_comprehension"
-                        else:
-                            stage_name = "prepare_training_data_for_deep_comprehension"
-                            logger.warning(f"CloudProcessStep {step} not found in _stage_mapping, using default stage")
-                    else:
-                        stage_name = step.value.lower().replace(" ", "_")
                 
                 step_name = step.value.lower().replace(" ", "_")
             else:
