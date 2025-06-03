@@ -52,18 +52,18 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
   const updateCloudConfig = useCloudProviderStore((state) => state.updateCloudConfig);
   const fetchCloudConfig = useCloudProviderStore((state) => state.fetchCloudConfig);
 
-  useEffect(() => {
-    const handleShowCloudProviderModal = () => {
-      setOpenCloudProviderModal(true);
-    };
+  // useEffect(() => {
+  //   const handleShowCloudProviderModal = () => {
+  //     setOpenCloudProviderModal(true);
+  //   };
 
-    window.addEventListener(EVENT.SHOW_CLOUD_PROVIDER_MODAL, handleShowCloudProviderModal);
-    fetchCloudConfig();
+  //   window.addEventListener(EVENT.SHOW_CLOUD_PROVIDER_MODAL, handleShowCloudProviderModal);
+  //   fetchCloudConfig();
 
-    return () => {
-      window.removeEventListener(EVENT.SHOW_CLOUD_PROVIDER_MODAL, handleShowCloudProviderModal);
-    };
-  }, [fetchCloudConfig]);
+  //   return () => {
+  //     window.removeEventListener(EVENT.SHOW_CLOUD_PROVIDER_MODAL, handleShowCloudProviderModal);
+  //   };
+  // }, [fetchCloudConfig]);
 
   const disabledChangeParams = useMemo(() => {
     return isTraining || trainSuspended;

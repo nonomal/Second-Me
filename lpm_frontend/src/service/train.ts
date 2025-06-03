@@ -75,6 +75,38 @@ export interface TrainAdvanceParams {
   is_cot?: boolean;
 }
 
+// Local training configuration
+export interface LocalTrainingParams {
+  model_name: string;
+  learning_rate?: number;
+  number_of_epochs?: number;
+  concurrency_threads?: number;
+  data_synthesis_mode?: string;
+  use_cuda?: boolean;
+  is_cot?: boolean;
+}
+
+// Cloud training configuration
+export interface CloudHyperParameters {
+  learning_rate?: number;
+  n_epochs?: number;
+}
+
+export interface CloudTrainingParams {
+  model_name: string;
+  base_model: string;
+  training_type?: string;
+  hyper_parameters?: CloudHyperParameters;
+  created_at?: string;
+}
+
+// Combined training configuration for API responses
+export interface TrainingParamsResponse {
+  local: LocalTrainingParams;
+  cloud: CloudTrainingParams;
+}
+
+// Legacy interfaces for backward compatibility
 export interface TrainingParams {
   concurrency_threads?: number;
   data_synthesis_mode?: string;
@@ -87,17 +119,6 @@ export interface TrainBaseParams {
   model_name: string;
   local_model_name: string;
   cloud_model_name: string;
-}
-
-export interface CloudHyperParameters {
-  learning_rate?: number;
-  n_epochs?: number;
-}
-
-export interface CloudTrainingParams {
-  base_model: string;
-  training_type?: string;
-  hyper_parameters?: CloudHyperParameters;
 }
 
 export type TrainingConfig = TrainingParams & TrainAdvanceParams & TrainBaseParams;
@@ -162,7 +183,7 @@ export const stopService = () => {
 };
 
 export const getTrainingParams = () => {
-  return Request<CommonResponse<TrainingConfig>>({
+  return Request<CommonResponse<TrainingParamsResponse>>({
     method: 'get',
     url: `/api/trainprocess/training_params`
   });

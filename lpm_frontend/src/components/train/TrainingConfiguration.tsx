@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { PlayIcon, StopIcon } from '@heroicons/react/24/outline';
 import { Tabs, message, Spin, Tooltip } from 'antd';
 import type { TabsProps } from 'antd';
-import type { TrainingConfig } from '@/service/train';
+import type { TrainingConfig, LocalTrainingParams, CloudTrainingParams } from '@/service/train';
 import type { IModelConfig } from '@/service/modelConfig';
 import LocalTrainingConfig from './LocalTrainingConfig';
 import CloudTrainingConfig from './CloudTrainingConfig';
@@ -19,14 +19,16 @@ interface TrainingConfigurationProps {
   baseModelOptions: BaseModelOption[];
   modelConfig: IModelConfig | null;
   isTraining: boolean;
-  updateTrainingParams: (params: TrainingConfig) => void;
+  updateLocalTrainingParams: (params: Partial<LocalTrainingParams>) => void;
+  updateCloudTrainingParams: (params: Partial<CloudTrainingParams>) => void;
   status: string;
   trainSuspended: boolean;
   handleResetProgress: () => void;
   handleTrainingAction: (trainingType: 'local' | 'cloud') => Promise<void>;
   trainActionLoading: boolean;
   setSelectedInfo: React.Dispatch<React.SetStateAction<boolean>>;
-  trainingParams: TrainingConfig;
+  localTrainingParams: LocalTrainingParams;
+  cloudTrainingParams: CloudTrainingParams;
   cudaAvailable: boolean;
   trainingType: 'local' | 'cloud';
   setTrainingType: (type: 'local' | 'cloud') => void;
@@ -37,8 +39,10 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
   baseModelOptions,
   modelConfig,
   isTraining,
-  updateTrainingParams,
-  trainingParams,
+  updateLocalTrainingParams,
+  updateCloudTrainingParams,
+  localTrainingParams,
+  cloudTrainingParams,
   status,
   handleResetProgress,
   trainSuspended,
@@ -166,28 +170,6 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
 
     // Allow tab change if no training is active or switching to the same type
     setTrainingType(key as 'local' | 'cloud');
-
-    if (key === 'local') {
-      if (
-        trainingParams.local_model_name &&
-        trainingParams.model_name !== trainingParams.local_model_name
-      ) {
-        updateTrainingParams({
-          ...trainingParams,
-          model_name: trainingParams.local_model_name
-        });
-      }
-    } else if (key === 'cloud') {
-      if (
-        trainingParams.cloud_model_name &&
-        trainingParams.model_name !== trainingParams.cloud_model_name
-      ) {
-        updateTrainingParams({
-          ...trainingParams,
-          model_name: trainingParams.cloud_model_name
-        });
-      }
-    }
   };
 
   // Helper function to get tooltip message for disabled tabs
@@ -251,8 +233,8 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
           modelConfig={modelConfig}
           status={status}
           trainSuspended={trainSuspended}
-          trainingParams={trainingParams}
-          updateTrainingParams={updateTrainingParams}
+          trainingParams={localTrainingParams}
+          updateTrainingParams={updateLocalTrainingParams}
         />
       )
     },
@@ -288,8 +270,8 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
           modelConfig={modelConfig as IModelConfig | null}
           status={status}
           trainSuspended={trainSuspended}
-          trainingParams={trainingParams}
-          updateTrainingParams={updateTrainingParams}
+          trainingParams={cloudTrainingParams}
+          updateTrainingParams={updateCloudTrainingParams}
         />
       )
     }

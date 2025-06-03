@@ -5,7 +5,7 @@ import { Fragment, useMemo, useState, useEffect } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import { Checkbox, InputNumber, message, Radio, Tooltip } from 'antd';
-import type { TrainingConfig } from '@/service/train';
+import type { LocalTrainingParams } from '@/service/train';
 import { EVENT } from '../../utils/event';
 import OpenAiModelIcon from '../svgs/OpenAiModelIcon';
 import CustomModelIcon from '../svgs/CustomModelIcon';
@@ -29,10 +29,10 @@ interface LocalTrainingConfigProps {
   baseModelOptions: BaseModelOption[];
   modelConfig: ModelConfig | null;
   isTraining: boolean;
-  updateTrainingParams: (params: TrainingConfig) => void;
+  updateTrainingParams: (params: Partial<LocalTrainingParams>) => void;
   status: string;
   trainSuspended: boolean;
-  trainingParams: TrainingConfig;
+  trainingParams: LocalTrainingParams;
   cudaAvailable: boolean;
 }
 
@@ -65,30 +65,16 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
       if (!trainingParams.model_name || !currentModelIsValid) {
         const defaultModel = baseModelOptions[0].value;
 
-        if (
-          trainingParams.model_name !== defaultModel ||
-          trainingParams.local_model_name !== defaultModel
-        ) {
+        if (trainingParams.model_name !== defaultModel) {
           updateTrainingParams({
-            ...trainingParams,
-            model_name: defaultModel,
-            local_model_name: defaultModel
-          });
-        }
-      } else {
-        if (trainingParams.local_model_name !== trainingParams.model_name) {
-          updateTrainingParams({
-            ...trainingParams,
-            local_model_name: trainingParams.model_name
+            model_name: defaultModel
           });
         }
       }
     } else {
-      if (trainingParams.model_name !== '' || trainingParams.local_model_name !== '') {
+      if (trainingParams.model_name !== '') {
         updateTrainingParams({
-          ...trainingParams,
-          model_name: '',
-          local_model_name: ''
+          model_name: ''
         });
       }
     }
@@ -208,9 +194,7 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
             onChange={(value) => {
               if (value !== trainingParams.model_name) {
                 updateTrainingParams({
-                  ...trainingParams,
-                  model_name: value,
-                  local_model_name: value
+                  model_name: value
                 });
               }
             }}

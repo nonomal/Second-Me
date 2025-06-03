@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import InfoModal from '@/components/InfoModal';
-import type { TrainingConfig } from '@/service/train';
+import type { TrainingConfig, LocalTrainingParams, CloudTrainingParams, TrainingParamsResponse } from '@/service/train';
 import {
   startTrain,
   stopTrain,
@@ -95,7 +95,8 @@ export default function TrainingPage(): JSX.Element {
   const [selectedInfo, setSelectedInfo] = useState<boolean>(false);
   const isTraining = useTrainingStore((state) => state.isTraining);
   const setIsTraining = useTrainingStore((state) => state.setIsTraining);
-  const [trainingParams, setTrainingParams] = useState<TrainingConfig>({} as TrainingConfig);
+  const [localTrainingParams, setLocalTrainingParams] = useState<LocalTrainingParams>({} as LocalTrainingParams);
+  const [cloudTrainingParams, setCloudTrainingParams] = useState<CloudTrainingParams>({} as CloudTrainingParams);
   const [trainActionLoading, setTrainActionLoading] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [showMemoryModal, setShowMemoryModal] = useState(false);
@@ -465,9 +466,12 @@ export default function TrainingPage(): JSX.Element {
         if (res.data.code === 0) {
           const data = res.data.data;
 
-          setTrainingParams(data);
+          // Set separate local and cloud training params
+          setLocalTrainingParams(data.local);
+          setCloudTrainingParams(data.cloud);
 
-          localStorage.setItem('trainingParams', JSON.stringify(data));
+          localStorage.setItem('localTrainingParams', JSON.stringify(data.local));
+          localStorage.setItem('cloudTrainingParams', JSON.stringify(data.cloud));
         } else {
           throw new Error(res.data.message);
         }
@@ -493,8 +497,12 @@ export default function TrainingPage(): JSX.Element {
     firstLoadRef.current = false;
   };
 
-  const updateTrainingParams = (params: TrainingConfig) => {
-    setTrainingParams((state: TrainingConfig) => ({ ...state, ...params }));
+  const updateLocalTrainingParams = (params: Partial<LocalTrainingParams>) => {
+    setLocalTrainingParams((state: LocalTrainingParams) => ({ ...state, ...params }));
+  };
+
+  const updateCloudTrainingParams = (params: Partial<CloudTrainingParams>) => {
+    setCloudTrainingParams((state: CloudTrainingParams) => ({ ...state, ...params }));
   };
 
   const getDetails = () => {
@@ -786,15 +794,17 @@ export default function TrainingPage(): JSX.Element {
     resetTrainingState();
 
     try {
-      console.log('Using startTrain API to train new model:', trainingParams.model_name);
+      console.log('Using startTrain API to train new model:', localTrainingParams.model_name);
       const res = await startTrain({
-        ...trainingParams,
-        model_name: trainingParams.local_model_name
-      });
+        ...localTrainingParams,
+        // Convert to legacy format for compatibility
+        local_model_name: localTrainingParams.model_name,
+        cloud_model_name: cloudTrainingParams.model_name
+      } as TrainingConfig);
 
       if (res.data.code === 0) {
         // Save training configuration and start polling
-        localStorage.setItem('trainingParams', JSON.stringify(trainingParams));
+        localStorage.setItem('localTrainingParams', JSON.stringify(localTrainingParams));
         scrollPageToBottom();
         startGetTrainingProgress();
       } else {
@@ -823,11 +833,16 @@ export default function TrainingPage(): JSX.Element {
     resetTrainingState();
 
     try {
-      const res = await retrain(trainingParams);
+      const res = await retrain({
+        ...localTrainingParams,
+        // Convert to legacy format for compatibility
+        local_model_name: localTrainingParams.model_name,
+        cloud_model_name: cloudTrainingParams.model_name
+      } as TrainingConfig);
 
       if (res.data.code === 0) {
         // Save training configuration and start polling
-        localStorage.setItem('trainingParams', JSON.stringify(trainingParams));
+        localStorage.setItem('localTrainingParams', JSON.stringify(localTrainingParams));
         scrollPageToBottom();
         startGetTrainingProgress();
       } else {
@@ -920,11 +935,11 @@ export default function TrainingPage(): JSX.Element {
 
     try {
       const res = await startCloudTraining({
-        base_model: trainingParams.cloud_model_name,
-        training_type: 'efficient_sft',
+        base_model: cloudTrainingParams.base_model,
+        training_type: cloudTrainingParams.training_type || 'efficient_sft',
         hyper_parameters: {
-          n_epochs: trainingParams.number_of_epochs,
-          learning_rate: trainingParams.learning_rate
+          n_epochs: cloudTrainingParams.hyper_parameters?.n_epochs,
+          learning_rate: cloudTrainingParams.hyper_parameters?.learning_rate
         }
       });
 
@@ -935,7 +950,7 @@ export default function TrainingPage(): JSX.Element {
           setCloudJobId(returnedJobId);
         }
         
-        localStorage.setItem('trainingParams', JSON.stringify(trainingParams));
+        localStorage.setItem('cloudTrainingParams', JSON.stringify(cloudTrainingParams));
         scrollPageToBottom();
         setTrainingType('cloud');
         startCloudTrainingPolling();
@@ -1026,8 +1041,10 @@ export default function TrainingPage(): JSX.Element {
           status={status}
           trainActionLoading={trainActionLoading}
           trainSuspended={trainingType === 'cloud' ? cloudTrainSuspended : trainSuspended}
-          trainingParams={trainingParams}
-          updateTrainingParams={updateTrainingParams}
+          localTrainingParams={localTrainingParams}
+          cloudTrainingParams={cloudTrainingParams}
+          updateLocalTrainingParams={updateLocalTrainingParams}
+          updateCloudTrainingParams={updateCloudTrainingParams}
           trainingType={trainingType}
           setTrainingType={setTrainingType}
           cloudTrainingStatus={cloudTrainingStatus}
