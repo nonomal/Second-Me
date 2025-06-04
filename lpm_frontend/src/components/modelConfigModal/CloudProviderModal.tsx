@@ -34,7 +34,7 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
   const [apiKey, setApiKey] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [originalConfig, setOriginalConfig] = useState<CloudProviderConfig | null>(null);
-  const [initialLoadDone, setInitialLoadDone] = useState<boolean>(false);
+  const [savedApiKey, setSavedApiKey] = useState<string>('');
 
   const configRef = useRef(cloudConfig);
   const updateConfigRef = useRef(updateCloudConfig);
@@ -44,60 +44,39 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
     updateConfigRef.current = updateCloudConfig;
   }, [cloudConfig, updateCloudConfig]);
 
-  // 立即获取最新配置，不等待模态框打开
+  // 预加载 API key
   useEffect(() => {
-    // 预加载API key，提前获取
-    const preloadApiKey = async () => {
+    const loadApiKey = async () => {
       try {
         const res = await getModelConfig();
-        if (res.data.data && res.data.data.cloud_service_api_key) {
-          // 只更新本地状态，不更新全局配置
-          setApiKey(res.data.data.cloud_service_api_key);
-          setInitialLoadDone(true);
+        if (res.data?.data?.cloud_service_api_key) {
+          setSavedApiKey(res.data.data.cloud_service_api_key);
         }
       } catch (error) {
-        console.error('Failed to preload API key:', error);
+        console.error('Failed to load API key:', error);
       }
     };
 
-    preloadApiKey();
+    loadApiKey();
   }, []);
 
+  // 当模态框打开时初始化状态
   useEffect(() => {
     if (open) {
-      setOriginalConfig({ ...configRef.current });
-      setProviderType(configRef.current.provider_type || '');
+      const currentConfig = { ...configRef.current };
+      setOriginalConfig(currentConfig);
+      setProviderType(currentConfig.provider_type || '');
       
-      // 如果预加载已完成，使用预加载的apiKey
-      if (initialLoadDone) {
-        // 已经有预加载的key，不需要再次加载
-        return;
-      }
-
-      if (configRef.current.provider_type === 'alibaba') {
-        setLoading(true);
-        getModelConfig()
-          .then((res) => {
-            if (res.data.data && res.data.data.cloud_service_api_key) {
-              setOriginalConfig({
-                ...configRef.current,
-                cloud_service_api_key: res.data.data.cloud_service_api_key
-              });
-              setApiKey(res.data.data.cloud_service_api_key); // Set local API Key
-            }
-          })
-          .catch((error) => {
-            console.error('Failed to get API key:', error);
-          })
-          .finally(() => {
-            setLoading(false);
-            setInitialLoadDone(true);
-          });
+      // 如果是 alibaba 类型，显示已保存的 API key
+      if (currentConfig.provider_type === 'alibaba') {
+        setApiKey(savedApiKey);
+      } else {
+        setApiKey('');
       }
     }
-  }, [open, initialLoadDone]);
+  }, [open, savedApiKey]);
 
-  const renderEmpty = () => {
+  const renderEmpty = useCallback(() => {
     return (
       <div className="flex flex-col items-center">
         <Image
@@ -112,7 +91,7 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
         </div>
       </div>
     );
-  };
+  }, []);
 
   const renderAlibabaCloud = useCallback(() => {
     return (
@@ -121,11 +100,9 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">API Key</label>
             <Input.Password
-              onChange={(e) => {
-                setApiKey(e.target.value); // Only update local state
-              }}
+              onChange={(e) => setApiKey(e.target.value)}
               placeholder="Enter your Alibaba Cloud API Key"
-              value={apiKey} // Use local state
+              value={apiKey}
             />
             <div className="mt-2 text-sm text-gray-500">
               You can find your API key in your{' '}
@@ -142,36 +119,56 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
         </div>
       </div>
     );
-  }, [apiKey]); // Add apiKey dependency
+  }, [apiKey]);
+
+  const renderNoneProvider = useCallback(() => {
+    return (
+      <div className="flex flex-col items-center">
+        <Image
+          alt="SecondMe Logo"
+          className="object-contain"
+          height={40}
+          src="/images/single_logo.png"
+          width={120}
+        />
+        <div className="text-gray-500 text-[18px] leading-[32px]">
+          None Cloud Provider Configured
+        </div>
+        <div className="text-sm text-gray-400 mt-2 text-center">
+          No cloud provider will be used for training. You can select "Model Studio" to configure Alibaba Cloud.
+        </div>
+      </div>
+    );
+  }, []);
 
   const handleUpdate = async (): Promise<void> => {
     try {
       setLoading(true);
 
-      if (providerType === 'alibaba' && apiKey) {
+      if (providerType === 'alibaba' && apiKey.trim()) {
         const modelConfigResponse = await getModelConfig();
 
-        if (modelConfigResponse.data.data) {
+        if (modelConfigResponse.data?.data) {
           const currentConfig = modelConfigResponse.data.data;
 
           await updateModelConfig({
             ...currentConfig,
-            cloud_service_api_key: apiKey // Use local apiKey state
+            cloud_service_api_key: apiKey.trim()
           });
 
-          // Update global state to alibaba
           updateConfigRef.current({
             ...configRef.current,
             provider_type: 'alibaba',
-            cloud_service_api_key: apiKey // Use local apiKey state
+            cloud_service_api_key: apiKey.trim()
           });
 
+          setSavedApiKey(apiKey.trim());
           message.success('API key has been successfully saved');
         }
       } else if (providerType === '') {
         const modelConfigResponse = await getModelConfig();
 
-        if (modelConfigResponse.data.data) {
+        if (modelConfigResponse.data?.data) {
           const currentConfig = modelConfigResponse.data.data;
 
           await updateModelConfig({
@@ -179,20 +176,18 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
             cloud_service_api_key: ''
           });
 
-          // Update global state to empty
           updateConfigRef.current({
             ...configRef.current,
             provider_type: '',
             cloud_service_api_key: ''
           });
 
+          setSavedApiKey('');
           message.success('Cloud provider configuration removed');
         }
       }
 
-      // Call save method and ensure state update
       await saveCloudConfig();
-
       onClose();
     } catch (error) {
       console.error('Error saving configuration:', error);
@@ -203,25 +198,40 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
   };
 
   const renderMainContent = useCallback(() => {
-    if (!providerType) {
-      return renderEmpty();
-    }
-
     if (providerType === 'alibaba') {
       return renderAlibabaCloud();
+    } else if (providerType === '') {
+      return renderNoneProvider();
     }
-
     return renderEmpty();
-  }, [providerType, renderAlibabaCloud]);
+  }, [providerType, renderAlibabaCloud, renderNoneProvider, renderEmpty]);
 
   const handleCancel = useCallback(() => {
     if (originalConfig) {
       updateConfigRef.current(originalConfig);
       setProviderType(originalConfig.provider_type || '');
-      setApiKey(originalConfig.cloud_service_api_key || ''); // Restore local API Key
+      setApiKey(originalConfig.cloud_service_api_key || '');
     }
     onClose();
   }, [onClose, originalConfig]);
+
+  const handleProviderTypeChange = useCallback((e: any) => {
+    const newProviderType = e.target.value;
+    setProviderType(newProviderType);
+
+    // 根据选择的提供商类型设置 API key
+    if (newProviderType === 'alibaba') {
+      setApiKey(savedApiKey); // 恢复已保存的 API key
+    } else {
+      setApiKey(''); // 清空 API key
+    }
+  }, [savedApiKey]);
+
+  // 计算 OK 按钮是否应该被禁用
+  const isOkDisabled = 
+    loading || 
+    providerType === '' || // 选择了 "None" 时禁用
+    (providerType === 'alibaba' && !apiKey.trim()); // 选择了 "Model Studio" 但没有 API key
 
   return (
     <Modal
@@ -229,7 +239,7 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
       confirmLoading={loading}
       destroyOnClose
       okButtonProps={{
-        disabled: (providerType === 'alibaba' && !apiKey) || loading
+        disabled: isOkDisabled
       }}
       onCancel={handleCancel}
       onOk={handleUpdate}
@@ -258,16 +268,7 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
           </p>
           <Radio.Group
             buttonStyle="solid"
-            onChange={(e) => {
-              const newProviderType = e.target.value;
-
-              setProviderType(newProviderType);
-
-              // If switching to non-alibaba type, clear local API Key
-              if (newProviderType !== 'alibaba') {
-                setApiKey('');
-              }
-            }}
+            onChange={handleProviderTypeChange}
             optionType="button"
             options={options}
             value={providerType}
@@ -286,5 +287,6 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
     </Modal>
   );
 };
+
 
 export default CloudProviderModal;
