@@ -37,6 +37,16 @@ const synthesisModeOptions = [
   { value: 'high', label: 'High' }
 ];
 
+const defaultCloudTrainingParams: CloudTrainingParams = {
+  model_name: '',
+  base_model: '',
+  data_synthesis_mode: 'medium', 
+  hyper_parameters: {
+    learning_rate: 0.0001,      
+    n_epochs: 3                 
+  }
+};
+
 const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
   modelConfig,
   isTraining,
@@ -52,18 +62,23 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
   const updateCloudConfig = useCloudProviderStore((state) => state.updateCloudConfig);
   const fetchCloudConfig = useCloudProviderStore((state) => state.fetchCloudConfig);
 
-  // useEffect(() => {
-  //   const handleShowCloudProviderModal = () => {
-  //     setOpenCloudProviderModal(true);
-  //   };
-
-  //   window.addEventListener(EVENT.SHOW_CLOUD_PROVIDER_MODAL, handleShowCloudProviderModal);
-  //   fetchCloudConfig();
-
-  //   return () => {
-  //     window.removeEventListener(EVENT.SHOW_CLOUD_PROVIDER_MODAL, handleShowCloudProviderModal);
-  //   };
-  // }, [fetchCloudConfig]);
+  // 初始化参数，确保所有参数都有默认值
+  useEffect(() => {
+    // 检查参数并设置默认值（如果缺少）
+    const mergedParams = {
+      ...defaultCloudTrainingParams,
+      ...trainingParams,
+      hyper_parameters: {
+        ...defaultCloudTrainingParams.hyper_parameters,
+        ...(trainingParams.hyper_parameters || {})
+      }
+    };
+    
+    // 只有在值不同时才更新
+    if (JSON.stringify(mergedParams) !== JSON.stringify(trainingParams)) {
+      updateTrainingParams(mergedParams);
+    }
+  }, []);
 
   const disabledChangeParams = useMemo(() => {
     return isTraining || trainSuspended;
@@ -360,7 +375,7 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
               onChange={handleSynthesisModeChange} // Use typed handler
               optionType="button"
               options={synthesisModeOptions}
-              value={trainingParams.data_synthesis_mode}
+              value={trainingParams.data_synthesis_mode || defaultCloudTrainingParams.data_synthesis_mode}
             />
             <span className="text-xs text-gray-500">
               Low: Fast data synthesis. Medium: Balanced synthesis and speed. High: Rich
@@ -521,7 +536,7 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
                     : undefined
                 }
                 step={0.0001}
-                value={trainingParams.hyper_parameters?.learning_rate}
+                value={trainingParams.hyper_parameters?.learning_rate || defaultCloudTrainingParams.hyper_parameters.learning_rate}
               />
               <div className="text-xs text-gray-500">
                 Enter a value between 0.00003 and 0.005 (recommended: 0.0001)
@@ -556,7 +571,7 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
                     : undefined
                 }
                 step={1}
-                value={trainingParams.hyper_parameters?.n_epochs}
+                value={trainingParams.hyper_parameters?.n_epochs || defaultCloudTrainingParams.hyper_parameters.n_epochs}
               />
               <div className="text-xs text-gray-500">
                 Enter an integer between 1 and 10 (recommended: 3)
