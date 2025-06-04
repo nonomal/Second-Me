@@ -97,6 +97,7 @@ export interface CloudTrainingParams {
   base_model: string;
   training_type?: string;
   hyper_parameters?: CloudHyperParameters;
+  data_synthesis_mode?: string;
   created_at?: string;
 }
 

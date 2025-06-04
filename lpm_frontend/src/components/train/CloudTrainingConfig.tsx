@@ -48,7 +48,6 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
   const [openCloudProviderModal, setOpenCloudProviderModal] = useState<boolean>(false);
   const [availableCloudModels, setAvailableCloudModels] = useState<CloudModel[]>([]);
   const [loadingModels, setLoadingModels] = useState<boolean>(false);
-  const [dataSynthesisMode, setDataSynthesisMode] = useState<string>('medium'); // Add local state for synthesis mode
   const cloudConfig = useCloudProviderStore((state) => state.cloudConfig);
   const updateCloudConfig = useCloudProviderStore((state) => state.updateCloudConfig);
   const fetchCloudConfig = useCloudProviderStore((state) => state.fetchCloudConfig);
@@ -209,8 +208,11 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
   }, [availableCloudModels]);
 
   const handleSynthesisModeChange = (e: RadioChangeEvent) => {
-    // Store synthesis mode in local state since it's not part of CloudTrainingParams
-    setDataSynthesisMode(e.target.value);
+    // Now data_synthesis_mode is part of CloudTrainingParams
+    updateTrainingParams({
+      ...trainingParams,
+      data_synthesis_mode: e.target.value
+    });
   };
 
 
@@ -358,7 +360,7 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
               onChange={handleSynthesisModeChange} // Use typed handler
               optionType="button"
               options={synthesisModeOptions}
-              value={dataSynthesisMode}
+              value={trainingParams.data_synthesis_mode}
             />
             <span className="text-xs text-gray-500">
               Low: Fast data synthesis. Medium: Balanced synthesis and speed. High: Rich
