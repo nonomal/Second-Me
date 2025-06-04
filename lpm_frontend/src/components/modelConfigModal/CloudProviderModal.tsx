@@ -34,6 +34,7 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
   const [apiKey, setApiKey] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [originalConfig, setOriginalConfig] = useState<CloudProviderConfig | null>(null);
+  const [initialLoadDone, setInitialLoadDone] = useState<boolean>(false);
 
   const configRef = useRef(cloudConfig);
   const updateConfigRef = useRef(updateCloudConfig);
@@ -43,11 +44,35 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
     updateConfigRef.current = updateCloudConfig;
   }, [cloudConfig, updateCloudConfig]);
 
+  // 立即获取最新配置，不等待模态框打开
+  useEffect(() => {
+    // 预加载API key，提前获取
+    const preloadApiKey = async () => {
+      try {
+        const res = await getModelConfig();
+        if (res.data.data && res.data.data.cloud_service_api_key) {
+          // 只更新本地状态，不更新全局配置
+          setApiKey(res.data.data.cloud_service_api_key);
+          setInitialLoadDone(true);
+        }
+      } catch (error) {
+        console.error('Failed to preload API key:', error);
+      }
+    };
+
+    preloadApiKey();
+  }, []);
+
   useEffect(() => {
     if (open) {
       setOriginalConfig({ ...configRef.current });
       setProviderType(configRef.current.provider_type || '');
-      setApiKey(configRef.current.cloud_service_api_key || '');
+      
+      // 如果预加载已完成，使用预加载的apiKey
+      if (initialLoadDone) {
+        // 已经有预加载的key，不需要再次加载
+        return;
+      }
 
       if (configRef.current.provider_type === 'alibaba') {
         setLoading(true);
@@ -66,10 +91,11 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
           })
           .finally(() => {
             setLoading(false);
+            setInitialLoadDone(true);
           });
       }
     }
-  }, [open]);
+  }, [open, initialLoadDone]);
 
   const renderEmpty = () => {
     return (
@@ -248,7 +274,13 @@ const CloudProviderModal = (props: IProps): JSX.Element => {
           />
         </div>
         <div className="w-full border-t border-gray-200 mt-1 mb-2" />
-        {renderMainContent()}
+        {loading ? (
+          <div className="flex items-center justify-center h-40">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          </div>
+        ) : (
+          renderMainContent()
+        )}
         <div className="w-full border-t border-gray-200 mt-4" />
       </div>
     </Modal>
