@@ -122,9 +122,17 @@ class TrainProcessService:
         try:
             # Mark step as in progress
             self.progress.mark_step_status(ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS, Status.IN_PROGRESS)
-            documents = self.list_documents() 
-            for doc in documents:
-                doc_id = doc.get("id")
+            
+            unembedding_docs = document_service._repository.find_unembedding()
+            logger.info(f"Found {len(unembedding_docs)} documents that need embedding generation")
+            
+            if not unembedding_docs:
+                logger.info("No documents need embedding generation, marking step as completed")
+                self.progress.mark_step_status(ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS, Status.COMPLETED)
+                return True
+                
+            for doc in unembedding_docs:
+                doc_id = doc.id
 
                 # Directly call document service instead of API
                 embedding = document_service.process_document_embedding(doc_id)
@@ -134,8 +142,9 @@ class TrainProcessService:
                     )
                     self.progress.mark_step_status(ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS, Status.FAILED)
                     return False
-                self.progress.mark_step_status(ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS, Status.COMPLETED)
-                logger.info(f"Successfully generated embedding for document {doc_id}") 
+                logger.info(f"Successfully generated embedding for document {doc_id}")
+            
+            self.progress.mark_step_status(ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS, Status.COMPLETED)
             return True
         except Exception as e:
             logger.error(f"Generate document embeddings failed: {str(e)}")
@@ -153,11 +162,17 @@ class TrainProcessService:
                 overlap=int(config.get("DOCUMENT_CHUNK_OVERLAP")),
             )
             documents = document_service.list_documents()
-            processed, failed = 0, 0
+            processed, failed, skipped = 0, 0, 0
 
             chunk_service = ChunkService()
             for doc in documents:
                 try:
+                    existing_chunks = document_service._repository.find_chunks(doc.id)
+                    if existing_chunks and len(existing_chunks) > 0:
+                        logger.info(f"Document {doc.id} already has {len(existing_chunks)} chunks, skipping...")
+                        skipped += 1
+                        continue
+                        
                     if not doc.raw_content:
                         logger.warning(f"Document {doc.id} has no content, skipping...")
                         failed += 1
@@ -176,6 +191,8 @@ class TrainProcessService:
                 except Exception as e:
                     logger.error(f"Failed to process document {doc.id}: {str(e)}")
                     failed += 1      
+            
+            logger.info(f"Chunk processing completed: {processed} processed, {skipped} skipped, {failed} failed")
             self.progress.mark_step_status(ProcessStep.CHUNK_DOCUMENT, Status.COMPLETED)
             return True
         except Exception as e:
@@ -520,7 +537,7 @@ class TrainProcessService:
         # Mark data as prepared
         self.l2_data_prepared = True
 
-        return self.l2_data
+        return self.l2_data   
     def train(self) -> bool:
         """Start model training"""
         try:
