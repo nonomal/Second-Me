@@ -218,7 +218,7 @@ def start_cloud_training():
     try:
         params_dir = Path("data/cloud_progress")
         if params_dir.exists():
-            import os
+            
             logger.info("Cleaning cloud_progress directory...")
             for file_path in params_dir.glob("*"):
                 if file_path.is_file():
@@ -234,12 +234,16 @@ def start_cloud_training():
         base_model = data.get("base_model")
         training_type = data.get("training_type", "efficient_sft")
         hyper_parameters = data.get("hyper_parameters", {})
+        data_synthesis_mode = data.get("data_synthesis_mode", "low")
+
+        os.environ["DATA_SYNTHESIS_MODE"] = data_synthesis_mode
         
         training_params = {
             "model_name": model_name,
             "base_model": base_model,
             "training_type": training_type,
             "hyper_parameters": hyper_parameters,
+            "data_synthesis_mode": data_synthesis_mode,
             "created_at": datetime.now().isoformat()
         }
         
@@ -448,7 +452,6 @@ def reset_cloud_training_progress():
         
         # Delete all related files
         files_to_delete = [
-            "cloud_training_params.json",  # Training parameters file
             "cloud_progress.json",         # Progress file
             "job_id.json"                 # Job ID file
         ]
@@ -482,16 +485,6 @@ def reset_cloud_training_progress():
         # Save initialized progress (only save once)
         new_progress_holder.save_progress()
         logger.info(f"Created new progress file with completely fresh state: {progress_file_path}")
-        
-        # Create an empty training parameters file to ensure old training service won't be loaded next time
-        empty_params = {
-            "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-            "reset": True
-        }
-        params_file = params_dir / "cloud_training_params.json"
-        with open(params_file, "w", encoding="utf-8") as f:
-            json.dump(empty_params, f, indent=2, ensure_ascii=False)
-        logger.info(f"Created empty training params file to prevent loading old service: {params_file}")
         
         return jsonify(APIResponse.success(message=f"Cloud training progress has been completely reset with a fresh state"))
     except Exception as e:

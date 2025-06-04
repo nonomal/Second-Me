@@ -138,7 +138,7 @@ class CloudProgress:
                             "completed": False,
                             "status": CloudStatus.PENDING,
                             "have_output": True,
-                            "path": "job_id.json"
+                            "path": "data/cloud_progress/job_id.json"
                         },
                         {
                             "name": "wait_for_fine_tune_completion",

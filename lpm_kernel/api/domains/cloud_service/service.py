@@ -119,7 +119,6 @@ class CloudService:
         logger.info(f"Fine-tuning job status: {status}")
 
         if status == "SUCCEEDED":
-            # 尝试从多个可能的字段获取模型ID
             output = response_data.get('output', {})
             self.model_id = output.get('finetuned_output') or output.get('model_id')
             logger.info(f"Fine-tuning successful! Model ID: {self.model_id}")
@@ -722,8 +721,6 @@ class CloudService:
                     # Calculate raw progress as a percentage of elapsed time vs total estimated time
                     raw_progress_percent = (fine_tune_elapsed / estimated_total_minutes) * 100
                     
-                    # Adjust progress: divide by 3 and add 66% (first two steps)
-                    # This ensures the progress goes from 66% to 100% during the fine-tuning step
                     adjusted_progress_percent = 66 + (raw_progress_percent / 3)
                     
                     # Cap at 99% (100% is reserved for completion)
@@ -821,21 +818,6 @@ class CloudService:
             {"id": "qwen2.5-32b-instruct"},
             {"id": "qwen2.5-72b-instruct"},
             
-
-            {"id": "qwen2-7b-instruct"},
-            {"id": "qwen2-72b-instruct"},
-            
-
-            {"id": "qwen1.5-7b-chat"},
-            {"id": "qwen1.5-14b-chat"},
-            {"id": "qwen1.5-72b-chat"},
-            
-
-            {"id": "qwen-turbo"},
-            {"id": "qwen-turbo-0624"},
-            {"id": "qwen-plus-0723"},
-            {"id": "qwen-vl-max-0201"},
-            {"id": "qwen-vl-plus"}
         ]
         
         logger.info(f"Returning {len(models)} models")

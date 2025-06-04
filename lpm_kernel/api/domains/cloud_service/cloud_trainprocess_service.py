@@ -112,8 +112,6 @@ class CloudTrainProcessService(TrainProcessService):
         """Prepare all necessary data for cloud training"""
         try:
             logger.info("Starting cloud training data preparation")
-
-            should_stop_after_current_step = self.is_stopped
             
             logger.info("Executing memory matrix activation steps...")
             stage_name = "activating_the_memory_matrix"
@@ -125,9 +123,6 @@ class CloudTrainProcessService(TrainProcessService):
             else:
 
                 logger.info("Step 1.1: Listing documents...")
- 
-                if should_stop_after_current_step:
-                    logger.info("Process has been stopped, will complete current stage and then stop")
 
                 if self.progress.is_step_completed(stage_name, "list_documents"):
                     logger.info("Step 'list_documents' already completed, skipping...")
@@ -136,7 +131,6 @@ class CloudTrainProcessService(TrainProcessService):
                         logger.error("Failed to list documents")
                         return PrepareDataResult.ERROR
             
-                # Update progress after completing first step
                 if stage:
                     stage["progress"] = 25.0  
                     stage["status"] = CloudStatus.IN_PROGRESS
@@ -146,12 +140,13 @@ class CloudTrainProcessService(TrainProcessService):
                         stage["steps"][0]["status"] = CloudStatus.COMPLETED
                     logger.info(f"Updated {stage_name} progress to 25% after completing list_documents")
                     self._update_overall_progress()
+                
+                if self.is_stopped:
+                    logger.info("Process has been stopped after completing list_documents, exiting.")
+                    return PrepareDataResult.STOPPED
             
                 # 2. Generate document embeddings
                 logger.info("Step 1.2: Generating document embeddings...")
-                if should_stop_after_current_step:
-                    logger.info("Process has been stopped, will complete current stage and then stop")
-
                 if self.progress.is_step_completed(stage_name, "generate_document_embeddings"):
                     logger.info("Step 'generate_document_embeddings' already completed, skipping...")
                 else:
@@ -168,13 +163,13 @@ class CloudTrainProcessService(TrainProcessService):
                         stage["steps"][1]["status"] = CloudStatus.COMPLETED
                     logger.info(f"Updated {stage_name} progress to 50% after completing generate_document_embeddings")
                     self._update_overall_progress()
+                # 步骤后检测停止信号
+                if self.is_stopped:
+                    logger.info("Process has been stopped after completing generate_document_embeddings, exiting.")
+                    return PrepareDataResult.STOPPED
             
                 # 3. Process document chunks
                 logger.info("Step 1.3: Processing document chunks...")
-                # Check if process should stop
-                if should_stop_after_current_step:
-                    logger.info("Process has been stopped, will complete current stage and then stop")
-                    # Continue with current step instead of returning immediately
                 if not super().process_chunks():
                     logger.error("Failed to process document chunks")
                     return PrepareDataResult.ERROR
@@ -189,12 +184,12 @@ class CloudTrainProcessService(TrainProcessService):
                     logger.info(f"Updated {stage_name} progress to 75% after completing process_chunks")
                     self._update_overall_progress()
             
+                if self.is_stopped:
+                    logger.info("Process has been stopped after completing process_chunks, exiting.")
+                    return PrepareDataResult.STOPPED
+            
                 # 4. Generate chunk embeddings
                 logger.info("Step 1.4: Generating chunk embeddings...")
-                # Check if process should stop
-                if should_stop_after_current_step:
-                    logger.info("Process has been stopped, will complete current stage and then stop")
-                    # Continue with current step instead of returning immediately
                 if not super().chunk_embedding():
                     logger.error("Failed to generate chunk embeddings")
                     return PrepareDataResult.ERROR
@@ -209,6 +204,10 @@ class CloudTrainProcessService(TrainProcessService):
                         stage["steps"][3]["status"] = CloudStatus.COMPLETED
                     logger.info(f"Updated {stage_name} progress to 100% and status to COMPLETED")
                     self._update_overall_progress()
+                
+                if self.is_stopped:
+                    logger.info("Process has been stopped after completing chunk_embedding, exiting.")
+                    return PrepareDataResult.STOPPED
             
 
             logger.info("Executing life narrative synthesis steps...")
@@ -222,9 +221,6 @@ class CloudTrainProcessService(TrainProcessService):
  
                 logger.info("Step 2.1: Extracting dimensional topics...")
  
-                if should_stop_after_current_step:
-                    logger.info("Process has been stopped, will complete current stage and then stop")
-
                 if self.progress.is_step_completed(stage_name, "extract_dimensional_topics"):
                     logger.info("Step 'extract_dimensional_topics' already completed, skipping...")
                 else:
@@ -242,12 +238,13 @@ class CloudTrainProcessService(TrainProcessService):
                         stage["steps"][0]["status"] = CloudStatus.COMPLETED
                     logger.info(f"Updated {stage_name} progress to 33% after completing extract_dimensional_topics")
                     self._update_overall_progress()
+
+                if self.is_stopped:
+                    logger.info("Process has been stopped after completing extract_dimensional_topics, exiting.")
+                    return PrepareDataResult.STOPPED
             
 
                 logger.info("Step 2.2: Generating biography...")
-                if should_stop_after_current_step:
-                    logger.info("Process has been stopped, will complete current stage and then stop")
-
                 if self.progress.is_step_completed(stage_name, "generate_biography"):
                     logger.info("Step 'generate_biography' already completed, skipping...")
                 else:
@@ -262,10 +259,12 @@ class CloudTrainProcessService(TrainProcessService):
                         stage["steps"][1]["status"] = CloudStatus.COMPLETED
                     logger.info(f"Updated {stage_name} progress to 66% after completing generate_biography")
                     self._update_overall_progress()
+                
+                if self.is_stopped:
+                    logger.info("Process has been stopped after completing generate_biography, exiting.")
+                    return PrepareDataResult.STOPPED
             
                 logger.info("Step 2.3: Mapping entity network...")
-                if should_stop_after_current_step:
-                    logger.info("Process has been stopped, will complete current stage and then stop")
                 if self.progress.is_step_completed(stage_name, "map_your_entity_network"):
                     logger.info("Step 'map_your_entity_network' already completed, skipping...")
                 else:
@@ -281,6 +280,10 @@ class CloudTrainProcessService(TrainProcessService):
                         stage["steps"][2]["status"] = CloudStatus.COMPLETED
                     logger.info(f"Updated {stage_name} progress to 100% and status to COMPLETED")
                     self._update_overall_progress()
+                
+                if self.is_stopped:
+                    logger.info("Process has been stopped after completing map_your_entity_network, exiting.")
+                    return PrepareDataResult.STOPPED
             
             logger.info("Executing training data preparation steps...")
             stage_name = "prepare_training_data_for_deep_comprehension"
@@ -290,8 +293,6 @@ class CloudTrainProcessService(TrainProcessService):
                 logger.info(f"Stage '{stage_name}' already completed, skipping...")
             else:
                 logger.info("Step 3.1: Decoding preference patterns...")
-                if should_stop_after_current_step:
-                    logger.info("Process has been stopped, will complete current stage and then stop")
                 if self.progress.is_step_completed(stage_name, "decode_preference_patterns"):
                     logger.info("Step 'decode_preference_patterns' already completed, skipping...")
                 else:
@@ -307,10 +308,13 @@ class CloudTrainProcessService(TrainProcessService):
                         stage["steps"][0]["status"] = CloudStatus.COMPLETED
                     logger.info(f"Updated {stage_name} progress to 33% after completing decode_preference_patterns")
                     self._update_overall_progress()
+
+                if self.is_stopped:
+                    logger.info("Process has been stopped after completing decode_preference_patterns, exiting.")
+                    return PrepareDataResult.STOPPED
             
                 logger.info("Step 3.2: Reinforcing identity...")
-                if should_stop_after_current_step:
-                    logger.info("Process has been stopped, will complete current stage and then stop")
+                
                 if self.progress.is_step_completed(stage_name, "reinforce_identity"):
                     logger.info("Step 'reinforce_identity' already completed, skipping...")
                 else:
@@ -325,10 +329,12 @@ class CloudTrainProcessService(TrainProcessService):
                         stage["steps"][1]["status"] = CloudStatus.COMPLETED
                     logger.info(f"Updated {stage_name} progress to 66% after completing reinforce_identity")
                     self._update_overall_progress()
+                
+                if self.is_stopped:
+                    logger.info("Process has been stopped after completing reinforce_identity, exiting.")
+                    return PrepareDataResult.STOPPED
             
                 logger.info("Step 3.3: Augmenting content retention...")
-                if should_stop_after_current_step:
-                    logger.info("Process has been stopped, will complete current stage and then stop")
                 if self.progress.is_step_completed(stage_name, "augment_content_retention"):
                     logger.info("Step 'augment_content_retention' already completed, skipping...")
                 else:
@@ -344,10 +350,14 @@ class CloudTrainProcessService(TrainProcessService):
                         stage["steps"][2]["status"] = CloudStatus.COMPLETED
                     logger.info(f"Updated {stage_name} progress to 100% and status to COMPLETED")
                     self._update_overall_progress()
+                
+                if self.is_stopped:
+                    logger.info("Process has been stopped after completing augment_content_retention, exiting.")
+                    return PrepareDataResult.STOPPED
             
             self._update_overall_progress()
             
-            if should_stop_after_current_step:
+            if self.is_stopped:
                 logger.info("Data preparation completed current step, stopping as requested")
                 return PrepareDataResult.STOPPED
                 
