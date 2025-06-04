@@ -121,188 +121,94 @@ class TrainProcessService:
             return []
 
     def generate_document_embeddings(self) -> bool:
-        """Process embeddings for all documents with incremental processing"""
+        """Process embeddings for all documents"""
         try:
             # Mark step as in progress
             self.progress.mark_step_status(ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS, Status.IN_PROGRESS)
-            
-            # Get documents that need embedding processing (INITIALIZED or FAILED status)
-            unembedded_documents = document_service._repository.find_unembedding()
-            
-            if not unembedded_documents:
-                logger.info("No documents need embedding generation - all documents already processed")
+            documents = self.list_documents() 
+            for doc in documents:
+                doc_id = doc.get("id")
+
+                # Directly call document service instead of API
+                embedding = document_service.process_document_embedding(doc_id)
+                if embedding is None:
+                    logger.error(
+                        f"Generate document embeddings failed for doc_id: {doc_id}"
+                    )
+                    self.progress.mark_step_status(ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS, Status.FAILED)
+                    return False
                 self.progress.mark_step_status(ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS, Status.COMPLETED)
-                return True
-            
-            total_documents = len(unembedded_documents)
-            processed_count = 0
-            
-            logger.info(f"Found {total_documents} documents that need embedding processing")
-            
-            for doc in unembedded_documents:
-                doc_id = doc.id
-                try:
-                    logger.info(f"Processing document {doc_id} ({processed_count + 1}/{total_documents})")
-                    
-                    # Process document embedding
-                    embedding = document_service.process_document_embedding(doc_id)
-                    if embedding is not None:
-                        processed_count += 1
-                        logger.info(f"Successfully generated embedding for document {doc_id}")
-                        
-                        # Update progress immediately after each document
-                        progress_percentage = (processed_count / total_documents) * 100
-                        self.progress.update_step_progress(
-                            ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS,
-                            progress_percentage,
-                            f"Processed {processed_count}/{total_documents} documents"
-                        )
-                    else:
-                        logger.error(f"Failed to generate embedding for document {doc_id}")
-                        
-                except Exception as e:
-                    logger.error(f"Error processing document {doc_id}: {str(e)}")
-                    # Document status is already updated in process_document_embedding
-                    continue
-            
-            # Mark step as completed
-            self.progress.mark_step_status(ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS, Status.COMPLETED)
-            logger.info(f"Document embedding generation completed: {processed_count}/{total_documents} documents processed successfully")
+                logger.info(f"Successfully generated embedding for document {doc_id}") 
             return True
-            
         except Exception as e:
             logger.error(f"Generate document embeddings failed: {str(e)}")
             self.progress.mark_step_status(ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS, Status.FAILED)
             return False
 
     def process_chunks(self) -> bool:
-        """Process document chunks with incremental processing"""
+        """Process document chunks"""
         try:
             # Mark step as in progress
             self.progress.mark_step_status(ProcessStep.CHUNK_DOCUMENT, Status.IN_PROGRESS)
-            
             config = Config.from_env()
             chunker = DocumentChunker(
                 chunk_size=int(config.get("DOCUMENT_CHUNK_SIZE")),
                 overlap=int(config.get("DOCUMENT_CHUNK_OVERLAP")),
             )
-            
-            # Get all documents
             documents = document_service.list_documents()
-            total_documents = len(documents)
-            processed_count = 0
-            failed_count = 0
+            processed, failed = 0, 0
 
             chunk_service = ChunkService()
-            
-            logger.info(f"Processing chunks for {total_documents} documents")
-            
             for doc in documents:
                 try:
                     if not doc.raw_content:
                         logger.warning(f"Document {doc.id} has no content, skipping...")
-                        failed_count += 1
+                        failed += 1
                         continue
 
-                    # Check if chunks already exist for this document
-                    existing_chunks = document_service._repository.find_chunks(doc.id)
-                    if existing_chunks:
-                        logger.info(f"Document {doc.id} already has {len(existing_chunks)} chunks, skipping chunk creation")
-                        processed_count += 1
-                    else:
-                        # Split into chunks and save
-                        chunks = chunker.split(doc.raw_content)
-                        for chunk in chunks:
-                            chunk.document_id = doc.id
-                            chunk_service.save_chunk(chunk)
+                    # Split into chunks and save
+                    chunks = chunker.split(doc.raw_content)
+                    for chunk in chunks:
+                        chunk.document_id = doc.id
+                        chunk_service.save_chunk(chunk)
 
-                        processed_count += 1
-                        logger.info(f"Document {doc.id} processed: {len(chunks)} new chunks created")
-                    
-                    # Update progress immediately after each document
-                    progress_percentage = (processed_count / total_documents) * 100
-                    self.progress.update_step_progress(
-                        ProcessStep.CHUNK_DOCUMENT,
-                        progress_percentage,
-                        f"Processed {processed_count}/{total_documents} documents"
+                    processed += 1
+                    logger.info(
+                        f"Document {doc.id} processed: {len(chunks)} chunks created"
                     )
-                    
                 except Exception as e:
                     logger.error(f"Failed to process document {doc.id}: {str(e)}")
-                    failed_count += 1
-                    
+                    failed += 1      
             self.progress.mark_step_status(ProcessStep.CHUNK_DOCUMENT, Status.COMPLETED)
-            logger.info(f"Chunk processing completed: {processed_count} processed, {failed_count} failed")
             return True
-            
         except Exception as e:
             logger.error(f"Process chunks failed: {str(e)}")
             self.progress.mark_step_status(ProcessStep.CHUNK_DOCUMENT, Status.FAILED)
             return False
 
     def chunk_embedding(self) -> bool:
-        """Process embeddings for all document chunks with incremental processing"""
+        """Process embeddings for all document chunks"""
         try:
             # Mark step as in progress
             self.progress.mark_step_status(ProcessStep.CHUNK_EMBEDDING, Status.IN_PROGRESS)
-            
-            # Get all documents and check which chunks need embedding
-            documents = document_service.list_documents()
-            total_documents = len(documents)
-            processed_documents = 0
-            
-            logger.info(f"Checking chunk embeddings for {total_documents} documents")
-            
+            documents = self.list_documents()
             for doc in documents:
-                doc_id = doc.id
+                doc_id = doc.get("id")
                 try:
-                    # Get chunks for this document
-                    chunks = document_service._repository.find_chunks(doc_id)
-                    if not chunks:
-                        logger.info(f"No chunks found for document {doc_id}, skipping")
-                        processed_documents += 1
+                    # Directly call document service to generate chunk embeddings
+                    processed_chunks = document_service.generate_document_chunk_embeddings(doc_id)
+                    if not processed_chunks:
+                        logger.warning(f"No chunks to process for document: {doc_id}")
                         continue
-                    
-                    # Check which chunks need embedding
-                    chunks_without_embedding = [chunk for chunk in chunks if not chunk.has_embedding]
-                    
-                    if not chunks_without_embedding:
-                        logger.info(f"All {len(chunks)} chunks for document {doc_id} already have embeddings, skipping")
-                        processed_documents += 1
-                    else:
-                        logger.info(f"Processing embeddings for {len(chunks_without_embedding)} chunks in document {doc_id}")
-                        
-                        # Process chunk embeddings incrementally
-                        processed_chunks = document_service.embedding_service.generate_chunk_embeddings(chunks_without_embedding)
-                        
-                        # Update database status for processed chunks
-                        success_count = 0
-                        for chunk_dto in processed_chunks:
-                            if chunk_dto.has_embedding:
-                                document_service._repository.update_chunk_embedding_status(chunk_dto.id, True)
-                                success_count += 1
-                        
-                        logger.info(f"Successfully processed {success_count}/{len(chunks_without_embedding)} chunk embeddings for document {doc_id}")
-                        processed_documents += 1
-                    
-                    # Update progress immediately after each document
-                    progress_percentage = (processed_documents / total_documents) * 100
-                    self.progress.update_step_progress(
-                        ProcessStep.CHUNK_EMBEDDING,
-                        progress_percentage,
-                        f"Processed {processed_documents}/{total_documents} documents"
-                    )
-                    
                 except Exception as e:
-                    logger.error(f"Error processing chunk embeddings for document {doc_id}: {str(e)}")
-                    processed_documents += 1
-                    continue
-            
-            # Mark step as completed
+                    logger.error(
+                        f"Generate chunk embeddings failed for doc_id: {doc_id}: {str(e)}"
+                    )
+                    self.progress.mark_step_status(ProcessStep.CHUNK_EMBEDDING, Status.FAILED)
+                    return False
+            # All documents' chunks processed successfully
             self.progress.mark_step_status(ProcessStep.CHUNK_EMBEDDING, Status.COMPLETED)
-            logger.info(f"Chunk embedding processing completed: {processed_documents}/{total_documents} documents processed")
             return True
-            
         except Exception as e:
             logger.error(f"Generate chunk embeddings failed: {str(e)}")
             self.progress.mark_step_status(ProcessStep.CHUNK_EMBEDDING, Status.FAILED)
@@ -1005,9 +911,10 @@ class TrainProcessService:
             
             # Check if training output exists
             if not os.path.exists(paths["personal_dir"]):
-                logger.error(f"Model '{self.model_name}' training output does not exist, please train model first")
-                self.progress.mark_step_status(ProcessStep.MERGE_WEIGHTS, Status.FAILED)
-                return False
+                return jsonify(APIResponse.error(
+                    message=f"Model '{model_name}' training output does not exist, please train model first",
+                    code=400
+                ))
 
             # Ensure merged output directory exists
             os.makedirs(paths["merged_dir"], exist_ok=True)
@@ -1089,6 +996,7 @@ class TrainProcessService:
             # Save training parameters to a JSON file in the GGUF directory
             training_params_path = os.path.join(gguf_dir, f"{timestamp}.json")
             try:
+                # 添加模型路径到训练参数
                 training_params["model_path"] = gguf_path
                 
                 with open(training_params_path, 'w', encoding='utf-8') as f:
@@ -1126,9 +1034,10 @@ class TrainProcessService:
                 with DatabaseSession.session() as session:
                     update_count = session.query(Memory).filter(Memory.status == "active").update(
                         {"is_trained": True},
-                        synchronize_session=False  
+                        synchronize_session=False  # 不同步会话状态，提高性能
                     )
                     
+                    # 提交更改
                     session.commit()
                 logger.info(f"Updated training status for {update_count} memory records")
             except Exception as e:
@@ -1176,9 +1085,9 @@ class TrainProcessService:
             return True
         except Exception as e:
             logger.error(f"Error checking training conditions: {str(e)}", exc_info=True)
-            if self.progress.progress.data["current_stage"]:
-                current_stage_name = self.progress.progress.data["current_stage"]
-                current_stage = next((s for s in self.progress.progress.data["stages"] if s["name"] == current_stage_name), None)
+            if self.progress.progress.current_stage:
+                current_step = self.progress.progress.data["current_stage"]
+                current_stage = next((s for s in self.progress.progress.data["stages"] if s["name"] == current_stage), None)
                 if current_stage and current_stage["current_step"]:
                     step = ProcessStep(current_stage["current_step"].lower().replace(" ", "_"))
                     self.progress.mark_step_status(step, Status.FAILED)
