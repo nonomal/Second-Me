@@ -1,3 +1,9 @@
+'''
+Author       : wyx-hhhh
+Date         : 2025-05-21
+LastEditTime : 2025-05-30
+Description  : 
+'''
 import aiohttp
 import logging
 from lpm_kernel.api.domains.upload.TrainingTags import TrainingTags
@@ -11,6 +17,8 @@ import requests
 from lpm_kernel.api.common.responses import ResponseHandler
 from lpm_kernel.api.domains.loads.load_service import LoadService
 from typing import Optional, List, Dict
+import os  
+from pathlib import Path 
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +65,115 @@ class RegistryClient:
         return {
             "Authorization": f"Bearer {instance_id}:{instance_password}"
         }
+
+    def _get_service_status_file_path(self):
+        """Get the path for service status file"""
+        return os.path.join(os.getcwd(), "data", "service_status.json")
+
+    def _get_current_service_type(self):
+        """
+        Get current active service type from service status file
+        
+        Returns:
+            tuple: (service_type, model_data) where service_type is 'local' or 'cloud'
+        """
+        try:
+            status_file_path = self._get_service_status_file_path()
+            if not os.path.exists(status_file_path):
+                logger.warning("Service status file not found, defaulting to local service")
+                return "local", {}
+            
+            with open(status_file_path, 'r', encoding='utf-8') as f:
+                status_data = json.load(f)
+            
+            service_type = status_data.get("service_type", "local")
+            model_data = status_data.get("model_data", {})
+            status = status_data.get("status", "inactive")
+            
+            if status != "active":
+                logger.warning(f"Service status is {status}, defaulting to local service")
+                return "local", {}
+            
+            logger.info(f"Current active service type: {service_type}")
+            return service_type, model_data
+            
+        except Exception as e:
+            logger.error(f"Failed to read service status file: {str(e)}")
+            return "local", {}
+
+    async def _check_local_service_status(self):
+        """
+        Check if local service is available
+        
+        Returns:
+            bool: True if local service is available
+        """
+        try:
+            config = Config.from_env()
+            status_url = f"{config.KERNEL2_SERVICE_URL}/api/kernel2/llama/status"
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(status_url, timeout=aiohttp.ClientTimeout(total=5)) as response:
+                    if response.status == 200:
+                        status_data = await response.json()
+                        return status_data.get("data", {}).get("is_loaded", False)
+                    
+        except Exception as e:
+            logger.error(f"Failed to check local service status: {str(e)}")
+        
+        return False
+
+    async def _check_cloud_service_status(self):
+        """
+        Check if cloud service is available
+        
+        Returns:
+            bool: True if cloud service is available
+        """
+        try:
+            config = Config.from_env()
+            status_url = f"{config.KERNEL2_SERVICE_URL}/api/cloud_service/service/status"
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(status_url, timeout=aiohttp.ClientTimeout(total=5)) as response:
+                    if response.status == 200:
+                        status_data = await response.json()
+                        return status_data.get("data", {}).get("status") == "active"
+                    
+        except Exception as e:
+            logger.error(f"Failed to check cloud service status: {str(e)}")
+        
+        return False
+
+    def _transform_request_for_cloud(self, request_data: dict, model_data: dict):
+        """
+        Transform OpenAI-compatible request for cloud inference API
+        
+        Args:
+            request_data: Original request data
+            model_data: Model data from service status
+            
+        Returns:
+            dict: Transformed request for cloud inference
+        """
+        cloud_request = {
+            "messages": request_data.get("messages", []),
+            "model_id": model_data.get("model_id", ""),
+            "temperature": request_data.get("temperature", 0.1),
+            "max_tokens": request_data.get("max_tokens", 2000),
+            "stream": request_data.get("stream", True),
+            "enable_l0_retrieval": request_data.get("enable_l0_retrieval", False),
+            "enable_l1_retrieval": request_data.get("enable_l1_retrieval", False),
+            "role_id": request_data.get("role_id")
+        }
+        
+        metadata = request_data.get("metadata", {})
+        if metadata:
+            cloud_request["enable_l0_retrieval"] = metadata.get("enable_l0_retrieval", False)
+            cloud_request["enable_l1_retrieval"] = metadata.get("enable_l1_retrieval", False)
+            cloud_request["role_id"] = metadata.get("role_id")
+        
+        return cloud_request
 
     def get_ws_url(self, instance_id: str, instance_password: str) -> str:
         """
@@ -318,7 +435,7 @@ class RegistryClient:
             return False
 
     async def handle_messages(self, websocket):
-        """Handle received WebSocket messages"""
+        """Handle received WebSocket messages with intelligent routing"""
         try:
             while True:
                 try:
@@ -331,81 +448,18 @@ class RegistryClient:
                     if message_type == "heartbeat_ack":
                         continue
                     elif message_type == "chat":
-                        # Handle chat request
+                        # Handle chat request with intelligent routing
                         try:
                             request_data = data.get("request", {})
                             logger.info(f"[Request details: {json.dumps(request_data, ensure_ascii=False)}")
                             
-                            # Call chat interface
-                            async with aiohttp.ClientSession() as session:
-                                logger.info(f"Preparing to send request to chat interface")
-                                config = Config.from_env()
-                                kernel2_url = f"{config.KERNEL2_SERVICE_URL}/api/kernel2/chat"
-                                async with session.post(
-                                    kernel2_url,
-                                    json=request_data,
-                                    headers={
-                                        "Content-Type": "application/json",
-                                        "Accept": "text/event-stream",  # Specify to accept SSE response
-                                        "Cache-Control": "no-cache",
-                                        "Connection": "keep-alive"
-                                    },
-                                    timeout=aiohttp.ClientTimeout(total=None),  # Disable timeout
-                                    chunked=True  # Enable chunked transfer
-                                ) as response:
-                                    # Check response status
-                                    logger.info(f"Response status code: {response.status}")
-                                    if response.status != 200:
-                                        error_text = await response.text()
-                                        logger.error(f"[request_id: {data.get('request_id')}] Failed to call chat interface: {error_text}")
-                                        await websocket.send(json.dumps({
-                                            "type": "chat_response",
-                                            "request_id": data.get("request_id"),
-                                            "error": f"Failed to call chat interface: {error_text}"
-                                        }))
-                                        continue
-
-                                    logger.debug(f"Starting to read streaming response")
-                                    message_count = 0
-                                    
-                                    # Direct forwarding of streaming response
-                                    async for line in response.content:
-                                        if line:
-                                            try:
-                                                # Convert bytes to string
-                                                decoded_line = line.decode('utf-8')
-
-                                                logger.debug(f"[request_id: {data.get('request_id')}] Received raw data: {decoded_line.strip()}")
-                                                
-                                                # Check if it's SSE format data
-                                                if decoded_line.startswith("data: "):
-                                                    message_count += 1
-                                                    data_content = decoded_line[6:].strip()
-                                                    # logger.info(f"[request_id: {data.get('request_id')}] Processing message {message_count}")
-                                                    
-                                                    # Check if it's a completion marker
-                                                    if data_content == "[DONE]":
-
-                                                        logger.info(f"[request_id: {data.get('request_id')}] Received completion marker, processed {message_count} messages in total")
-                                                        await websocket.send(json.dumps({
-                                                            "type": "chat_response",
-                                                            "request_id": data.get("request_id"),
-                                                            "done": True
-                                                        }))
-                                                        continue
-                                                    
-                                                    # Directly forward original SSE data
-                                                    await websocket.send(json.dumps({
-                                                        "type": "chat_response",
-                                                        "request_id": data.get("request_id"),
-                                                        "raw_sse": data_content,  # Contains original SSE data
-                                                        "done": False
-                                                    }))
-                                                    logger.debug(f"[requestId: {data.get('request_id')}] Forwarded SSE message #{message_count}")
-                                            except UnicodeDecodeError as e:
-                                                logger.error(f"[requestId: {data.get('request_id')}] Failed to decode response data: {str(e)}")
-                                            except Exception as e:
-                                                logger.error(f"[requestId: {data.get('request_id')}] Error processing response data: {str(e)}, type: {type(e).__name__}")
+                            service_type, model_data = self._get_current_service_type()
+                            logger.info(f"Current service type: {service_type}")
+                            
+                            if service_type == "cloud":
+                                await self._handle_cloud_inference(websocket, data, request_data, model_data)
+                            else:
+                                await self._handle_local_chat(websocket, data, request_data)
 
                         except Exception as e:
                             logger.error(f"Failed to process chat request: {str(e)}")
@@ -426,6 +480,149 @@ class RegistryClient:
         except Exception as e:
             logger.error(f"Message processing loop failed: {str(e)}")
             raise
+
+    async def _handle_local_chat(self, websocket, data, request_data):
+        """Handle chat request using local chat interface"""
+        async with aiohttp.ClientSession() as session:
+            logger.info(f"Routing to local chat interface")
+            config = Config.from_env()
+            kernel2_url = f"{config.KERNEL2_SERVICE_URL}/api/kernel2/chat"
+            
+            async with session.post(
+                kernel2_url,
+                json=request_data,
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "text/event-stream",
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive"
+                },
+                timeout=aiohttp.ClientTimeout(total=None),
+                chunked=True
+            ) as response:
+                # Check response status
+                logger.info(f"Local chat response status: {response.status}")
+                if response.status != 200:
+                    error_text = await response.text()
+                    logger.error(f"[request_id: {data.get('request_id')}] Failed to call local chat interface: {error_text}")
+                    await websocket.send(json.dumps({
+                        "type": "chat_response",
+                        "request_id": data.get("request_id"),
+                        "error": f"Failed to call local chat interface: {error_text}"
+                    }))
+                    return
+
+                logger.debug(f"Starting to read local chat streaming response")
+                message_count = 0
+                
+                # Direct forwarding of streaming response
+                async for line in response.content:
+                    if line:
+                        try:
+                            # Convert bytes to string
+                            decoded_line = line.decode('utf-8')
+                            logger.debug(f"[request_id: {data.get('request_id')}] Received raw data: {decoded_line.strip()}")
+                            
+                            # Check if it's SSE format data
+                            if decoded_line.startswith("data: "):
+                                message_count += 1
+                                data_content = decoded_line[6:].strip()
+                                
+                                # Check if it's a completion marker
+                                if data_content == "[DONE]":
+                                    logger.info(f"[request_id: {data.get('request_id')}] Local chat completed, processed {message_count} messages")
+                                    await websocket.send(json.dumps({
+                                        "type": "chat_response",
+                                        "request_id": data.get("request_id"),
+                                        "done": True
+                                    }))
+                                    continue
+                                
+                                # Directly forward original SSE data
+                                await websocket.send(json.dumps({
+                                    "type": "chat_response",
+                                    "request_id": data.get("request_id"),
+                                    "raw_sse": data_content,
+                                    "done": False
+                                }))
+                                logger.debug(f"[requestId: {data.get('request_id')}] Forwarded local chat SSE message #{message_count}")
+                        except UnicodeDecodeError as e:
+                            logger.error(f"[requestId: {data.get('request_id')}] Failed to decode local chat response: {str(e)}")
+                        except Exception as e:
+                            logger.error(f"[requestId: {data.get('request_id')}] Error processing local chat response: {str(e)}")
+
+    async def _handle_cloud_inference(self, websocket, data, request_data, model_data):
+        """Handle chat request using cloud inference interface"""
+        # Transform request for cloud inference API
+        cloud_request = self._transform_request_for_cloud(request_data, model_data)
+        
+        async with aiohttp.ClientSession() as session:
+            logger.info(f"Routing to cloud inference interface with model: {model_data.get('model_id', 'unknown')}")
+            config = Config.from_env()
+            cloud_url = f"{config.KERNEL2_SERVICE_URL}/api/cloud_service/train/inference"
+            
+            async with session.post(
+                cloud_url,
+                json=cloud_request,
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "text/event-stream",
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive"
+                },
+                timeout=aiohttp.ClientTimeout(total=None),
+                chunked=True
+            ) as response:
+                # Check response status
+                logger.info(f"Cloud inference response status: {response.status}")
+                if response.status != 200:
+                    error_text = await response.text()
+                    logger.error(f"[request_id: {data.get('request_id')}] Failed to call cloud inference interface: {error_text}")
+                    await websocket.send(json.dumps({
+                        "type": "chat_response",
+                        "request_id": data.get("request_id"),
+                        "error": f"Failed to call cloud inference interface: {error_text}"
+                    }))
+                    return
+
+                logger.debug(f"Starting to read cloud inference streaming response")
+                message_count = 0
+                
+                # Direct forwarding of streaming response
+                async for line in response.content:
+                    if line:
+                        try:
+                            # Convert bytes to string
+                            decoded_line = line.decode('utf-8')
+                            logger.debug(f"[request_id: {data.get('request_id')}] Received cloud raw data: {decoded_line.strip()}")
+                            
+                            # Check if it's SSE format data
+                            if decoded_line.startswith("data: "):
+                                message_count += 1
+                                data_content = decoded_line[6:].strip()
+                                
+                                # Check if it's a completion marker
+                                if data_content == "[DONE]":
+                                    logger.info(f"[request_id: {data.get('request_id')}] Cloud inference completed, processed {message_count} messages")
+                                    await websocket.send(json.dumps({
+                                        "type": "chat_response",
+                                        "request_id": data.get("request_id"),
+                                        "done": True
+                                    }))
+                                    continue
+                                
+                                # Directly forward original SSE data
+                                await websocket.send(json.dumps({
+                                    "type": "chat_response",
+                                    "request_id": data.get("request_id"),
+                                    "raw_sse": data_content,
+                                    "done": False
+                                }))
+                                logger.debug(f"[requestId: {data.get('request_id')}] Forwarded cloud inference SSE message #{message_count}")
+                        except UnicodeDecodeError as e:
+                            logger.error(f"[requestId: {data.get('request_id')}] Failed to decode cloud inference response: {str(e)}")
+                        except Exception as e:
+                            logger.error(f"[requestId: {data.get('request_id')}] Error processing cloud inference response: {str(e)}")
 
     def list_uploads(self, page_no: int = 1, page_size: int = 10, status: Optional[List[str]] = None):
         """Get list of registered Upload instances with pagination and status filter

@@ -31,13 +31,23 @@ class RequirementEnhancementStrategy(SystemPromptStrategy):
         # Add knowledge retrieval results if enabled
         knowledge_sections = []
         
-        if request.enable_l0_retrieval:
-            l0_knowledge = default_retriever.retrieve(request.message)
+        enable_l0 = request.metadata.get('enable_l0_retrieval', False) if request.metadata else False
+        enable_l1 = request.metadata.get('enable_l1_retrieval', False) if request.metadata else False
+        
+        # Get user message from messages array
+        user_message = ""
+        for msg in request.messages:
+            if msg.get("role") == "user":
+                user_message = msg.get("content", "")
+                break
+        
+        if enable_l0 and user_message:
+            l0_knowledge = default_retriever.retrieve(user_message)
             if l0_knowledge:
                 knowledge_sections.append(f"Reference knowledge:\n{l0_knowledge}")
                 
-        if request.enable_l1_retrieval:
-            l1_knowledge = default_l1_retriever.retrieve(request.message)
+        if enable_l1 and user_message:
+            l1_knowledge = default_l1_retriever.retrieve(user_message)
             if l1_knowledge:
                 knowledge_sections.append(f"Reference shades:\n{l1_knowledge}")
                 

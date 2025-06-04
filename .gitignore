@@ -28,6 +28,7 @@ data/uploads/*
 data/progress/*
 lpm_frontend/node_modules
 lpm_frontend/yarn.lock
+job_id.json
 
 # L2 Model Storage
 resources/model/output/merged_model/*
@@ -64,6 +65,7 @@ resources/L2/data/*
 !resources/L2/data/.gitkeep
 
 resources/model/output/gguf/*
+!resources/model/output/gguf/.gitkeep
 resources/L2/base_models/*
 logs/*.log
 logs/train/*.log

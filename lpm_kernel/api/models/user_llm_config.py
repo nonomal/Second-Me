@@ -26,6 +26,9 @@ class UserLLMConfig(Base):
     thinking_endpoint = Column(String(200), nullable=True, comment='Thinking API endpoint')
     thinking_api_key = Column(String(200), nullable=True, comment='Thinking API key')
     
+    # Cloud Service configuration
+    cloud_service_api_key = Column(String(200), nullable=True, comment='Cloud Service API key')
+    
     created_at = Column(DateTime, default=datetime.utcnow, comment='Creation time')
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment='Update time')
 
@@ -47,6 +50,7 @@ class UserLLMConfig(Base):
             'thinking_model_name': self.thinking_model_name,
             'thinking_endpoint': self.thinking_endpoint,
             'thinking_api_key': self.thinking_api_key,
+            'cloud_service_api_key': self.cloud_service_api_key,
             'created_at': self.created_at,
             'updated_at': self.updated_at
         }
@@ -67,6 +71,7 @@ class UserLLMConfig(Base):
             thinking_model_name=data.get('thinking_model_name'),
             thinking_endpoint=data.get('thinking_endpoint'),
             thinking_api_key=data.get('thinking_api_key'),
+            cloud_service_api_key=data.get('cloud_service_api_key'),
             created_at=data.get('created_at'),
             updated_at=data.get('updated_at')
         )

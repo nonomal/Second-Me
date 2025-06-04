@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, String, BigInteger, JSON, DateTime, Enum
+from sqlalchemy import Column, String, BigInteger, JSON, DateTime, Enum, Boolean
 from sqlalchemy.sql import func
 from lpm_kernel.common.repository.database_session import Base
 import os
@@ -20,6 +20,7 @@ class Memory(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     status = Column(Enum("active", "deleted"), nullable=False, default="active")
+    is_trained = Column(Boolean, nullable=False, default=False)  
 
     def __init__(self, name, size, path, metadata=None):
         import uuid
@@ -35,6 +36,8 @@ class Memory(Base):
         # set default time
         self.created_at = datetime.now()
         self.updated_at = datetime.now()
+        # set default training status
+        self.is_trained = False
 
     def to_dict(self):
         """Convert to dictionary, including document_id"""
@@ -45,6 +48,7 @@ class Memory(Base):
             "path": self.path,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "meta_data": self.meta_data,
+            "is_trained": self.is_trained,
         }
         if self.document_id:
             result["document_id"] = self.document_id

@@ -1,5 +1,6 @@
 import { Request } from '../utils/request';
 import type { CommonResponse, EmptyResponse } from '../types/responseModal';
+import type { ModelInfo } from './model';
 
 interface ProcessInfo {
   cmdline: string[];
@@ -21,7 +22,7 @@ interface StartTrainResponse {
 export type StepStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'suspended';
 export type StageStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'suspended';
 
-interface TrainStep {
+export interface TrainStep { // Add export here
   completed: boolean;
   current_file?: string;
   name: string;
@@ -30,7 +31,7 @@ interface TrainStep {
   have_output?: boolean;
 }
 
-interface TrainStage {
+export interface TrainStage { // Add export here
   name: string;
   progress: number;
   status: StageStatus;
@@ -74,6 +75,39 @@ export interface TrainAdvanceParams {
   is_cot?: boolean;
 }
 
+// Local training configuration
+export interface LocalTrainingParams {
+  model_name: string;
+  learning_rate?: number;
+  number_of_epochs?: number;
+  concurrency_threads?: number;
+  data_synthesis_mode?: string;
+  use_cuda?: boolean;
+  is_cot?: boolean;
+}
+
+// Cloud training configuration
+export interface CloudHyperParameters {
+  learning_rate?: number;
+  n_epochs?: number;
+}
+
+export interface CloudTrainingParams {
+  model_name: string;
+  base_model: string;
+  training_type?: string;
+  hyper_parameters?: CloudHyperParameters;
+  data_synthesis_mode?: string;
+  created_at?: string;
+}
+
+// Combined training configuration for API responses
+export interface TrainingParamsResponse {
+  local: LocalTrainingParams;
+  cloud: CloudTrainingParams;
+}
+
+// Legacy interfaces for backward compatibility
 export interface TrainingParams {
   concurrency_threads?: number;
   data_synthesis_mode?: string;
@@ -84,6 +118,8 @@ export interface TrainingParams {
 
 export interface TrainBaseParams {
   model_name: string;
+  local_model_name: string;
+  cloud_model_name: string;
 }
 
 export type TrainingConfig = TrainingParams & TrainAdvanceParams & TrainBaseParams;
@@ -125,11 +161,11 @@ export const retrain = (config: TrainingConfig) => {
   });
 };
 
-export const startService = (config: TrainingConfig) => {
+export const startService = (info: ModelInfo) => {
   return Request<CommonResponse<EmptyResponse>>({
     method: 'post',
     url: `/api/kernel2/llama/start`,
-    data: config
+    data: info
   });
 };
 
@@ -148,7 +184,7 @@ export const stopService = () => {
 };
 
 export const getTrainingParams = () => {
-  return Request<CommonResponse<TrainingConfig>>({
+  return Request<CommonResponse<TrainingParamsResponse>>({
     method: 'get',
     url: `/api/trainprocess/training_params`
   });

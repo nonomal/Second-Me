@@ -10,6 +10,7 @@ import type { ChatRequest } from '@/hooks/useSSE';
 import { useSSE } from '@/hooks/useSSE';
 import { message } from 'antd';
 import { useLoadInfoStore } from '@/store/useLoadInfoStore';
+import { getActiveCloudModel } from '@/utils/cloudModelUtils';
 
 // Function to generate unique ID
 const generateMessageId = () => {
@@ -166,7 +167,14 @@ export default function RoleChat() {
       stream: true
     };
 
-    await sendStreamMessage(chatRequest);
+    // Check if a cloud model is active
+    const cloudModel = getActiveCloudModel();
+
+    if (cloudModel) {
+      await sendStreamMessage(chatRequest, true, cloudModel.deployed_model);
+    } else {
+      await sendStreamMessage(chatRequest);
+    }
   };
 
   const handleClearChat = () => {

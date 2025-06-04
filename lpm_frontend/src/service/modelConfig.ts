@@ -1,7 +1,7 @@
 import { Request } from '../utils/request';
 import type { CommonResponse, EmptyResponse } from '../types/responseModal';
 
-export type IModelConfig = IBaseModelParams & IThinkingModelParams;
+export type IModelConfig = IBaseModelParams & IThinkingModelParams & ICloudServiceParams;
 
 export interface IBaseModelParams {
   id: number;
@@ -21,6 +21,10 @@ export interface IThinkingModelParams {
   thinking_model_name: string;
   thinking_api_key: string;
   thinking_endpoint: string;
+}
+
+export interface ICloudServiceParams {
+  cloud_service_api_key: string;
 }
 
 export const getModelConfig = () => {

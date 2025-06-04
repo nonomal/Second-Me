@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import time
@@ -8,6 +9,8 @@ from lpm_kernel.L1.serializers import NotesStorage
 from lpm_kernel.kernel.note_service import NoteService
 from lpm_kernel.L2.l2_generator import L2Generator
 from lpm_kernel.L2.utils import save_hf_model
+from lpm_kernel.models.memory import Memory
+from lpm_kernel.common.repository.database_session import DatabaseSession
 from lpm_kernel.api.common.responses import APIResponse
 from lpm_kernel.api.domains.loads.services import LoadService
 from lpm_kernel.kernel.chunk_service import ChunkService
@@ -993,9 +996,33 @@ class TrainProcessService:
             gguf_dir = paths["gguf_dir"]
             logger.info(f"GGUF output directory: {gguf_dir}")
             
+            # Generate timestamp for the filename
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            gguf_filename = f"{timestamp}.gguf"
+            
             script_path = os.path.join(os.getcwd(), "lpm_kernel/L2/convert_hf_to_gguf.py")
-            gguf_path = os.path.join(gguf_dir, "model.gguf")
+            gguf_path = os.path.join(gguf_dir, gguf_filename)
             logger.info(f"GGUF output path: {gguf_path}")
+
+            # Get training parameters from TrainingParamsManager
+            from ..trainprocess.training_params_manager import TrainingParamsManager
+            training_params = TrainingParamsManager.get_latest_training_params()
+            logger.info(f"Retrieved training parameters: {training_params}")
+            
+            # Save training parameters to a JSON file in the GGUF directory
+            training_params_path = os.path.join(gguf_dir, f"{timestamp}.json")
+            try:
+                # 添加模型路径到训练参数
+                training_params["model_path"] = gguf_path
+                
+                with open(training_params_path, 'w', encoding='utf-8') as f:
+                    json.dump(training_params, f, indent=2)
+                logger.info(f"Training parameters saved to {training_params_path}")
+            except Exception as e:
+                logger.error(f"Failed to save training parameters: {str(e)}")
+                self.progress.mark_step_status(ProcessStep.CONVERT_MODEL, Status.FAILED)
+                return False
             
             # Build parameters
             args = [
@@ -1018,6 +1045,23 @@ class TrainProcessService:
                 script_type="convert_model",
                 args=args
             )
+            
+            # Model conversion completed
+            try:
+                with DatabaseSession.session() as session:
+                    update_count = session.query(Memory).filter(Memory.status == "active").update(
+                        {"is_trained": True},
+                        synchronize_session=False  # 不同步会话状态，提高性能
+                    )
+                    
+                    # 提交更改
+                    session.commit()
+                logger.info(f"Updated training status for {update_count} memory records")
+            except Exception as e:
+                logger.error(f"Failed to update memory training status: {str(e)}", exc_info=True)
+                self.progress.mark_step_status(ProcessStep.CONVERT_MODEL, Status.FAILED)
+                return False
+                
             
             logger.info(f"Model conversion result: {result}")
             
@@ -1059,9 +1103,10 @@ class TrainProcessService:
         except Exception as e:
             logger.error(f"Error checking training conditions: {str(e)}", exc_info=True)
             if self.progress.progress.current_stage:
-                current_step = self.progress.progress.stages[self.progress.progress.current_stage].current_step
-                if current_step:
-                    step = ProcessStep(current_step)
+                current_step = self.progress.progress.data["current_stage"]
+                current_stage = next((s for s in self.progress.progress.data["stages"] if s["name"] == current_stage), None)
+                if current_stage and current_stage["current_step"]:
+                    step = ProcessStep(current_stage["current_step"].lower().replace(" ", "_"))
                     self.progress.mark_step_status(step, Status.FAILED)
             return False
 

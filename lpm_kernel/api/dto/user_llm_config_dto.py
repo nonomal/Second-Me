@@ -23,6 +23,9 @@ class BaseUserLLMConfigDTO(BaseModel):
     thinking_endpoint: Optional[str] = None
     thinking_api_key: Optional[str] = None
     
+    # Cloud Service configuration
+    cloud_service_api_key: Optional[str] = None
+    
     def dict(self, *args, **kwargs):
         result = super().dict(*args, **kwargs)
         return result
@@ -53,6 +56,9 @@ class UpdateUserLLMConfigDTO(BaseModel):
     thinking_endpoint: Optional[str] = None
     thinking_api_key: Optional[str] = None
     
+    # Cloud Service configuration
+    cloud_service_api_key: Optional[str] = None
+    
     def dict(self, *args, **kwargs):
         result = super().dict(*args, **kwargs)
         return result
@@ -82,6 +88,7 @@ class UserLLMConfigDTO(BaseUserLLMConfigDTO):
             thinking_model_name=model.thinking_model_name,
             thinking_endpoint=model.thinking_endpoint,
             thinking_api_key=model.thinking_api_key,
+            cloud_service_api_key=model.cloud_service_api_key,
             created_at=model.created_at,
             updated_at=model.updated_at
         )

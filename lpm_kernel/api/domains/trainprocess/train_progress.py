@@ -202,6 +202,58 @@ class TrainProgress:
         # Update overall status
         self._update_overall_status()
 
+    def update_step_progress(self, stage: str, step: str, current: int, total: int, description: Optional[str] = None):
+        """Update progress within a step (for real-time progress tracking)
+        
+        Args:
+            stage: Stage key (snake_case format)
+            step: Step key (snake_case format)  
+            current: Current item being processed
+            total: Total items to process
+            description: Optional description of what is being processed
+        """
+        stage_data = self.stage_map[stage]
+        step_data = self.steps_map[stage][step]
+        
+        # Calculate step progress
+        step_progress = (current / total) * 100.0 if total > 0 else 0.0
+        
+        # Update step with progress info
+        step_data["current"] = current
+        step_data["total"] = total
+        step_data["step_progress"] = step_progress
+        if description:
+            step_data["description"] = description
+        
+        # Update step status to in_progress if not already completed/failed
+        if step_data["status"] in ["pending"]:
+            step_data["status"] = "in_progress"
+        
+        # Calculate stage progress based on step completion and current step progress
+        completed_steps = sum(1 for s in stage_data["steps"] if s["completed"])
+        total_steps = len(stage_data["steps"])
+        
+        # Find current step index
+        current_step_index = None
+        for i, s in enumerate(stage_data["steps"]):
+            if s["name"] == step_data["name"]:
+                current_step_index = i
+                break
+        
+        if current_step_index is not None:
+            # Progress = completed steps + current step progress
+            stage_progress = (completed_steps + (step_progress / 100.0)) / total_steps * 100.0
+            stage_data["progress"] = min(stage_progress, 100.0)
+        
+        # Update stage status and current step
+        self._update_stage_status(stage_data, step_data)
+        
+        # Update overall progress
+        self._update_overall_progress()
+        
+        # Update overall status
+        self._update_overall_status()
+
     def _update_stage_progress(self, stage_data: Dict, stageProgress: Optional[float] = None):
         """Update the progress of a stage
         
