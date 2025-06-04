@@ -268,11 +268,7 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
                   Cloud Service Used : &nbsp;
                 </span>
                 <AlibabaCloudIcon className="h-5 w-5 mr-2 text-orange-600" />
-                <span className="font-medium">
-                  {cloudConfig.provider_type === 'alibaba'
-                    ? 'Alibaba Cloud Model Studio'
-                    : 'Custom Cloud'}
-                </span>
+                <span className="font-medium">Alibaba Cloud Model Studio</span>
                 <button
                   className={classNames(
                     'ml-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors cursor-pointer relative z-10',
