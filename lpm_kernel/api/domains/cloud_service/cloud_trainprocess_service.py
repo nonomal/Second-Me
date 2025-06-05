@@ -694,8 +694,18 @@ class CloudTrainProcessService(TrainProcessService):
                                 logger.info(f"Retrieved job_id from file: {self.job_id}")
                 except Exception as e:
                     logger.error(f"Failed to read job ID from file: {str(e)}", exc_info=True)
-            
-            # Terminate the wait completion process if it's running
+
+            if self.job_id:
+                logger.info(f"Attempting to cancel fine-tune job: {self.job_id}")
+                success = self.cloud_service.cancel_fine_tune_job(self.job_id)
+
+                if success:
+                    logger.info(f"Successfully canceled fine-tune job: {self.job_id}")
+                else:
+                    logger.error(f"Failed to cancel fine-tune job: {self.job_id}")
+            else:
+                logger.warning("No active fine-tune job found to delete")
+
             if self._wait_completion_process and self._wait_completion_process.is_alive():
                 logger.info(f"Terminating wait completion process (PID: {self._wait_completion_pid})")
                 try:
@@ -707,17 +717,6 @@ class CloudTrainProcessService(TrainProcessService):
                     logger.info(f"Wait completion process terminated successfully")
                 except Exception as e:
                     logger.error(f"Error terminating wait completion process: {str(e)}", exc_info=True)
-            
-            if self.job_id:
-                logger.info(f"Attempting to cancel fine-tune job: {self.job_id}")
-                success = self.cloud_service.cancel_fine_tune_job(self.job_id)
-                
-                if success:
-                    logger.info(f"Successfully canceled fine-tune job: {self.job_id}")
-                else:
-                    logger.error(f"Failed to cancel fine-tune job: {self.job_id}")
-            else:
-                logger.warning("No active fine-tune job found to delete")
 
             if current_step:
                 step_status = None
