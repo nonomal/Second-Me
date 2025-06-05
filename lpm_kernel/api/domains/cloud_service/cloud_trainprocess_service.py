@@ -614,7 +614,7 @@ class CloudTrainProcessService(TrainProcessService):
         except Exception as e:
             logger.error(f"Error updating overall progress: {str(e)}")
     
-    def stop_process(self) -> bool:
+    def stop_process(self) -> str:
         """Stop the cloud training process
         
         This method will attempt to stop the fine-tuning job if it's in progress,
@@ -622,15 +622,12 @@ class CloudTrainProcessService(TrainProcessService):
         It will also wait for the current data processing step to complete before returning.
         
         Returns:
-            bool: True if the process was successfully stopped, False otherwise
+            str: A message indicating the status of the stop operation
         """
         try:
             logger.info(f"Attempting to stop cloud training process for model: {self.model_name}")
             
             self.is_stopped = True
-            
-            max_wait_time = 300 
-            wait_start = time.time()
             
             current_stage = self.progress.get_progress().get("current_stage")
             logger.info(f"Current stage when stopping: {current_stage}")
@@ -658,18 +655,18 @@ class CloudTrainProcessService(TrainProcessService):
                         break
             
             logger.info(f"Current step when stopping: {current_step}")
-            
-            while time.time() - wait_start < max_wait_time:
+
+            while True:
                 if current_step:
                     step_status = None
                     current_stage_data = None
-                    
+
                     for stage in self.progress.progress.data["stages"]:
                         if stage["name"] == current_stage:
                             current_stage_data = stage
                             logger.info(f"Found current stage data: {stage['name']}")
                             break
-                    
+
                     if current_stage_data:
                         step_name = current_step.value if hasattr(current_step, 'value') else str(current_step)
                         logger.info(f"Looking for step with name: {step_name}")
@@ -678,17 +675,15 @@ class CloudTrainProcessService(TrainProcessService):
                                 step_status = step["status"]
                                 logger.info(f"Found step status: {step_status}")
                                 break
-                    
+
                     logger.info(f"Current step status: {step_status}")
                     if step_status in [CloudStatus.COMPLETED, CloudStatus.FAILED, CloudStatus.CANCELED]:
                         logger.info(f"Step {current_step.value} has status {step_status}, continuing with stop process")
                         break
-                
-                time.sleep(2)
-            
-            if time.time() - wait_start >= max_wait_time:
-                logger.warning(f"Waited {max_wait_time} seconds for current step to complete, proceeding with stop process")
-            
+
+                time.sleep(20)
+
+
             if not self.job_id:
                 try:
                     params_dir = Path("data/cloud_progress")
@@ -750,8 +745,8 @@ class CloudTrainProcessService(TrainProcessService):
                     logger.info(f"Step {current_step} is already COMPLETED, preserving its status")
             
             logger.info("Cloud training process has been stopped successfully")
-            return True
+            return 'success'
                 
         except Exception as e:
             logger.error(f"Error stopping cloud process: {str(e)}", exc_info=True)
-            return False
+            return 'failed'
