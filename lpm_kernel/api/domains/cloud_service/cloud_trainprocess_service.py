@@ -656,33 +656,30 @@ class CloudTrainProcessService(TrainProcessService):
             
             logger.info(f"Current step when stopping: {current_step}")
 
-            while True:
-                if current_step:
-                    step_status = None
-                    current_stage_data = None
+            if current_step:
+                step_status = None
+                current_stage_data = None
 
-                    for stage in self.progress.progress.data["stages"]:
-                        if stage["name"] == current_stage:
-                            current_stage_data = stage
-                            logger.info(f"Found current stage data: {stage['name']}")
-                            break
-
-                    if current_stage_data:
-                        step_name = current_step.value if hasattr(current_step, 'value') else str(current_step)
-                        logger.info(f"Looking for step with name: {step_name}")
-                        for step in current_stage_data["steps"]:
-                            if step["name"] == step_name:
-                                step_status = step["status"]
-                                logger.info(f"Found step status: {step_status}")
-                                break
-
-                    logger.info(f"Current step status: {step_status}")
-                    if step_status in [CloudStatus.COMPLETED, CloudStatus.FAILED, CloudStatus.CANCELED]:
-                        logger.info(f"Step {current_step.value} has status {step_status}, continuing with stop process")
+                for stage in self.progress.progress.data["stages"]:
+                    if stage["name"] == current_stage:
+                        current_stage_data = stage
+                        logger.info(f"Found current stage data: {stage['name']}")
                         break
 
-                time.sleep(20)
+                if current_stage_data:
+                    step_name = current_step.value if hasattr(current_step, 'value') else str(current_step)
+                    logger.info(f"Looking for step with name: {step_name}")
+                    for step in current_stage_data["steps"]:
+                        if step["name"] == step_name:
+                            step_status = step["status"]
+                            logger.info(f"Found step status: {step_status}")
+                            break
 
+                logger.info(f"Current step status: {step_status}")
+                if step_status in [CloudStatus.COMPLETED, CloudStatus.FAILED, CloudStatus.CANCELED]:
+                    logger.info(f"Step {current_step.value} has status {step_status}, continuing with stop process")
+                else:
+                    return "pending"
 
             if not self.job_id:
                 try:
