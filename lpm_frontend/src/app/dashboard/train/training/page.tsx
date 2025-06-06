@@ -304,6 +304,47 @@ export default function TrainingPage(): JSX.Element {
     }, 10000); // Poll every 10 seconds
   };
 
+  // Check cloud training pause status on page load
+  const checkCloudPauseStatus = async (): Promise<'pending' | 'success' | 'failed' | null> => {
+    try {
+      const res = await stopCloudTraining();
+      
+      if (res.data.code === 0 && res.data.data) {
+        const status = res.data.data.status;
+        
+        if (status === 'pending') {
+          // If pause is still pending, show the pending state and start polling
+          setIsPauseRequested(true);
+          setPauseStatus('pending');
+          pollPauseStatus();
+          console.log('Found pending pause operation, starting status polling...');
+          return 'pending';
+        } else if (status === 'success') {
+          // Pause was completed successfully - update UI to show suspended state
+          setIsTraining(false);
+          setCloudTrainSuspended(true);
+          setCloudTrainingStatus('suspended');
+          setIsPauseRequested(false);
+          setPauseStatus(null);
+          stopCloudPolling();
+          console.log('Previous pause operation completed successfully, UI updated to suspended state');
+          return 'success';
+        } else if (status === 'failed') {
+          // Pause failed, clear any pending state
+          setIsPauseRequested(false);
+          setPauseStatus(null);
+          console.log('Previous pause operation failed');
+          return 'failed';
+        }
+      }
+      return null;
+    } catch (error) {
+      // Silently handle errors - this is just a status check
+      console.log('No pending pause operation found or error checking pause status:', error);
+      return null;
+    }
+  };
+
   useEffect(() => {
     fetchModelConfig();
   }, []);
@@ -348,28 +389,44 @@ export default function TrainingPage(): JSX.Element {
             setCloudJobId(currentJobId);
           }
 
-          // If training is in progress, set the state and start polling
+          // If training is in progress, check for pause status first
           if (progressData.status === 'in_progress') {
             setTrainingType('cloud');
-            setIsTraining(true);
-            setStatus('training');
-            setCloudTrainSuspended(false);
-            startCloudTrainingPolling();
+            console.log('Cloud training detected as in_progress, checking pause status...');
+            
+            // Check if there's a pending or completed pause operation first
+            const pauseStatus = await checkCloudPauseStatus();
+            console.log('Pause status check result:', pauseStatus);
+            
+            // If pause was successful or pending, don't start training flow
+            if (pauseStatus !== 'success' && pauseStatus !== 'pending') {
+              console.log('No active pause found, starting normal training flow...');
+              setIsTraining(true);
+              setStatus('training');
+              setCloudTrainSuspended(false);
+              setCloudTrainingStatus('training');
+              startCloudTrainingPolling();
+            } else {
+              console.log('Pause operation found, skipping training flow start');
+            }
           } else if (progressData.status === 'completed') {
             setTrainingType('cloud');
             setStatus('trained');
             setIsTraining(false);
             setCloudTrainSuspended(false);
+            setCloudTrainingStatus('trained');
           } else if (progressData.status === 'failed') {
             setTrainingType('cloud');
             setStatus('training'); // Keep as 'training' since ModelStatus doesn't have 'failed'
             setIsTraining(false);
             setCloudTrainSuspended(false);
+            setCloudTrainingStatus('failed');
           } else if (progressData.status === 'suspended') {
             setTrainingType('cloud');
             setStatus('training');
             setIsTraining(false);
             setCloudTrainSuspended(true);
+            setCloudTrainingStatus('suspended');
           }
         }
       }
