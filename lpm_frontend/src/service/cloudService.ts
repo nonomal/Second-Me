@@ -78,6 +78,7 @@ export const startCloudTraining = (params: {
   base_model: string;
   training_type?: string;
   data_synthesis_mode?: string;
+  language?: string;
   hyper_parameters?: Record<string, unknown>;
 }): AxiosPromise<CommonResponse<unknown>> => {
   return Request<CommonResponse<unknown>>({

@@ -1109,6 +1109,7 @@ export default function TrainingPage(): JSX.Element {
         base_model: cloudTrainingParams.base_model,
         training_type: cloudTrainingParams.training_type || 'efficient_sft',
         data_synthesis_mode: cloudTrainingParams.data_synthesis_mode || 'medium',
+        language: cloudTrainingParams.language || 'english',
         hyper_parameters: {
           n_epochs: cloudTrainingParams.hyper_parameters?.n_epochs,
           learning_rate: cloudTrainingParams.hyper_parameters?.learning_rate
