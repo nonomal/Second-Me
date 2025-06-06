@@ -171,6 +171,22 @@ stop_services() {
             log_info "Port ${LOCAL_FRONTEND_PORT} is not in use"
         fi
     fi
+
+    PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    SERVICE_STATUS_FILE="${PROJECT_ROOT}/data/service_status.json"
+    
+    log_info "Checking for service status file at: ${SERVICE_STATUS_FILE}"
+    if [ -f "$SERVICE_STATUS_FILE" ]; then
+        log_info "Removing service status file..."
+        rm -f "$SERVICE_STATUS_FILE"
+        if [ ! -f "$SERVICE_STATUS_FILE" ]; then
+            log_success "Service status file removed successfully"
+        else
+            log_warning "Failed to remove service status file"
+        fi
+    else
+        log_info "Service status file not found, nothing to remove"
+    fi
     
     log_success "All services stopped successfully"
 }

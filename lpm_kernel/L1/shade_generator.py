@@ -28,11 +28,13 @@ from lpm_kernel.configs.config import Config
 from lpm_kernel.api.common.script_executor import ScriptExecutor
 
 from lpm_kernel.configs.logging import get_train_process_logger
+from lpm_kernel.kernel.l0_base import get_preferred_language
+
 logger = get_train_process_logger()
 
 class ShadeGenerator:
     def __init__(self):
-        self.preferred_language = "en"
+        self.preferred_language = get_preferred_language()
         self.model_params = {
             "temperature": 0,
             "max_tokens": 3000,
@@ -456,7 +458,7 @@ class ShadeMerger:
             "presence_penalty": 0,
             "timeout": 45,
         }
-        self.preferred_language = "en"
+        self.preferred_language = get_preferred_language()
         self._top_p_adjusted = False  # Flag to track if top_p has been adjusted
 
 

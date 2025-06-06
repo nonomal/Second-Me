@@ -236,6 +236,7 @@ def start_cloud_training():
         training_type = data.get("training_type", "efficient_sft")
         hyper_parameters = data.get("hyper_parameters", {})
         data_synthesis_mode = data.get("data_synthesis_mode", "low")
+        language = data.get("language", "en")
 
         os.environ["DATA_SYNTHESIS_MODE"] = data_synthesis_mode
         
@@ -245,6 +246,7 @@ def start_cloud_training():
             "training_type": training_type,
             "hyper_parameters": hyper_parameters,
             "data_synthesis_mode": data_synthesis_mode,
+            "language": language,
             "created_at": datetime.now().isoformat()
         }
         

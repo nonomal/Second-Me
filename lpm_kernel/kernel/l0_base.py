@@ -1,6 +1,8 @@
 from typing import Dict, Optional
 import logging
 import time
+import os
+import json
 from lpm_kernel.file_data.document import Document
 from lpm_kernel.L0.l0_generator import L0Generator
 from lpm_kernel.L0.models import (
@@ -17,11 +19,34 @@ from lpm_kernel.file_data.document_dto import DocumentDTO
 logger = logging.getLogger(__name__)
 
 
+def get_preferred_language():
+
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    local_params_path = os.path.join(base_dir, "data", "progress", "training_params.json")
+    cloud_params_path = os.path.join(base_dir, "data", "cloud_progress", "cloud_training_params.json")
+    
+    try:
+        if os.path.exists(local_params_path):
+            with open(local_params_path, 'r', encoding='utf-8') as f:
+                params = json.load(f)
+                if "language" in params:
+                    return params["language"]
+        else:
+            if os.path.exists(cloud_params_path):
+                with open(cloud_params_path, 'r', encoding='utf-8') as f:
+                    params = json.load(f)
+                    if "language" in params:
+                        return params["language"]
+    except Exception as e:
+        logging.warning(f"Failed to read training parameters: {str(e)}")
+    
+    return "en"
+
+
 class InsightKernel:
     def __init__(self):
         self.generator = L0Generator()
-        config = Config.from_env()
-        self.preferred_language = config.get("PREFER_LANGUAGE", "en")
+        self.preferred_language = get_preferred_language()
 
     def analyze(self, doc: DocumentDTO) -> Dict:
         """Generate document insight"""
@@ -62,8 +87,7 @@ class InsightKernel:
 class SummaryKernel:
     def __init__(self):
         self.generator = L0Generator()
-        config = Config.from_env()
-        self.preferred_language = config.get("PREFER_LANGUAGE", "en")
+        self.preferred_language = get_preferred_language()
 
     def analyze(self, doc: DocumentDTO, insight: str = "") -> Dict:
         """Generate document summary"""
