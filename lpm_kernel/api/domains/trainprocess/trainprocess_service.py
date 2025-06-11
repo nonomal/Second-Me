@@ -2,6 +2,7 @@ import json
 import os
 import re
 import time
+from flask import jsonify
 import psutil
 from typing import Optional, Dict
 from lpm_kernel.L1.utils import save_true_topics
@@ -929,7 +930,7 @@ class TrainProcessService:
             # Check if training output exists
             if not os.path.exists(paths["personal_dir"]):
                 return jsonify(APIResponse.error(
-                    message=f"Model '{model_name}' training output does not exist, please train model first",
+                    message=f"Model '{self.model_name}' training output does not exist, please train model first",
                     code=400
                 ))
 
@@ -1104,7 +1105,7 @@ class TrainProcessService:
             logger.error(f"Error checking training conditions: {str(e)}", exc_info=True)
             if self.progress.progress.current_stage:
                 current_step = self.progress.progress.data["current_stage"]
-                current_stage = next((s for s in self.progress.progress.data["stages"] if s["name"] == current_stage), None)
+                current_stage = next((s for s in self.progress.progress.data["stages"] if s["name"] == current_step), None)
                 if current_stage and current_stage["current_step"]:
                     step = ProcessStep(current_stage["current_step"].lower().replace(" ", "_"))
                     self.progress.mark_step_status(step, Status.FAILED)

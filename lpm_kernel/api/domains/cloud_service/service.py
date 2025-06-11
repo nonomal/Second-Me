@@ -812,12 +812,9 @@ class CloudService:
         logger.info("Returning hardcoded list of models that support fine-tuning...")
         
         models = [
-
-            {"id": "qwen2.5-7b-instruct"},
-            {"id": "qwen2.5-14b-instruct"},
-            {"id": "qwen2.5-32b-instruct"},
-            {"id": "qwen2.5-72b-instruct"},
-            
+            {"id": "qwen3-8b"},
+            {"id": "qwen3-14b"},
+            {"id": "qwen3-32b"},
         ]
         
         logger.info(f"Returning {len(models)} models")
