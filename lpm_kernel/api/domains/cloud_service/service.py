@@ -195,10 +195,25 @@ class CloudService:
 
             result = []
             for ft in succeeded_fine_tunes:
+                deployed_name = None
+                is_deployed = False
+                
+                # 提取微调模型ID的后缀
+                ft_id_suffix = ft.get("job_id", "").split("-")[-1] if ft.get("job_id") else ""
+                
+                # 查找匹配的部署模型
+                for d in running_deployments:
+                    d_model_suffix = d.get("model_name", "").split("-")[-1] if d.get("model_name") else ""
+                    if ft_id_suffix and d_model_suffix and ft_id_suffix == d_model_suffix:
+                        is_deployed = True
+                        deployed_name = d.get("deployed_model")
+                        break
+                
                 result.append({
                     "job_id": ft.get("job_id"),
                     "base_model": ft.get("base_model"),
-                    "is_deployed": any(d.get("model_name").split("-")[-1] == ft.get("job_id").split("-")[-1] for d in running_deployments if d.get("model_name") and ft.get("job_id")),
+                    "is_deployed": is_deployed,
+                    "deployed_name": deployed_name,
                     "hyper_parameters": ft.get("hyper_parameters"),
                     "training_type": ft.get("training_type"),
                     "usage": ft.get("usage"),
