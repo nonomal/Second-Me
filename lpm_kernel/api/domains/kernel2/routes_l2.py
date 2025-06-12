@@ -125,7 +125,7 @@ def downloadModel():
     
     Request body:
     {
-        "model_name": str  # Model name, e.g. "Qwen/Qwen2.5-0.5B-Instruct"
+        "model_name": str  # Model name, e.g. "Qwen/Qwen3-0.6B"
     }
     
     Returns:

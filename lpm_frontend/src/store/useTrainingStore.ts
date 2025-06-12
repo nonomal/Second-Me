@@ -196,7 +196,7 @@ export const useTrainingStore = create<ModelState>((set, get) => ({
         config.model_name ||
         config.local_model_name ||
         config.cloud_model_name ||
-        'Qwen2.5-0.5B-Instruct';
+        'Qwen3-0.6B';
       
       const res = await getTrainProgress({
         model_name: modelName,

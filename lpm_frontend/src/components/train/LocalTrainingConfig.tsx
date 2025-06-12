@@ -4,14 +4,14 @@ import type React from 'react';
 import { Fragment, useMemo, useState, useEffect } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
 import { QuestionCircleOutlined } from '@ant-design/icons';
-import { Checkbox, InputNumber, message, Radio, Tooltip } from 'antd';
+import { InputNumber, message, Radio, Tooltip } from 'antd';
 import type { LocalTrainingParams } from '@/service/train';
 import { EVENT } from '../../utils/event';
 import OpenAiModelIcon from '../svgs/OpenAiModelIcon';
 import CustomModelIcon from '../svgs/CustomModelIcon';
 import ColumnArrowIcon from '../svgs/ColumnArrowIcon';
 import DoneIcon from '../svgs/DoneIcon';
-import ThinkingModelModal from '../ThinkingModelModal';
+// import ThinkingModelModal from '../ThinkingModelModal';
 import { useModelConfigStore } from '@/store/useModelConfigStore';
 import classNames from 'classnames';
 
@@ -402,7 +402,7 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
           </div>
         </div>
 
-        <div className="flex flex-col gap-3">
+        {/* <div className="flex flex-col gap-3">
           <div className="text-base font-semibold text-gray-800 flex items-center">
             Step 4: Configure Advanced Behavior
           </div>
@@ -447,10 +447,10 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
               <QuestionCircleOutlined className="cursor-pointer ml-2" />
             </Tooltip>
           </div>
-        </div>
+        </div> */}
       </div>
 
-      <ThinkingModelModal onClose={() => setOpenThinkingModel(false)} open={openThinkingModel} />
+      {/* <ThinkingModelModal onClose={() => setOpenThinkingModel(false)} open={openThinkingModel} /> */}
     </div>
   );
 };
