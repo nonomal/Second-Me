@@ -745,18 +745,27 @@ def start_cloud_service():
         try:
             # Verify deployment exists by checking deployed_model field
             deployments = cloud_service.list_deployments()
-            if not any(dep.get("deployed_model") == deployment_model  for dep in deployments):
+            model_name = deployment_model
+
+            found = False
+            for dep in deployments:
+                if dep.get("deployed_model") == deployment_model:
+                    model_name = dep.get("name")
+                    found = True
+                    break
+                    
+            if not found:
                 return jsonify(APIResponse.error(
                     message=f"Cloud model deployment '{deployment_model}' not found",
                     code=404
                 ))
         except Exception as e:
-            logger.warning(f"Could not verify cloud deployment: {str(e)}")
+            return jsonify(APIResponse.error(message=f"Failed to verify model deployment: {str(e)}"))
 
         # Create service status file for cloud service
         model_data = {
-            "deployment_model": deployment_model,
-            "model_name": deployment_model,
+            "model_id": deployment_model,
+            "model_name": model_name,
             "model_path": f"cloud/{deployment_model}",
             "service_endpoint": "cloud_inference"
         }
@@ -874,4 +883,3 @@ def get_cloud_service_status():
         error_msg = f"Failed to get cloud service status: {str(e)}"
         logger.error(error_msg)
         return jsonify(APIResponse.error(message=error_msg, code=500))
-
