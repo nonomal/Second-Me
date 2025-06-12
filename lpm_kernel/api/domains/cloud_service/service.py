@@ -68,7 +68,7 @@ class CloudService:
         logger.info(f"Upload successful! File ID: {self.file_id}")
         return True
 
-    def create_fine_tune_job(self, base_model="qwen2.5-7b-instruct", training_type="efficient_sft", hyper_parameters=None):
+    def create_fine_tune_job(self, base_model, training_type="efficient_sft", hyper_parameters=None):
         """Create fine-tuning job"""
         if not self.file_id:
             raise ValueError("Please upload the training data file first!")
