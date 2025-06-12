@@ -18,8 +18,8 @@ import { useLoadInfoStore } from '@/store/useLoadInfoStore';
 import TrainingTipModal from '../upload/TraingTipModal';
 import { getMemoryList } from '@/service/memory';
 import { getModelList, ModelInfo } from '@/service/model';
-import { 
-  listDeployments, 
+import {
+  listDeployments,
   CloudDeployment,
   startCloudService,
   stopCloudService,
@@ -84,9 +84,10 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
       listDeployments()
         .then((res) => {
           if (res.data.code === 0 && res.data.data.deployments) {
+            // Show all deployments, including both deployed and undeployed ones
             const deploymentModels: ModelInfo[] = res.data.data.deployments.map((deployment: CloudDeployment) => {
-
-                const timestampMatch = deployment.deployed_model.match(/ft-(\d{12})/);
+                // Extract timestamp from job_id
+                const timestampMatch = deployment.job_id.match(/ft-(\d{12})/);
                 let extractedTimestamp;
                 if (timestampMatch) {
                   const rawTimestamp = timestampMatch[1];
@@ -101,16 +102,20 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
                 }
                 
                 const modelInfo = {
-                  model_path: `cloud/${deployment.name}`, 
-                  full_path: `/models/cloud/${deployment.deployed_model}`,
+                  model_path: `cloud/${deployment.job_id}`, 
+                  full_path: `/models/cloud/${deployment.job_id}`,
                   file_size: 0, 
                   created_time: extractedTimestamp,
                   training_params: {
                     type: 'fine-tuned',
                     base_model: deployment.base_model,
+                    job_id: deployment.job_id,
                     deployed_model: deployment.deployed_model,
-                    status: deployment.status,
-                    created_at: deployment.deployed_model
+                    name: deployment.name,
+                    training_type: deployment.training_type,
+                    is_deployed: deployment.is_deployed,
+                    usage: deployment.usage,
+                    hyper_parameters: deployment.hyper_parameters
                   }
                 };
                 
@@ -166,6 +171,9 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
     const isCloudDeployment = isCloud || (fileName && model.model_path.startsWith('cloud/'));
     const timeStamp = fileName?.replace('.gguf', '') || 'Unknown version';
     const modelName = model.model_path.split('/')[0];
+    
+    // Check deployment status for cloud models
+    const isDeployed = isCloudDeployment ? (model.training_params.is_deployed && model.training_params.deployed_model) : true;
 
     // Check if this is the newest model in its category
     const isNewestLocal =
@@ -179,7 +187,9 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
         key={model.model_path}
         className={`relative cursor-pointer hover:bg-white/80 rounded-lg transition-all duration-200 p-3 border mb-2 hover:shadow-md hover:border-blue-300 ${
           isCloud 
-            ? 'border-blue-200 bg-blue-50/50 hover:bg-blue-50/80' 
+            ? isDeployed 
+              ? 'border-blue-200 bg-blue-50/50 hover:bg-blue-50/80' 
+              : 'border-orange-200 bg-orange-50/50 hover:bg-orange-50/80'
             : 'border-gray-200 bg-white/60 hover:bg-white/90'
         }`}
         onClick={() => onModelSelect(model)}
@@ -193,10 +203,24 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
                   New
                 </div>
               )}
+              {isCloudDeployment && (
+                <div className={`ml-2 px-2 py-0.5 text-xs rounded-full font-medium ${
+                  isDeployed 
+                    ? 'bg-green-100 text-green-700 border border-green-200' 
+                    : 'bg-orange-100 text-orange-700 border border-orange-200'
+                }`}>
+                  {isDeployed ? 'Deployed' : 'Not Deployed'}
+                </div>
+              )}
             </div>
             <Text className="text-xs text-gray-600" type="secondary">
               {isCloudDeployment && model.training_params.base_model ? model.training_params.base_model : modelName}
             </Text>
+            {isCloudDeployment && !isDeployed && (
+              <Text className="text-xs text-orange-600 mt-1">
+                Please deploy this model in DashScope Console first
+              </Text>
+            )}
           </div>
 
           <div className="flex items-center space-x-2 ml-4">
@@ -207,6 +231,15 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
                   <div className="font-semibold text-white mb-2 text-sm border-b border-white/20 pb-2">
                     {timeStamp}
                   </div>
+                  
+                  {isCloudDeployment && (
+                    <div className="mb-2">
+                      <div className="text-blue-200 text-xs mb-1">Deployment Status</div>
+                      <div className={`text-xs ${isDeployed ? 'text-green-300' : 'text-orange-300'}`}>
+                        {isDeployed ? 'Ready to use' : 'Requires deployment in DashScope Console'}
+                      </div>
+                    </div>
+                  )}
                   
                   {model.training_params.base_model && (
                     <div className="mb-2">
@@ -228,11 +261,7 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
                         return `${year}-${month}-${day} ${hour}:${minute}`;
                       };
 
-                      if (isCloudDeployment) {
-                        return <div className="text-white/90 text-xs">{formatTime(model.created_time)}</div>;
-                      } else {
-                        return <div className="text-white/90 text-xs">{formatTime(model.created_time)}</div>;
-                      }
+                      return <div className="text-white/90 text-xs">{formatTime(model.created_time)}</div>;
                     })()}
                   </div>
 
@@ -241,16 +270,17 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
                       (() => {
                         const priorityOrder = [
                           'type',
-                          'status',
-                          'deployed_model'
+                          'training_type',
+                          'is_deployed',
+                          'deployed_model',
+                          'name',
+                          'usage'
                         ];
 
                         return Object.entries(model.training_params)
                           .filter(([key]) => {
-                            if (key === 'created_at') return false; 
                             if (key === 'base_model') return false; 
-                            if (key === 'model_name') return false; 
-                            if (!isCloudDeployment && key === 'model_path') return false;
+                            if (key === 'hyper_parameters') return false; // Too complex to display
                             return true;
                           })
                           .sort((a, b) => {
@@ -268,7 +298,14 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
                                 {key.replace(/_/g, ' ')}:
                               </span>
                               <span className="text-white/90 text-xs ml-2 text-right break-all">
-                                {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                {key === 'is_deployed' 
+                                  ? (value ? 'Yes' : 'No')
+                                  : key === 'deployed_model'
+                                  ? (value || 'Not deployed')
+                                  : key === 'name'
+                                  ? (value || 'No name assigned')
+                                  : (typeof value === 'object' ? JSON.stringify(value) : String(value))
+                                }
                               </span>
                             </div>
                           ));
@@ -445,6 +482,7 @@ export function ModelStatus() {
   const [showtrainingModal, setShowtrainingModal] = useState(false);
   const [showModelSelectionModal, setShowModelSelectionModal] = useState(false);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [showDeploymentRequiredModal, setShowDeploymentRequiredModal] = useState(false);
   const [selectedModelForConfirmation, setSelectedModelForConfirmation] = useState<ModelInfo | null>(null);
 
   // Model selection states
@@ -692,6 +730,17 @@ export function ModelStatus() {
     config.model_name = model.model_path;
     localStorage.setItem('trainingParams', JSON.stringify(config));
 
+    // Check if it's a cloud model and if it's deployed
+    const isCloudModel = model.model_path.includes('cloud/');
+    const isDeployed = isCloudModel ? (model.training_params.is_deployed && model.training_params.deployed_model) : true;
+
+    if (isCloudModel && !isDeployed) {
+      // Show deployment required modal instead of confirmation
+      setSelectedModelForConfirmation(model);
+      setShowDeploymentRequiredModal(true);
+      return;
+    }
+
     // Do not close the model selection modal, just show confirmation on top
     // Set the selected model for confirmation and show confirmation modal
     setSelectedModelForConfirmation(model);
@@ -705,12 +754,29 @@ export function ModelStatus() {
 
     if (isCloudModel) {
       setServiceStarting(true);
+
+      // For deployed cloud models, we must use deployed_model
+      const deployedModel = selectedModelForConfirmation.training_params.deployed_model;
       
+      console.log('Cloud model deployment info:', {
+        job_id: selectedModelForConfirmation.training_params.job_id,
+        deployed_model: deployedModel,
+        name: selectedModelForConfirmation.training_params.name,
+        is_deployed: selectedModelForConfirmation.training_params.is_deployed
+      });
+      
+      if (!deployedModel) {
+        messageApi.error({ content: 'Model is not deployed. Please deploy it first in DashScope Console.', duration: 3 });
+        setServiceStarting(false);
+        return;
+      }
+
       const cloudStartRequest = {
-        model_id: selectedModelForConfirmation.training_params.deployed_model || selectedModelForConfirmation.model_path,
-        model_name: selectedModelForConfirmation.model_path.split('/')[1] || 'Unknown Cloud Model'
+        deployment_model: deployedModel
       };
       
+      console.log('Starting cloud service with request:', cloudStartRequest);
+
       startCloudService(cloudStartRequest)
         .then((res) => {
           if (res.data.code === 0) {
@@ -897,15 +963,19 @@ export function ModelStatus() {
                   </div>
                   <div>
                     <Text strong className="text-base">
-                      {selectedModelForConfirmation.model_path.split('/')[1]}
+                      {selectedModelForConfirmation.training_params.is_deployed && selectedModelForConfirmation.training_params.name 
+                        ? selectedModelForConfirmation.training_params.name 
+                        : selectedModelForConfirmation.training_params.job_id}
                     </Text>
                     <div className="flex items-center">
                       <Text type="secondary" className="text-sm">
-                        {selectedModelForConfirmation.model_path.split('/')[0]}
+                        {selectedModelForConfirmation.model_path.includes('cloud/') 
+                          ? `Base Model: ${selectedModelForConfirmation.training_params.base_model}` 
+                          : selectedModelForConfirmation.model_path.split('/')[0]}
                       </Text>
                       {selectedModelForConfirmation.model_path.includes('cloud/') && (
-                        <span className="ml-2 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs">
-                          Cloud Model
+                        <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 border border-green-200 text-xs rounded-full font-medium">
+                          Deployed
                         </span>
                       )}
                     </div>
@@ -916,7 +986,9 @@ export function ModelStatus() {
                   title={
                     <div className="text-xs max-w-xs">
                       <div className="font-semibold text-white mb-2 text-sm border-b border-white/20 pb-2">
-                        {selectedModelForConfirmation.model_path.split('/')[1]}
+                        {selectedModelForConfirmation.training_params.is_deployed && selectedModelForConfirmation.training_params.name 
+                          ? selectedModelForConfirmation.training_params.name 
+                          : selectedModelForConfirmation.training_params.job_id}
                       </div>
                       
                       {selectedModelForConfirmation.training_params.base_model && (
@@ -947,10 +1019,10 @@ export function ModelStatus() {
                         {Object.entries(selectedModelForConfirmation.training_params).length > 0 ? (
                           (() => {
                             const priorityOrder = [
-                              'type', 
-                              'status', 
-                              'base_model', 
-                              'deployed_model',
+                              'type',
+                              'status',
+                              'base_model',
+                              'deployed_model'
                             ];
                             
                             return Object.entries(selectedModelForConfirmation.training_params)
@@ -999,7 +1071,9 @@ export function ModelStatus() {
                     <p className="mb-2 font-medium text-gray-700">
                       Starting{' '}
                       <span className="font-bold text-blue-600">
-                        {selectedModelForConfirmation.model_path.split('/')[1]}
+                        {selectedModelForConfirmation.training_params.is_deployed && selectedModelForConfirmation.training_params.name 
+                          ? selectedModelForConfirmation.training_params.name 
+                          : selectedModelForConfirmation.training_params.job_id}
                       </span>{' '}
                       will incur charges on your Alibaba Cloud Model Studio account and will be
                       billed continuously based on token usage.
@@ -1018,6 +1092,98 @@ export function ModelStatus() {
                     <p className="text-gray-600">Do you want to continue?</p>
                   </div>
                 )}
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
+
+      {/* Deployment Required Modal */}
+      <Modal
+        cancelText="Close"
+        centered
+        footer={[
+          <button
+            key="close"
+            className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+            onClick={() => setShowDeploymentRequiredModal(false)}
+          >
+            Close
+          </button>,
+          <button
+            key="console"
+            className="ml-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            onClick={() => {
+              window.open('https://bailian.console.aliyun.com/?tab=model#/efm/model_deploy', '_blank');
+              setShowDeploymentRequiredModal(false);
+            }}
+          >
+            Go to DashScope Console
+          </button>
+        ]}
+        onCancel={() => setShowDeploymentRequiredModal(false)}
+        open={showDeploymentRequiredModal}
+        title={<div className="text-lg font-medium text-orange-600">Deployment Required</div>}
+        width={520}
+      >
+        <div className="py-4">
+          {selectedModelForConfirmation && (
+            <>
+              <div className="flex items-center mb-4">
+                <div className="bg-orange-50 p-3 rounded-lg mr-4">
+                  <svg
+                    fill="none"
+                    height="24"
+                    stroke="#f97316"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                  </svg>
+                </div>
+                <div>
+                  <Text strong className="text-base">
+                    {selectedModelForConfirmation.training_params.job_id}
+                  </Text>
+                  <div className="flex items-center mt-1">
+                    <Text className="text-sm text-gray-600">
+                      Base Model: {selectedModelForConfirmation.training_params.base_model}
+                    </Text>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                <div className="mb-3">
+                  <h4 className="font-semibold text-orange-800 mb-2">Model Not Deployed</h4>
+                  <p className="text-sm text-orange-700 mb-3">
+                    This model has been trained successfully but is not yet deployed. 
+                    You need to deploy it in the DashScope Console before you can start the service.
+                  </p>
+                </div>
+                
+                <div className="space-y-2 text-sm text-orange-700">
+                  <div className="flex items-start">
+                    <span className="inline-block w-6 h-6 bg-orange-200 text-orange-800 rounded-full text-xs font-bold text-center leading-6 mr-2 mt-0.5 flex-shrink-0">1</span>
+                    <span>Go to the DashScope Console at bailian.console.aliyun.com</span>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="inline-block w-6 h-6 bg-orange-200 text-orange-800 rounded-full text-xs font-bold text-center leading-6 mr-2 mt-0.5 flex-shrink-0">2</span>
+                    <span>Navigate to your fine-tuned models section</span>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="inline-block w-6 h-6 bg-orange-200 text-orange-800 rounded-full text-xs font-bold text-center leading-6 mr-2 mt-0.5 flex-shrink-0">3</span>
+                    <span>Find and deploy model: <strong>{selectedModelForConfirmation.training_params.job_id}</strong></span>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="inline-block w-6 h-6 bg-orange-200 text-orange-800 rounded-full text-xs font-bold text-center leading-6 mr-2 mt-0.5 flex-shrink-0">4</span>
+                    <span>Return here and refresh the model list to start the service</span>
+                  </div>
+                </div>
               </div>
             </>
           )}
