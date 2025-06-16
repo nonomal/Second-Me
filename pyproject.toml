@@ -46,7 +46,7 @@ transformers = "4.51.0"
 torch = "2.5.1"
 peft = "0.14.0"
 trl = "0.13.0"
-gguf = "0.10.0"
+gguf = "^0.17.0"
 datasets = "3.3.2"
 jiter = "0.8.2"
 
