@@ -188,7 +188,7 @@ class DataTrainingArguments:
     Arguments pertaining to what data we are going to input our model for training.
     """
     dataset_name: Optional[str] = field(
-        default="/Users/yanmuyuan/Second-Me/resources/L2/data/merged.json",
+        default="resources/L2/data/merged.json",
         metadata={"help": "The preference dataset to use."},
     )
     append_concat_token: Optional[bool] = field(
