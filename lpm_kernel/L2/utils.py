@@ -487,67 +487,17 @@ def create_and_prepare_model(args, data_args, training_args, model_kwargs=None):
     return model, peft_config, tokenizer
 
 
-def create_chat_data(data_args, tokenizer):
-    """Creates and preprocesses chat data for training.
-    
-    Args:
-        data_args: Arguments for dataset configuration.
-        tokenizer: Tokenizer for text processing.
-        
-    Returns:
-        Processed dataset ready for training.
-    """
-    def preprocess(sample, user_name='user', is_cot=False):
-        """Preprocesses a chat sample.
-        
-        Args:
-            sample: The input sample to process.
-            user_name: Name of the user. Defaults to 'user'.
-            is_cot: Whether to use chain-of-thought prompts. Defaults to False.
-            
-        Returns:
-            Processed chat sample.
-        """
-        if sample.get('assistant') is None and sample.get('enhanced_request') is not None:
-            user_message = f"{user_name}'s request is: " + sample['user_request']
-            messages = [
-                {"role": "system", "content": CONTEXT_COT_PROMPT.format(user_name=user_name) if is_cot else CONTEXT_PROMPT.format(user_name=user_name)},
-                {"role": "user", "content": user_message},
-                {"role": "assistant", "content": sample['enhanced_request'].strip('\n')},
-            ]
-            return [{"content": tokenizer.apply_chat_template(messages, tokenize=False)}]
-        if sample.get('assistant') is None and sample.get('user_feedback') is not None:
-            user_message = f"{user_name}'s request is: " + sample['user_request'] + "\n" + "Expert's response is: " + sample['expert_response']
-            messages = [
-                {"role": "system", "content": JUDGE_COT_PROMPT.format(user_name=user_name) if is_cot else JUDGE_PROMPT.format(user_name=user_name)},
-                {"role": "user", "content": user_message},
-                {"role": "assistant", "content": sample['user_feedback'].strip('\n')},
-            ]
-            return [{"content": tokenizer.apply_chat_template(messages, tokenize=False)}]
-        
-        if sample.get('assistant') is None:
-            return []
-        sample['assistant'] = sample['assistant'].strip('\n')
-        
+def create_chat_data(examples):
+    messages_list = []
+    user_list, assistant_list = examples['user'], examples['assistant']
+    for user, assistant in zip(user_list, assistant_list):
         messages = [
-            {"role": "system", "content": MEMORY_COT_PROMPT.format(user_name=user_name) if is_cot else MEMORY_PROMPT.format(user_name=user_name)},
-            {"role": "user", "content": sample['user']},
-            {"role": "assistant", "content": sample['assistant']},
+            {"role": "system", "content": ""},
+            {"role": "user", "content": user},
+            {"role": "assistant", "content": assistant},
         ]
-        if 'None' in sample['assistant']:
-            return []
-        return [{"content": tokenizer.apply_chat_template(messages, tokenize=False)}]
-    
-    dataset = load_dataset("json", data_files=data_args.dataset_name, split="train")
-    res_dataset = []
-    
-    for case in dataset:
-        res_dataset.extend(preprocess(case, data_args.user_name, data_args.is_cot))
-    
-    res = Dataset.from_list(res_dataset)
-    print(f"**************Dataset contains {res.num_rows} elements.**************")
-
-    return res
+        messages_list.append(messages)
+    return {"messages": messages_list}
 
 
 def formatting_prompts_func(example):

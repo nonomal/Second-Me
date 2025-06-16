@@ -42,7 +42,7 @@ pytest = "7.4.4"
 ruff = "0.1.15"
 pandas = "2.2.3"
 fnllm = {extras = ["azure", "openai"], version = "0.1.2"}
-transformers = "4.47.1"
+transformers = "4.51.0"
 torch = "2.5.1"
 peft = "0.14.0"
 trl = "0.13.0"

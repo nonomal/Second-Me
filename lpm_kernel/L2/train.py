@@ -22,7 +22,12 @@ from tqdm import tqdm
 from transformers import HfArgumentParser, TrainingArguments, set_seed
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from trl import SFTTrainer, SFTConfig, DataCollatorForCompletionOnlyLM
+
+# 添加项目根目录到Python路径
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
 from lpm_kernel.configs.logging import TRAIN_LOG_FILE
+from datasets import load_dataset
 
 # Local imports
 from lpm_kernel.L2.utils import (
@@ -31,6 +36,7 @@ from lpm_kernel.L2.utils import (
     create_chat_data,
     release_ollama_models_early,
 )
+
 from lpm_kernel.configs.logging import LOGGING_CONFIG
 import logging.config
 from lpm_kernel.configs.logging import get_train_process_logger
@@ -178,8 +184,11 @@ class ModelArguments:
 
 @dataclass
 class DataTrainingArguments:
+    """
+    Arguments pertaining to what data we are going to input our model for training.
+    """
     dataset_name: Optional[str] = field(
-        default="timdettmers/openassistant-guanaco",
+        default="/Users/yanmuyuan/Second-Me/resources/L2/data/merged.json",
         metadata={"help": "The preference dataset to use."},
     )
     append_concat_token: Optional[bool] = field(
@@ -202,6 +211,7 @@ class DataTrainingArguments:
         default=False,
         metadata={"help": "If True, the dataset is sequential."},
     )
+
     is_cot: Optional[bool] = field(
         default=False,
         metadata={"help": "If True, the dataset is COT dataset."},
@@ -210,6 +220,49 @@ class DataTrainingArguments:
         default="User",
         metadata={"help": "The name of the user."},
     )
+
+class MindSFTTrainer(SFTTrainer):
+    def get_train_dataloader(self) -> DataLoader:
+        """
+                Returns the training [`~torch.utils.data.DataLoader`].
+
+                Will use no sampler if `train_dataset` does not implement `__len__`, a random sampler (adapted to distributed
+                training if necessary) otherwise.
+
+                Subclass and override this method if you want to inject some custom behavior.
+                """
+        if self.train_dataset is None:
+            raise ValueError("Trainer: training requires a train_dataset.")
+
+        train_dataset = self.train_dataset
+        data_collator = self.data_collator
+        if isinstance(train_dataset, datasets.Dataset):
+            train_dataset = self._remove_unused_columns(train_dataset, description="training")
+        else:
+            data_collator = self._get_collator_with_removed_columns(data_collator, description="training")
+
+        dataloader_params = {
+            "batch_size": self._train_batch_size,
+            "collate_fn": data_collator,
+            "num_workers": self.args.dataloader_num_workers,
+            "pin_memory": self.args.dataloader_pin_memory,
+            "persistent_workers": self.args.dataloader_persistent_workers,
+        }
+
+        if not isinstance(train_dataset, torch.utils.data.IterableDataset):
+            dataloader_params["sampler"] = SequentialSampler(self.train_dataset)
+            dataloader_params["drop_last"] = self.args.dataloader_drop_last
+            dataloader_params["worker_init_fn"] = seed_worker
+            dataloader_params["prefetch_factor"] = self.args.dataloader_prefetch_factor
+
+        return self.accelerator.prepare(DataLoader(train_dataset, **dataloader_params))
+
+def seed_worker(_):
+    """
+    Helper function to set worker seed during Dataloader initialization.
+    """
+    worker_seed = torch.initial_seed() % 2**32
+    set_seed(worker_seed)
 
 
 def main(model_args, data_args, training_args):
@@ -239,31 +292,32 @@ def main(model_args, data_args, training_args):
     logger.info("Applying memory optimizations to training configuration")
     training_args = memory_manager.optimize_training_args(training_args)
 
+    # 禁用MPS内存上限
+    os.environ["PYTORCH_MPS_HIGH_WATERMARK_RATIO"] = "0.0"
+    logger.info("Setting PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0 to disable memory upper limit")
+
     # --- Accelerate optimizer state offloading logic ---
-    # Enable optimizer state offload to CPU if VRAM is low and not using DeepSpeed
+    # Enable optimizer state offload to CPU if VRAM is low
     vram_total = memory_manager.get_memory_info().get("vram_total_gb", 0)
     use_accelerate_offload = False
     if torch.cuda.is_available() and model_args.use_cuda and vram_total > 0 and vram_total < 16:
-        # Only set if not already using DeepSpeed
-        if not hasattr(training_args, "deepspeed") or training_args.deepspeed is None:
-            logger.info("Enabling Hugging Face Accelerate optimizer state offload to CPU for low VRAM GPUs")
-            accelerate_config = {
-                "compute_environment": "LOCAL_MACHINE",
-                "deepspeed_config": None,
-                "distributed_type": "NO",
-                "downcast_bf16": False,
-                "fsdp_config": {},
-                "main_training_function": "main",
-                "mixed_precision": "no",
-                "num_machines": 1,
-                "num_processes": 1,
-                "use_cpu": False,
-                "zero3_init_flag": False,
-                "offload_optimizer_device": "cpu",
-                "offload_param_device": "none"
-            }
-            training_args.accelerate_config = accelerate_config
-            use_accelerate_offload = True
+        logger.info("Enabling Hugging Face Accelerate optimizer state offload to CPU for low VRAM GPUs")
+        accelerate_config = {
+            "compute_environment": "LOCAL_MACHINE",
+            "distributed_type": "NO",
+            "downcast_bf16": False,
+            "fsdp_config": {},
+            "main_training_function": "main",
+            "mixed_precision": "no",
+            "num_machines": 1,
+            "num_processes": 1,
+            "use_cpu": False,
+            "zero3_init_flag": False,
+            "offload_optimizer_device": "cpu",
+            "offload_param_device": "none"
+        }
+        training_args.accelerate_config = accelerate_config
+        use_accelerate_offload = True
 
     # Model loading with device_map="auto" for automatic offloading
     logger.info(f"Loading model with automatic memory management from {model_args.model_name_or_path}")
@@ -304,11 +358,40 @@ def main(model_args, data_args, training_args):
     if model_args.use_flash_attn and torch.cuda.is_available() and model_args.use_cuda:
         model_kwargs["attn_implementation"] = "flash_attention_2"
         logger.info("Using Flash Attention 2 for memory efficiency")
+
+    # Set default device map if not already set by quantization
+    if "device_map" not in model_kwargs or model_kwargs["device_map"] is None:
+        model_kwargs["device_map"] = {"": int(os.getenv("LOCAL_RANK", 0))}
     
-    # Load model with built-in memory management features
-    model, peft_config, tokenizer = create_and_prepare_model(
-        model_args, data_args, training_args, model_kwargs=model_kwargs
+    # Set default torch dtype if using CUDA
+    if torch.cuda.is_available() and model_args.use_cuda:
+        model_kwargs["torch_dtype"] = torch.bfloat16
+    
+    # Add gradient checkpointing related settings
+    model_kwargs["use_cache"] = not training_args.gradient_checkpointing
+    
+    logger.info(f"Loading model with settings: {model_kwargs}")
+    
+    model = AutoModelForCausalLM.from_pretrained(
+        model_args.model_name_or_path,
+        **model_kwargs
     )
+
+    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, padding_side="right")
+
+    if model_args.use_peft_lora:
+        peft_config = LoraConfig(
+            lora_alpha=model_args.lora_alpha,
+            lora_dropout=model_args.lora_dropout,
+            r=model_args.lora_r,
+            bias="none",
+            task_type="CAUSAL_LM",
+            target_modules=model_args.lora_target_modules.split(",")
+            if model_args.lora_target_modules != "all-linear"
+            else model_args.lora_target_modules,
+        )
+    else:
+        peft_config = None
     
     # If model has meta tensors, handle them properly
     if hasattr(model, "is_meta") and model.is_meta:
@@ -328,11 +411,9 @@ def main(model_args, data_args, training_args):
         logger.info("Setting memory fraction limit to avoid OOM errors")
 
     # datasets
-    train_dataset = create_chat_data(
-        data_args,
-        tokenizer,
-    )
-    
+    dataset = load_dataset("json", data_files=data_args.dataset_name, split="train")
+    train_dataset = dataset.map(create_chat_data, batched=True, remove_columns=dataset.column_names)
+
     response_template = "\n<|im_start|>assistant\n"
     
     collator = DataCollatorForCompletionOnlyLM(response_template, tokenizer=tokenizer)
@@ -342,52 +423,13 @@ def main(model_args, data_args, training_args):
         "add_special_tokens": data_args.add_special_tokens,
     }
 
-    # Use DeepSpeed to handle meta tensors if available
-    try:
-        # Only configure DeepSpeed if meta tensors are present and DeepSpeed is available
-        if hasattr(model, "is_meta") and model.is_meta:
-            logger.info("Model has meta tensors, checking DeepSpeed availability")
-            # First verify DeepSpeed is properly installed and importable
-            try:
-                import deepspeed
-                logger.info("DeepSpeed is available, configuring for meta tensor handling")
-                
-                # Configure with appropriate settings for meta tensors
-                training_args.deepspeed = {
-                    "zero_stage": 3,
-                    "offload_optimizer": {
-                        "device": "cpu"
-                    },
-                    "offload_param": {
-                        "device": "cpu"
-                    },
-                    "zero3_init_flag": True,
-                    "zero_force_ds_cpu_optimizer": False
-                }
-                logger.info("DeepSpeed configured for meta tensor handling")
-            except ImportError:
-                logger.warning("DeepSpeed is not available, meta tensors will be handled differently")
-                # If DeepSpeed isn't available, use alternative approach to handle meta tensors
-                if torch.cuda.is_available() and model_args.use_cuda:
-                    logger.info("Initializing meta tensors on GPU")
-                    # Use device_map instead of DeepSpeed for meta tensor initialization
-                    from accelerate import init_empty_weights
-                    with init_empty_weights():
-                        model.to_empty(device="cuda")
-                else:
-                    logger.info("Initializing meta tensors on CPU")
-                    model.to_empty(device="cpu")
-    except Exception as e:
-        logger.warning(f"Could not configure meta tensor handling: {e}")
-        logger.warning(traceback.format_exc())
 
-    trainer = SFTTrainer(
+    trainer = MindSFTTrainer(
         model=model,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         args=training_args,
         train_dataset=train_dataset,
         peft_config=peft_config,
-        formatting_func=formatting_prompts_func,
         data_collator=collator,
     )
     
