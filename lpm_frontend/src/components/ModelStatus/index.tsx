@@ -2,6 +2,7 @@ import { Status, statusRankMap, useTrainingStore } from '@/store/useTrainingStor
 import { startService, stopService } from '@/service/train';
 import { StatusBar } from '../StatusBar';
 import { useRef, useEffect, useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { message, Select, Tooltip, Spin, Modal, Tabs, List, Typography, Empty } from 'antd';
 import {
   CloudUploadOutlined,
@@ -461,6 +462,7 @@ const StatusDot = ({ active }: { active: boolean }) => (
 // Helper component for option tooltips
 
 export function ModelStatus() {
+  const router = useRouter();
   const status = useTrainingStore((state) => state.status);
   const setStatus = useTrainingStore((state) => state.setStatus);
   const serviceStarted = useTrainingStore((state) => state.serviceStarted);
@@ -625,6 +627,10 @@ export function ModelStatus() {
             if (!isRunning) {
               setServiceStopping(false);
               clearPolling();
+              // Navigate to train page after service is stopped
+              setTimeout(() => {
+                router.push('/dashboard/train/training');
+              }, 500);
             }
           }
         })
@@ -649,6 +655,10 @@ export function ModelStatus() {
               if (res.data.code === 0) {
                 messageApi.success({ content: 'Cloud service stopped successfully!', duration: 2 });
                 fetchServiceStatus();
+                // Navigate to train page after stopping service
+                setTimeout(() => {
+                  router.push('/dashboard/train/training');
+                }, 1000);
               } else {
                 messageApi.error({ content: res.data.message || 'Failed to stop cloud service', duration: 2 });
               }

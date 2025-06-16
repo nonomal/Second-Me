@@ -148,11 +148,11 @@ export const useTrainingStore = create<ModelState>((set, get) => ({
           clearActiveCloudModel();
         });
       }
-      
+
       // Check cloud service status (uses status field with 'active'/'stopped')
       if (cloudRes.data.code === 0 && cloudRes.data.data.status === 'active') {
         serviceStarted = true;
-        
+
         // Set active cloud model when cloud service is active
         const modelData = cloudRes.data.data.model_data;
 
@@ -172,9 +172,9 @@ export const useTrainingStore = create<ModelState>((set, get) => ({
           clearActiveCloudModel();
         });
       }
-      
+
       set({ serviceStarted });
-      
+
       // Return the local service response for backward compatibility
       return localRes;
     });
@@ -192,16 +192,12 @@ export const useTrainingStore = create<ModelState>((set, get) => ({
     set({ error: false });
 
     try {
-      const modelName =
-        config.model_name ||
-        config.local_model_name ||
-        config.cloud_model_name ||
-        'Qwen3-0.6B';
-      
+      const modelName = config.local.model_name || 'Qwen3-0.6B';
+
       const res = await getTrainProgress({
         model_name: modelName,
-        local_model_name: config.local_model_name || modelName,
-        cloud_model_name: config.cloud_model_name || ''
+        local_model_name: config.local.model_name || modelName,
+        cloud_model_name: config.cloud.model_name || ''
       });
 
       if (res.data.code === 0) {

@@ -72,7 +72,6 @@ def get_service_status():
     status_file_path = get_service_status_file_path()
     if not os.path.exists(status_file_path):
         return None
-    
     try:
         with open(status_file_path, 'r', encoding='utf-8') as f:
             return json.load(f)

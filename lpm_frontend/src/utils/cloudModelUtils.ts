@@ -2,6 +2,9 @@
  * Utilities for managing cloud model state
  */
 
+import { getServiceStatus } from '../service/train';
+import { getCloudServiceStatus } from '../service/cloudService';
+
 export interface ActiveCloudModel {
   name: string;
   deployed_model: string;
@@ -118,14 +121,10 @@ export const getCurrentModelDisplayName = (): string => {
  */
 export const getCurrentModelDisplayNameAsync = async (): Promise<string> => {
   try {
-    // Import the service functions dynamically to avoid circular dependencies
-    const trainModule = await import('../service/train');
-    const cloudModule = await import('../service/cloudService');
-
     // Check both local and cloud service status
     const [localRes, cloudRes] = await Promise.allSettled([
-      trainModule.getServiceStatus(),
-      cloudModule.getCloudServiceStatus()
+      getServiceStatus(),
+      getCloudServiceStatus()
     ]);
 
     // Check cloud service first
