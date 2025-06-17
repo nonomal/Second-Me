@@ -44,8 +44,8 @@ export const getCloudTrainingProgress = (): AxiosPromise<
 };
 
 // Stop cloud training
-export const stopCloudTraining = (): AxiosPromise<CommonResponse<unknown>> => {
-  return Request<CommonResponse<unknown>>({
+export const stopCloudTraining = (): AxiosPromise<CommonResponse<{status: 'success' | 'pending' | 'failed'}>> => {
+  return Request<CommonResponse<{status: 'success' | 'pending' | 'failed'}>>({
     method: 'post',
     url: '/api/cloud_service/train/stop'
   });
@@ -78,6 +78,7 @@ export const startCloudTraining = (params: {
   base_model: string;
   training_type?: string;
   data_synthesis_mode?: string;
+  language?: string;
   hyper_parameters?: Record<string, unknown>;
 }): AxiosPromise<CommonResponse<unknown>> => {
   return Request<CommonResponse<unknown>>({

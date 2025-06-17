@@ -199,14 +199,15 @@ def stop_cloud_training():
         
         if not train_service:
             return jsonify(APIResponse.error("No training parameters found. Please use /train/start endpoint for initial training."))
+
+        result = train_service.stop_process()
         
-        # Stop training process
-        success = train_service.stop_process()
-        
-        if success:
-            return jsonify(APIResponse.success(message=f"Cloud training process  stopped successfully"))
-        else:
-            return jsonify(APIResponse.error(f"Failed to stop cloud training process"))
+        if result == 'success':
+            return jsonify(APIResponse.success(message=f"Cloud training process stopped successfully", data={"status": "success"}))
+        elif result == 'pending':
+            return jsonify(APIResponse.success(message=f"Cloud training process is in the process of stopping", data={"status": "pending"}))
+        else:  # 'failed'
+            return jsonify(APIResponse.error(message=f"Failed to stop cloud training process", data={"status": "failed"}))
     
     except Exception as e:
         logger.error(f"Failed to stop cloud training process: {str(e)}", exc_info=True)
@@ -235,6 +236,7 @@ def start_cloud_training():
         training_type = data.get("training_type", "efficient_sft")
         hyper_parameters = data.get("hyper_parameters", {})
         data_synthesis_mode = data.get("data_synthesis_mode", "low")
+        language = data.get("language", "en")
 
         os.environ["DATA_SYNTHESIS_MODE"] = data_synthesis_mode
         
@@ -244,6 +246,7 @@ def start_cloud_training():
             "training_type": training_type,
             "hyper_parameters": hyper_parameters,
             "data_synthesis_mode": data_synthesis_mode,
+            "language": language,
             "created_at": datetime.now().isoformat()
         }
         
@@ -877,4 +880,3 @@ def get_cloud_service_status():
         error_msg = f"Failed to get cloud service status: {str(e)}"
         logger.error(error_msg)
         return jsonify(APIResponse.error(message=error_msg, code=500))
-

@@ -129,6 +129,7 @@ class CloudTrainProcessService(TrainProcessService):
                 else:
                     if not super().list_documents():
                         logger.error("Failed to list documents")
+                        self.progress.mark_step_status(ProcessStep.LIST_DOCUMENTS, CloudStatus.FAILED)
                         return PrepareDataResult.ERROR
             
                 if stage:
@@ -152,6 +153,7 @@ class CloudTrainProcessService(TrainProcessService):
                 else:
                     if not super().generate_document_embeddings():
                         logger.error("Failed to generate document embeddings")
+                        self.progress.mark_step_status(ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS, CloudStatus.FAILED)
                         return PrepareDataResult.ERROR
             
                 # Update progress after completing second step
@@ -172,6 +174,7 @@ class CloudTrainProcessService(TrainProcessService):
                 logger.info("Step 1.3: Processing document chunks...")
                 if not super().process_chunks():
                     logger.error("Failed to process document chunks")
+                    self.progress.mark_step_status(ProcessStep.CHUNK_DOCUMENT, CloudStatus.FAILED)
                     return PrepareDataResult.ERROR
             
                 # Update progress after completing third step
@@ -192,6 +195,7 @@ class CloudTrainProcessService(TrainProcessService):
                 logger.info("Step 1.4: Generating chunk embeddings...")
                 if not super().chunk_embedding():
                     logger.error("Failed to generate chunk embeddings")
+                    self.progress.mark_step_status(ProcessStep.CHUNK_EMBEDDING, CloudStatus.FAILED)
                     return PrepareDataResult.ERROR
             
                 # Update progress to 100% after completing first stage
@@ -209,7 +213,6 @@ class CloudTrainProcessService(TrainProcessService):
                     logger.info("Process has been stopped after completing chunk_embedding, exiting.")
                     return PrepareDataResult.STOPPED
             
-
             logger.info("Executing life narrative synthesis steps...")
             stage_name = "synthesize_your_life_narrative"
             stage = self.progress.progress.stage_map.get(stage_name)
@@ -226,6 +229,7 @@ class CloudTrainProcessService(TrainProcessService):
                 else:
                     if not super().extract_dimensional_topics():
                         logger.error("Failed to extract dimensional topics")
+                        self.progress.mark_step_status(ProcessStep.EXTRACT_DIMENSIONAL_TOPICS, CloudStatus.FAILED)
                         return PrepareDataResult.ERROR
             
  
@@ -250,6 +254,7 @@ class CloudTrainProcessService(TrainProcessService):
                 else:
                     if not super().generate_biography():
                         logger.error("Failed to generate biography")
+                        self.progress.mark_step_status(ProcessStep.GENERATE_BIOGRAPHY, CloudStatus.FAILED)
                         return PrepareDataResult.ERROR
             
                 if stage:
@@ -270,6 +275,7 @@ class CloudTrainProcessService(TrainProcessService):
                 else:
                     if not super().map_your_entity_network():
                         logger.error("Failed to map entity network")
+                        self.progress.mark_step_status(ProcessStep.MAP_ENTITY_NETWORK, CloudStatus.FAILED)
                         return PrepareDataResult.ERROR
             
                 if stage:
@@ -298,6 +304,7 @@ class CloudTrainProcessService(TrainProcessService):
                 else:
                     if not super().decode_preference_patterns():
                         logger.error("Failed to decode preference patterns")
+                        self.progress.mark_step_status(ProcessStep.DECODE_PREFERENCE_PATTERNS, CloudStatus.FAILED)
                         return PrepareDataResult.ERROR
             
                 if stage:
@@ -320,6 +327,7 @@ class CloudTrainProcessService(TrainProcessService):
                 else:
                     if not super().reinforce_identity():
                         logger.error("Failed to reinforce identity")
+                        self.progress.mark_step_status(ProcessStep.REINFORCE_IDENTITY, CloudStatus.FAILED)
                         return PrepareDataResult.ERROR
             
                 if stage:
@@ -340,6 +348,7 @@ class CloudTrainProcessService(TrainProcessService):
                 else:
                     if not super().augment_content_retention():
                         logger.error("Failed to augment content retention")
+                        self.progress.mark_step_status(ProcessStep.AUGMENT_CONTENT_RETENTION, CloudStatus.FAILED)
                         return PrepareDataResult.ERROR
             
                 if stage:
@@ -370,8 +379,7 @@ class CloudTrainProcessService(TrainProcessService):
                 for step in self.progress.get_progress().get("stages", []):
                     if step["name"].lower().replace(" ", "_") == current_stage and step["current_step"]:
                         stage_name = current_stage
-                        step_name = step["current_step"].lower().replace(" ", "_")
-                        self.progress.mark_step_status(stage_name, step_name, CloudStatus.FAILED)
+                        self.progress.mark_step_status(stage_name, CloudStatus.FAILED)
                         break
             return PrepareDataResult.ERROR
     
@@ -505,15 +513,14 @@ class CloudTrainProcessService(TrainProcessService):
             self._wait_completion_pid = self._wait_completion_process.pid
             logger.info(f"Job monitoring process started with PID: {self._wait_completion_pid}")
             
-            self.progress.mark_step_status(CloudProcessStep.WAIT_FOR_FINE_TUNE_COMPLETION, CloudStatus.IN_PROGRESS, 
-                                          "Fine-tune job is running in the background")
+            self.progress.mark_step_status(CloudProcessStep.WAIT_FOR_FINE_TUNE_COMPLETION, CloudStatus.IN_PROGRESS)
         
             logger.info("Cloud training process completed successfully")
             return True
         except Exception as e:
             logger.error(f"Cloud training process failed: {str(e)}", exc_info=True)
             if self.current_step:
-                self.progress.mark_step_status(self.current_step, CloudStatus.FAILED, f"Error: {str(e)}")
+                self.progress.mark_step_status(self.current_step, CloudStatus.FAILED)
             return False
 
     def _wait_for_completion_process(self, cloud_service, job_id):
@@ -549,8 +556,7 @@ class CloudTrainProcessService(TrainProcessService):
                     if status in ["COMPLETED", "FAILED", "CANCELED"]:
                         self.progress.mark_step_status(
                             CloudProcessStep.WAIT_FOR_FINE_TUNE_COMPLETION,
-                            cloud_status,
-                            message
+                            cloud_status
                         )
                 except Exception as e:
                     logger.error(f"Error in progress callback: {str(e)}", exc_info=True)
@@ -568,8 +574,9 @@ class CloudTrainProcessService(TrainProcessService):
                 logger.error(f"Fine-tuning job failed")
         except Exception as e:
             logger.error(f"Error in async wait thread: {str(e)}", exc_info=True)
-            self.progress.mark_step_status("cloud_training", "wait_for_fine-tune_completion", CloudStatus.FAILED)
-    
+            self.progress.mark_step_status(CloudProcessStep.WAIT_FOR_FINE_TUNE_COMPLETION, CloudStatus.FAILED)
+
+
     def update_memory_training_status(self):
         """Update is_trained flag for memory records after successful cloud training"""
         try:
@@ -614,7 +621,7 @@ class CloudTrainProcessService(TrainProcessService):
         except Exception as e:
             logger.error(f"Error updating overall progress: {str(e)}")
     
-    def stop_process(self) -> bool:
+    def stop_process(self) -> str:
         """Stop the cloud training process
         
         This method will attempt to stop the fine-tuning job if it's in progress,
@@ -622,78 +629,69 @@ class CloudTrainProcessService(TrainProcessService):
         It will also wait for the current data processing step to complete before returning.
         
         Returns:
-            bool: True if the process was successfully stopped, False otherwise
+            str: A message indicating the status of the stop operation
         """
         try:
             logger.info(f"Attempting to stop cloud training process for model: {self.model_name}")
             
             self.is_stopped = True
             
-            max_wait_time = 300 
-            wait_start = time.time()
-            
             current_stage = self.progress.get_progress().get("current_stage")
             logger.info(f"Current stage when stopping: {current_stage}")
             current_step = None
+            
+            # Check if we're in the data synthesis stage
+            is_data_synthesis_stage = False
             
             if current_stage:
                 for stage in self.progress.get_progress().get("stages", []):
                     if stage["name"] == current_stage:
                         current_step_name = stage.get("current_step")
                         if current_step_name:
-                            found = False
-                            for step in CloudProcessStep:
+                            for step in ProcessStep:
                                 if step.value == current_step_name:
                                     current_step = step
-                                    found = True
-                                    logger.info(f"Found step in CloudProcessStep: {current_step}")
+                                    logger.info(f"Found step in ProcessStep: {current_step}")
+                                    is_data_synthesis_stage = True
                                     break
-                            
-                            if not found:
-                                for step in ProcessStep:
-                                    if step.value == current_step_name:
-                                        current_step = step
-                                        logger.info(f"Found step in ProcessStep: {current_step}")
-                                        break
+
                         break
             
             logger.info(f"Current step when stopping: {current_step}")
-            
-            while time.time() - wait_start < max_wait_time:
-                if current_step:
-                    step_status = None
-                    current_stage_data = None
-                    
-                    for stage in self.progress.progress.data["stages"]:
-                        if stage["name"] == current_stage:
-                            current_stage_data = stage
-                            logger.info(f"Found current stage data: {stage['name']}")
-                            break
-                    
-                    if current_stage_data:
-                        step_name = current_step.value if hasattr(current_step, 'value') else str(current_step)
-                        logger.info(f"Looking for step with name: {step_name}")
-                        for step in current_stage_data["steps"]:
-                            if step["name"] == step_name:
-                                step_status = step["status"]
-                                logger.info(f"Found step status: {step_status}")
-                                break
-                    
-                    logger.info(f"Current step status: {step_status}")
-                    if step_status in [CloudStatus.COMPLETED, CloudStatus.FAILED, CloudStatus.CANCELED]:
-                        logger.info(f"Step {current_step.value} has status {step_status}, continuing with stop process")
+            logger.info(f"Is data synthesis stage: {is_data_synthesis_stage}")
+
+            # If we're in the data synthesis stage, check the step status
+            if is_data_synthesis_stage and current_step:
+                step_status = None
+                current_stage_data = None
+
+                for stage in self.progress.progress.data["stages"]:
+                    if stage["name"] == current_stage:
+                        current_stage_data = stage
+                        logger.info(f"Found current stage data: {stage['name']}")
                         break
-                
-                time.sleep(2)
-            
-            if time.time() - wait_start >= max_wait_time:
-                logger.warning(f"Waited {max_wait_time} seconds for current step to complete, proceeding with stop process")
-            
+
+                if current_stage_data:
+                    step_name = current_step.value if hasattr(current_step, 'value') else str(current_step)
+                    logger.info(f"Looking for step with name: {step_name}")
+                    for step in current_stage_data["steps"]:
+                        if step["name"] == step_name:
+                            step_status = step["status"]
+                            logger.info(f"Found step status: {step_status}")
+                            break
+
+                    logger.info(f"Current step status: {step_status}")
+                    if step_status in [CloudStatus.COMPLETED, CloudStatus.FAILED]:
+                        logger.info(f"Step {current_step.value} has status {step_status}, continuing with stop process")
+                    else:
+                        logger.info(f"Step {current_step.value} is still running, returning pending status")
+                        return "pending"
+
             if not self.job_id:
                 try:
                     params_dir = Path("data/cloud_progress")
                     job_file_path = params_dir / "job_id.json"
-                    
+
                     if job_file_path.exists():
                         with open(job_file_path, "r") as f:
                             job_info = json.load(f)
@@ -702,8 +700,18 @@ class CloudTrainProcessService(TrainProcessService):
                                 logger.info(f"Retrieved job_id from file: {self.job_id}")
                 except Exception as e:
                     logger.error(f"Failed to read job ID from file: {str(e)}", exc_info=True)
-            
-            # Terminate the wait completion process if it's running
+
+            if self.job_id:
+                logger.info(f"Attempting to cancel fine-tune job: {self.job_id}")
+                success = self.cloud_service.cancel_fine_tune_job(self.job_id)
+
+                if success:
+                    logger.info(f"Successfully canceled fine-tune job: {self.job_id}")
+                else:
+                    logger.error(f"Failed to cancel fine-tune job: {self.job_id}")
+            else:
+                logger.warning("No active fine-tune job found to delete")
+
             if self._wait_completion_process and self._wait_completion_process.is_alive():
                 logger.info(f"Terminating wait completion process (PID: {self._wait_completion_pid})")
                 try:
@@ -715,43 +723,23 @@ class CloudTrainProcessService(TrainProcessService):
                     logger.info(f"Wait completion process terminated successfully")
                 except Exception as e:
                     logger.error(f"Error terminating wait completion process: {str(e)}", exc_info=True)
-            
-            if self.job_id:
-                logger.info(f"Attempting to cancel fine-tune job: {self.job_id}")
-                success = self.cloud_service.cancel_fine_tune_job(self.job_id)
-                
-                if success:
-                    logger.info(f"Successfully canceled fine-tune job: {self.job_id}")
-                else:
-                    logger.error(f"Failed to cancel fine-tune job: {self.job_id}")
-            else:
-                logger.warning("No active fine-tune job found to delete")
 
-            if current_step:
-                step_status = None
-                current_stage_data = None
+            # If not in data synthesis stage, set the cloud process steps to pending
+            if not is_data_synthesis_stage:
+                logger.info("Not in data synthesis stage, setting cloud process steps to pending status")
                 
-                for stage in self.progress.progress.data["stages"]:
-                    if stage["name"] == current_stage:
-                        current_stage_data = stage
-                        break
+                # Set the three specific cloud process steps to pending status
+                self.progress.mark_step_status(CloudProcessStep.UPLOAD_TRAINING_DATA, CloudStatus.PENDING)
+                self.progress.mark_step_status(CloudProcessStep.CREATE_FINE_TUNE_JOB, CloudStatus.PENDING)
+                self.progress.mark_step_status(CloudProcessStep.WAIT_FOR_FINE_TUNE_COMPLETION, CloudStatus.PENDING)
                 
-                if current_stage_data:
-                    step_name = current_step.value if hasattr(current_step, 'value') else str(current_step)
-                    for step in current_stage_data["steps"]:
-                        if step["name"] == step_name:
-                            step_status = step["status"]
-                            break
-                
-                if step_status != CloudStatus.COMPLETED:
-                    logger.info(f"Marking step {current_step} as CANCELED because its status is {step_status}")
-                    self.progress.mark_step_status(current_step, CloudStatus.CANCELED, "Process canceled by user")
-                else:
-                    logger.info(f"Step {current_step} is already COMPLETED, preserving its status")
+                # Save the progress
+                self.progress.save_progress()
+                logger.info("Cloud process steps have been set to pending status")
             
             logger.info("Cloud training process has been stopped successfully")
-            return True
+            return 'success'
                 
         except Exception as e:
             logger.error(f"Error stopping cloud process: {str(e)}", exc_info=True)
-            return False
+            return 'failed'
