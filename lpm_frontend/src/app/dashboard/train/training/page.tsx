@@ -480,6 +480,7 @@ export default function TrainingPage(): JSX.Element {
 
           localStorage.setItem('localTrainingParams', JSON.stringify(data.local));
           localStorage.setItem('cloudTrainingParams', JSON.stringify(data.cloud));
+          localStorage.setItem('trainingParams', JSON.stringify(data));
         } else {
           throw new Error(res.data.message);
         }
