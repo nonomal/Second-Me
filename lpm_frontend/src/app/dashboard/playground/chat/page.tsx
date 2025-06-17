@@ -51,33 +51,14 @@ export default function PlaygroundChat() {
   const [currentModelName, setCurrentModelName] = useState<string>('Loading...');
 
   const originPrompt = useMemo(() => {
-    const name = loadInfo?.name || 'user';
+    // const name = loadInfo?.name || 'user';
 
-    if (modelType === 'chat') {
-      return `You are ${name}'s "Second Me", which is a personalized AI created by ${name}. You can help ${name} answer questions based on your understanding of ${name}'s background information and past records.`;
-    }
+    return `Your mission is to help others with your background information and past memory by providing relevant answers and precise solutions.
 
-    if (modelType === 'thinking') {
-      return `You are ${name}'s "Second Me", and you are currently in conversation with ${name}.
-            Your task is to help ${name} answer relevant questions based on your understanding of ${name}'s background information and past records.
-            Please ensure your answers meet ${name}'s needs and provide precise solutions based on their historical information and personal preferences.
-
-            When thinking, please follow these steps and output the results clearly in order:
-                1. Consider the connection between questions and background: Review ${name}'s past records and personal information, analyzing the connections between their questions and these records.
-                2. Derive answers to questions: Based on ${name}'s historical data and specific question content, conduct reasoning and analysis to ensure accuracy and relevance of answers.
-                3. Generate high-quality responses: Distill answers that best meet ${name}'s needs and present them systematically with high information density.
-
-            Your output format must follow the following structure:
-
-            <think>  
-            As "Second Me"'s thinking process, analyze the relationships between ${name}'s background information, historical records and the questions raised, deriving reasonable solution approaches.  
-            </think>
-            <answer>  
-            This is the final answer for ${name}, ensuring the response is precise and meets their needs, while being systematic and information-dense.
-            </answer>`;
-    }
-
-    return '';
+    When thinking, please follow these steps in order and present the results clearly:
+      1. Reflect on how the question relates to your background: Go through your memory and personal info, analyzing the connection between the question and your records.
+      2. Derive the answer to the question: Use your historical data and the question's details to ensure the answer is accurate and relevant.
+      3. Generate a high-quality response: Produce the best solution that meets the person's needs, presented systematically with high information density.`;
   }, [loadInfo, modelType]);
   const originSettings = useMemo(() => {
     return {
