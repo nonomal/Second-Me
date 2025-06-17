@@ -343,7 +343,6 @@ class CloudProgressHolder:
             holder = CloudProgressHolder(model_name=model_name, job_id=job_id)
             holder.progress.data = data
             holder._rebuild_mappings()
-            holder._reset_in_progress_status()
             
             return holder, job_id
         except Exception as e:
@@ -385,39 +384,10 @@ class CloudProgressHolder:
                 
                 self._rebuild_mappings()
                 
-                self._reset_in_progress_status()
-                
                 logger.debug(f"Loaded progress data from {self.progress_file}")
         except Exception as e:
             logger.error(f"Error loading progress: {str(e)}")
-    
-    def _reset_in_progress_status(self):
-        """
-        Reset any in_progress status to failed after loading from file
-        """
-        need_save = False
-        
-        if self.progress.data["status"] == CloudStatus.IN_PROGRESS:
-            self.progress.data["status"] = CloudStatus.FAILED
-            need_save = True
-            logger.info("Reset overall in_progress status to failed")
-        
-        for stage in self.progress.data["stages"]:
-            if stage["status"] == CloudStatus.IN_PROGRESS:
-                stage["status"] = CloudStatus.FAILED
-                need_save = True
-                logger.info(f"Reset stage '{stage['name']}' in_progress status to failed")
-            
-            for step in stage["steps"]:
-                if step["status"] == CloudStatus.IN_PROGRESS:
-                    step["status"] = CloudStatus.FAILED
-                    step["completed"] = False
-                    need_save = True
-                    logger.info(f"Reset step '{step['name']}' in_progress status to failed")
-        
-        if need_save:
-            self.save_progress()
-            logger.info("Saved progress after resetting in_progress statuses")
+
     
     def save_progress(self):
         """
@@ -437,39 +407,38 @@ class CloudProgressHolder:
         except Exception as e:
             logger.error(f"Error saving progress: {str(e)}")
     
-    def mark_step_status(self, step, status: str, step_name: str = None):
+    def mark_step_status(self, step, status: str):
         """
         Mark step status
         
         Args:
             step: Process step (CloudProcessStep/ProcessStep enum or stage name string)
             status: Status (string value)
-            step_name: Optional step name (only used when step is a string)
         """
         try:
             
             if hasattr(step, 'value') and isinstance(step.value, str):
                 stage_name = self.progress._stage_mapping[step]
                 step_name = step.value
-            else:
-                stage_name = step
-                if step_name is None:
-                    step_name = stage_name
+
             
-            if hasattr(status, 'value') and isinstance(status.value, str):
-                status_str = status.value
+                if hasattr(status, 'value') and isinstance(status.value, str):
+                    status_str = status.value
+                else:
+                    status_str = str(status)
+
+                self.progress.update_progress(stage_name, step_name, status_str)
+
+                self.save_progress()
+
+                logger.debug(f"Marked step status: step={step}, stage_name={stage_name}, step_name={step_name}, status={status_str}")
             else:
-                status_str = str(status)
-                
-            self.progress.update_progress(stage_name, step_name, status_str)
-            
-            self.save_progress()
+                logger.warning(f"Invalid step value: {step}")
+
         except Exception as e:
             logger.error(f"Error marking step status: {str(e)}")
-            logger.debug(f"Error details: step={step}, stage_name={stage_name if 'stage_name' in locals() else 'unknown'}, step_name={step_name if 'step_name' in locals() else 'unknown'}")
 
-
-    def update_step_progress(self, step, progress: float, message: str = None, step_name: str = None):
+    def update_step_progress(self, step, progress: float, message: str = None):
         """
         Update step progress
         
@@ -477,14 +446,12 @@ class CloudProgressHolder:
             step: Process step (CloudProcessStep/ProcessStep enum or stage name string)
             progress: Progress value (0-100)
             message: Optional message
-            step_name: Optional step name (only used when step is a string)
         """
         try:
             extra_info = {}
             if message:
                 extra_info["message"] = message
-            
-            status = None
+
             if progress >= 100:
                 status = CloudStatus.COMPLETED
             elif progress > 0:
@@ -498,18 +465,14 @@ class CloudProgressHolder:
                 if hasattr(self.progress, '_stage_mapping') and step in self.progress._stage_mapping:
 
                     stage_name = self.progress._stage_mapping.get(step)
-                    if not stage_name:
-                        logger.error(f"No stage mapping found for step: {step}")
-                
-                step_name = step.value.lower().replace(" ", "_")
+                    step_name = step.value
+                    self.progress.update_progress(stage_name, step_name, status, progress, extra_info)
+            
+                    self.save_progress()
+                else:
+                    logger.warning(f"Invalid step value: {step}")
             else:
-                stage_name = step
-                if step_name is None:
-                    step_name = stage_name
-            
-            self.progress.update_progress(stage_name, step_name, status, progress, extra_info)
-            
-            self.save_progress()
+                logger.warning(f"Invalid step value: {step}")
         except Exception as e:
             logger.error(f"Error updating step progress: {str(e)}")
     

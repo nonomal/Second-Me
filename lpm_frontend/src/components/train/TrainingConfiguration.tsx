@@ -33,6 +33,8 @@ interface TrainingConfigurationProps {
   trainingType: 'local' | 'cloud';
   setTrainingType: (type: 'local' | 'cloud') => void;
   cloudTrainingStatus?: 'idle' | 'training' | 'trained' | 'failed' | 'suspended';
+  isPauseRequested?: boolean;
+  pauseStatus?: 'success' | 'pending' | 'failed' | null;
 }
 
 const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
@@ -52,12 +54,19 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
   cudaAvailable,
   trainingType,
   setTrainingType,
-  cloudTrainingStatus = 'idle'
+  cloudTrainingStatus = 'idle',
+  isPauseRequested = false,
+  pauseStatus = null
 }) => {
   const activeTabKey = trainingType;
 
   const trainButtonText = useMemo(() => {
     if (isTraining) {
+      // Show specific message when pausing is pending
+      if (activeTabKey === 'cloud' && isPauseRequested && pauseStatus === 'pending') {
+        return 'Stopping...';
+      }
+
       return 'Stop Training';
     }
     
@@ -88,11 +97,20 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
     }
 
     return 'Start Local Training';
-  }, [isTraining, status, trainSuspended, activeTabKey, cloudTrainingStatus]);
+  }, [
+    isTraining,
+    status,
+    trainSuspended,
+    activeTabKey,
+    cloudTrainingStatus,
+    isPauseRequested,
+    pauseStatus
+  ]);
 
   const trainButtonIcon = useMemo(() => {
     return isTraining ? (
-      trainActionLoading ? (
+      trainActionLoading ||
+      (activeTabKey === 'cloud' && isPauseRequested && pauseStatus === 'pending') ? (
         <Spin className="h-5 w-5 mr-2" />
       ) : (
         <StopIcon className="h-5 w-5 mr-2" />
@@ -100,7 +118,7 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
     ) : (
       <PlayIcon className="h-5 w-5 mr-2" />
     );
-  }, [isTraining, trainActionLoading]);
+  }, [isTraining, trainActionLoading, activeTabKey, isPauseRequested, pauseStatus]);
 
   const handleTraining = async () => {
     if (!isTraining && !trainSuspended) {

@@ -84,6 +84,7 @@ export interface LocalTrainingParams {
   data_synthesis_mode?: string;
   use_cuda?: boolean;
   is_cot?: boolean;
+  language?: string;
 }
 
 // Cloud training configuration
@@ -99,6 +100,7 @@ export interface CloudTrainingParams {
   hyper_parameters?: CloudHyperParameters;
   data_synthesis_mode?: string;
   created_at?: string;
+  language?: string;
 }
 
 // Combined training configuration for API responses

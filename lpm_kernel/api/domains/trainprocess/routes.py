@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, Response, request
 from charset_normalizer import from_path
 from pathlib import Path
 import json
+from datetime import datetime
 
 from lpm_kernel.api.domains.trainprocess.trainprocess_service import TrainProcessService
 from lpm_kernel.api.domains.trainprocess.training_params_manager import TrainingParamsManager
@@ -68,9 +69,10 @@ def start_process():
         data_synthesis_mode = data.get("data_synthesis_mode", None)
         use_cuda = data.get("use_cuda", False)  # Default to False if not provided
         is_cot = data.get("is_cot", None)
+        language = data.get("language", "en")
         
         # Log the received parameters
-        logger.info(f"Training parameters: model_name={model_name}, learning_rate={learning_rate}, number_of_epochs={number_of_epochs}, concurrency_threads={concurrency_threads}, data_synthesis_mode={data_synthesis_mode}, is_cot={is_cot}")
+        logger.info(f"Training parameters: model_name={model_name}, learning_rate={learning_rate}, number_of_epochs={number_of_epochs}, concurrency_threads={concurrency_threads}, data_synthesis_mode={data_synthesis_mode}, is_cot={is_cot}, language={language}")
 
         # Create service instance with model name and additional parameters
         last_train_service = TrainProcessService.get_instance()
@@ -95,7 +97,8 @@ def start_process():
             "concurrency_threads": concurrency_threads,
             "data_synthesis_mode": data_synthesis_mode,
             "use_cuda": use_cuda,  # Make sure to include use_cuda parameter
-            "is_cot": is_cot
+            "is_cot": is_cot,
+            "language": language  # Add language parameter
         }
         
         params_manager = TrainingParamsManager()
@@ -119,7 +122,8 @@ def start_process():
                     "concurrency_threads": concurrency_threads,
                     "data_synthesis_mode": data_synthesis_mode,
                     "use_cuda": use_cuda,  # Include in response
-                    "is_cot": is_cot
+                    "is_cot": is_cot,
+                    "language": language  # Add language parameter
                 }
             )
         )
@@ -321,7 +325,6 @@ def get_training_params():
         # Get the latest cloud training parameters
         project_root = Path(__file__).resolve().parent.parent.parent.parent.parent
         cloud_params_file = project_root / "data/cloud_progress/cloud_training_params.json"
-        cloud_training_params = {}
         
         if cloud_params_file.exists():
             try:
@@ -329,8 +332,10 @@ def get_training_params():
                     cloud_training_params = json.load(f)
             except Exception as e:
                 logger.error(f"Failed to load cloud training parameters: {str(e)}", exc_info=True)
+                cloud_training_params = get_default_cloud_params()
         else:
-            logger.error(f"Cloud training parameters file does not exist: {cloud_params_file}")
+            logger.warning(f"Cloud training parameters file does not exist: {cloud_params_file}, using default values")
+            cloud_training_params = get_default_cloud_params()
         
         # Combine both parameters
         combined_params = {
@@ -343,6 +348,21 @@ def get_training_params():
         logger.error(f"Error getting training parameters: {str(e)}", exc_info=True)
         return jsonify(APIResponse.error(message=f"Error getting training parameters: {str(e)}"))
 
+def get_default_cloud_params():
+    """Return default cloud training parameters"""
+    current_time = datetime.now()
+    timestamp = current_time.strftime("%Y%m%d_%H%M%S")
+    return {
+        "model_name": timestamp,
+        "base_model": "qwen2.5-7b-instruct",
+        "training_type": "efficient_sft",
+        "hyper_parameters": {
+            "n_epochs": 1
+        },
+        "data_synthesis_mode": "low",
+        "language": "en",
+        "created_at": current_time.isoformat()
+    }
 
 @trainprocess_bp.route("/retrain", methods=["POST"])
 def retrain():
@@ -384,9 +404,10 @@ def retrain():
         data_synthesis_mode = data.get("data_synthesis_mode", None)
         use_cuda = data.get("use_cuda", False)
         is_cot = data.get("is_cot", None)
+        language = data.get("language", "en")  # Add language parameter, default to English
         
         # Log the received parameters
-        logger.info(f"Retrain parameters: model_name={model_name}, learning_rate={learning_rate}, number_of_epochs={number_of_epochs}, concurrency_threads={concurrency_threads}, data_synthesis_mode={data_synthesis_mode}, use_cuda={use_cuda}, is_cot={is_cot}")
+        logger.info(f"Retrain parameters: model_name={model_name}, learning_rate={learning_rate}, number_of_epochs={number_of_epochs}, concurrency_threads={concurrency_threads}, data_synthesis_mode={data_synthesis_mode}, use_cuda={use_cuda}, is_cot={is_cot}, language={language}")
         
         # Create training service instance
         train_service = TrainProcessService(current_model_name=model_name)
@@ -406,7 +427,8 @@ def retrain():
             "concurrency_threads": concurrency_threads,
             "data_synthesis_mode": data_synthesis_mode,
             "use_cuda": use_cuda,
-            "is_cot": is_cot
+            "is_cot": is_cot,
+            "language": language  # Add language parameter
         }
         
         params_manager = TrainingParamsManager()
@@ -430,7 +452,8 @@ def retrain():
                     "concurrency_threads": concurrency_threads,
                     "data_synthesis_mode": data_synthesis_mode,
                     "use_cuda": use_cuda,
-                    "is_cot": is_cot
+                    "is_cot": is_cot,
+                    "language": language  # Add language parameter
                 }
             )
         )

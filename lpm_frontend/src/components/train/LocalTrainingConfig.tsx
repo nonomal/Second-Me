@@ -80,6 +80,16 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
     }
   }, [baseModelOptions, trainingParams, updateTrainingParams]);
 
+  // Initialize language parameter if not set
+  useEffect(() => {
+    if (!trainingParams.language) {
+      updateTrainingParams({
+        ...trainingParams,
+        language: 'english'
+      });
+    }
+  }, [trainingParams, updateTrainingParams]);
+
   const disabledChangeParams = useMemo(() => {
     return isTraining || trainSuspended;
   }, [isTraining, trainSuspended]);
@@ -397,6 +407,105 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
                 {cudaAvailable
                   ? 'Enable for faster training on NVIDIA GPUs.'
                   : 'CUDA acceleration is not available on this system.'}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 mt-4">
+              <div className="flex gap-3 items-center">
+                <div className="font-medium">Training Language</div>
+                <Tooltip title="Select the language for training data synthesis and model responses. This affects how the AI processes and generates content in your chosen language.">
+                  <QuestionCircleOutlined className="cursor-pointer" />
+                </Tooltip>
+              </div>
+              <Listbox
+                disabled={disabledChangeParams}
+                onChange={(value) => {
+                  if (value !== trainingParams.language) {
+                    updateTrainingParams({
+                      ...trainingParams,
+                      language: value
+                    });
+                  }
+                }}
+                value={trainingParams.language || 'english'}
+              >
+                <div className="relative mt-1">
+                  <Listbox.Button
+                    className={classNames(
+                      'relative w-[300px] cursor-pointer rounded-lg bg-white py-2 pl-3 pr-10 text-left border border-gray-300 focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-300',
+                      disabledChangeParams && 'opacity-50 !cursor-not-allowed'
+                    )}
+                  >
+                    <span className="block truncate">
+                      {trainingParams.language === 'chinese' ? 'Chinese (中文)' : 'English'}
+                    </span>
+                    <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                      <ColumnArrowIcon className="h-5 w-5 text-gray-400" />
+                    </span>
+                  </Listbox.Button>
+                  <Transition
+                    as={Fragment}
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                  >
+                    <Listbox.Options className="absolute mt-1 max-h-60 w-[300px] overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 z-[1] focus:outline-none">
+                      <Listbox.Option
+                        className={({ active }) =>
+                          `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
+                            active ? 'bg-blue-100 text-blue-900' : 'text-gray-900'
+                          }`
+                        }
+                        value="english"
+                      >
+                        {({ selected }) => (
+                          <>
+                            <span
+                              className={`block truncate ${
+                                selected ? 'font-medium' : 'font-normal'
+                              }`}
+                            >
+                              English
+                            </span>
+                            {selected ? (
+                              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-blue-600">
+                                <DoneIcon className="h-5 w-5" />
+                              </span>
+                            ) : null}
+                          </>
+                        )}
+                      </Listbox.Option>
+                      <Listbox.Option
+                        className={({ active }) =>
+                          `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
+                            active ? 'bg-blue-100 text-blue-900' : 'text-gray-900'
+                          }`
+                        }
+                        value="chinese"
+                      >
+                        {({ selected }) => (
+                          <>
+                            <span
+                              className={`block truncate ${
+                                selected ? 'font-medium' : 'font-normal'
+                              }`}
+                            >
+                              Chinese (中文)
+                            </span>
+                            {selected ? (
+                              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-blue-600">
+                                <DoneIcon className="h-5 w-5" />
+                              </span>
+                            ) : null}
+                          </>
+                        )}
+                      </Listbox.Option>
+                    </Listbox.Options>
+                  </Transition>
+                </div>
+              </Listbox>
+              <div className="text-xs text-gray-500">
+                Choose the primary language for training data and model responses
               </div>
             </div>
           </div>
