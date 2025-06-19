@@ -372,10 +372,15 @@ def main(model_args, data_args, training_args):
     
     logger.info(f"Loading model with settings: {model_kwargs}")
     
-    model = AutoModelForCausalLM.from_pretrained(
-        model_args.model_name_or_path,
-        **model_kwargs
-    )
+    try:
+        model = AutoModelForCausalLM.from_pretrained(
+            model_args.model_name_or_path,
+            **model_kwargs
+        )
+    except Exception as load_err:
+        logger.error(f"Error while loading model: {load_err}")
+        logger.error(traceback.format_exc())
+        raise
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, padding_side="right")
 
